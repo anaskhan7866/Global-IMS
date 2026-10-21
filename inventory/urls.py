@@ -2,6 +2,11 @@ from django.urls import path
 from .views import EmployeeListView, EmployeeDetailView, VendorOrderListView, AddInventoryView
 
 urlpatterns = [
+    # Primary Inventory Route (Application Root)
+    path('', AddInventoryView.as_view(), name='inventory-home'),
+    path('inventory/', AddInventoryView.as_view(), name='inventory'),
+    path('add-inventory/', AddInventoryView.as_view(), name='add-inventory'),
+
     # Employee Productivity Views
     path('employees/', EmployeeListView.as_view(), name='employee-list'),
     path('employees/<int:pk>/', EmployeeDetailView.as_view(), name='employee-detail-default'),
@@ -10,7 +15,4 @@ urlpatterns = [
 
     # Vendor Purchase Orders View
     path('vendor-orders/', VendorOrderListView.as_view(), name='vendor-order-list'),
-
-    # Add Inventory Stock View
-    path('add-inventory/', AddInventoryView.as_view(), name='add-inventory'),
 ]

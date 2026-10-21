@@ -170,7 +170,7 @@ class DashboardHomeViewTestCase(TestCase):
         )
 
     def test_dashboard_home_view_get(self):
-        response = self.client.get('/')
+        response = self.client.get('/dashboard/')
         self.assertEqual(response.status_code, 200)
         self.assertTemplateUsed(response, 'dashboard/home.html')
 
