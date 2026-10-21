@@ -310,21 +310,33 @@
                                 <button
                                     type="button"
                                     onclick="fillQuickAdd('{{ item.name|escapejs }}', '{{ item.weight }}')"
-                                    class="inline-flex items-center space-x-1 px-3 py-1.5 rounded-lg bg-slate-900 hover:bg-cyan-950 text-slate-300 hover:text-cyan-300 border border-slate-800 hover:border-cyan-700 text-xs font-medium transition"
+                                    class="inline-flex items-center space-x-1 px-2.5 py-1.5 rounded-lg bg-slate-900 hover:bg-cyan-950 text-slate-300 hover:text-cyan-300 border border-slate-800 hover:border-cyan-700 text-xs font-medium transition"
                                     title="Add more stock for this specific core box"
                                 >
                                     <svg class="w-3.5 h-3.5 text-cyan-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>
                                     <span>Add</span>
                                 </button>
+                                {% if item.current_stock > 0 %}
                                 <button
                                     type="button"
                                     onclick="openRemoveStockModal('{{ item.id }}', '{{ item.name|escapejs }}', '{{ item.weight }}', '{{ item.current_stock|floatformat:0 }}', '{{ item.unit_of_measure }}')"
-                                    class="inline-flex items-center space-x-1 px-3 py-1.5 rounded-lg bg-slate-900 hover:bg-rose-950 text-slate-300 hover:text-rose-300 border border-slate-800 hover:border-rose-700 text-xs font-medium transition"
+                                    class="inline-flex items-center space-x-1 px-2.5 py-1.5 rounded-lg bg-slate-900 hover:bg-rose-950 text-slate-300 hover:text-rose-300 border border-slate-800 hover:border-rose-700 text-xs font-medium transition"
                                     title="Remove stock from this specific core box"
                                 >
                                     <svg class="w-3.5 h-3.5 text-rose-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 12H4"/></svg>
                                     <span>Remove</span>
                                 </button>
+                                {% else %}
+                                <button
+                                    type="button"
+                                    onclick="openDeleteProductModal('{{ item.id }}', '{{ item.name|escapejs }}', '{{ item.weight }}', '{{ item.sku }}')"
+                                    class="inline-flex items-center space-x-1 px-2.5 py-1.5 rounded-lg bg-rose-950/70 hover:bg-rose-900 text-rose-300 border border-rose-800 text-xs font-semibold transition shadow-sm"
+                                    title="Remove complete product from inventory (stock is zero)"
+                                >
+                                    <svg class="w-3.5 h-3.5 text-rose-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg>
+                                    <span>Delete</span>
+                                </button>
+                                {% endif %}
                             </div>
                         </td>
                     </tr>
@@ -431,6 +443,65 @@
                     <span>Confirm Remove Stock</span>
                 </button>
             </div>
+        </form>
+    </div>
+</div>
+
+<!-- Modal: Delete Product (when stock is zero) -->
+<div id="deleteProductModal" class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm hidden transition-opacity">
+    <div class="relative w-full max-w-md rounded-2xl bg-slate-950 border border-rose-900/60 shadow-2xl overflow-hidden p-6 space-y-5">
+        <div class="flex items-center justify-between border-b border-slate-800/80 pb-3.5">
+            <div class="flex items-center space-x-3">
+                <div class="w-9 h-9 rounded-xl bg-rose-950 text-rose-400 flex items-center justify-center border border-rose-800">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg>
+                </div>
+                <div>
+                    <h3 class="text-base font-bold text-white tracking-tight">Delete Complete Product</h3>
+                    <p class="text-xs text-rose-400 font-medium">Stock is zero &bull; Ready for permanent removal</p>
+                </div>
+            </div>
+            <button type="button" onclick="closeDeleteProductModal()" class="text-slate-400 hover:text-white transition">
+                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+            </button>
+        </div>
+
+        <p class="text-xs text-slate-300">
+            Are you sure you want to completely remove this product from the inventory catalog? This action will remove the product record since current stock is zero.
+        </p>
+
+        <div class="p-3.5 rounded-xl bg-slate-900 border border-slate-800 space-y-1.5 text-xs">
+            <div class="flex justify-between">
+                <span class="text-slate-400">Product Name:</span>
+                <span id="deleteModalProductName" class="font-bold text-white">Product Name</span>
+            </div>
+            <div class="flex justify-between">
+                <span class="text-slate-400">Unit Weight:</span>
+                <span id="deleteModalProductWeight" class="font-mono-code text-cyan-400 font-bold">0.000 kg</span>
+            </div>
+            <div class="flex justify-between">
+                <span class="text-slate-400">Current Stock:</span>
+                <span class="font-mono-code text-rose-400 font-bold">0 units (Zero Stock)</span>
+            </div>
+        </div>
+
+        <form method="post" action="{% url 'add-inventory' %}" class="flex items-center justify-end space-x-3 pt-2 border-t border-slate-800">
+            {% csrf_token %}
+            <input type="hidden" name="action" value="delete_product">
+            <input type="hidden" name="item_id" id="deleteModalItemId">
+            <button
+                type="button"
+                onclick="closeDeleteProductModal()"
+                class="px-4 py-2 rounded-xl bg-slate-900 hover:bg-slate-800 text-slate-300 text-xs font-semibold border border-slate-800 transition"
+            >
+                Cancel
+            </button>
+            <button
+                type="submit"
+                class="inline-flex items-center space-x-2 px-5 py-2 rounded-xl bg-rose-600 hover:bg-rose-500 text-white text-xs font-bold shadow-lg shadow-rose-950/60 transition"
+            >
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg>
+                <span>Yes, Delete Product</span>
+            </button>
         </form>
     </div>
 </div>
@@ -599,16 +670,35 @@
         removeModal.classList.add('hidden');
     }
 
+    // Modal: Open & Close Delete Product Dialog (when stock is zero)
+    const deleteModal = document.getElementById('deleteProductModal');
+    const deleteModalItemId = document.getElementById('deleteModalItemId');
+    const deleteModalProductName = document.getElementById('deleteModalProductName');
+    const deleteModalProductWeight = document.getElementById('deleteModalProductWeight');
+
+    function openDeleteProductModal(id, name, weight, sku) {
+        deleteModalItemId.value = id;
+        deleteModalProductName.textContent = name;
+        deleteModalProductWeight.textContent = `${parseFloat(weight).toFixed(3)} kg/box`;
+        deleteModal.classList.remove('hidden');
+    }
+
+    function closeDeleteProductModal() {
+        deleteModal.classList.add('hidden');
+    }
+
     // Close modal on Escape or Outside click
     window.addEventListener('keydown', function (e) {
-        if (e.key === 'Escape' && !removeModal.classList.contains('hidden')) {
-            closeRemoveStockModal();
+        if (e.key === 'Escape') {
+            if (!removeModal.classList.contains('hidden')) closeRemoveStockModal();
+            if (!deleteModal.classList.contains('hidden')) closeDeleteProductModal();
         }
     });
     removeModal.addEventListener('click', function (e) {
-        if (e.target === removeModal) {
-            closeRemoveStockModal();
-        }
+        if (e.target === removeModal) closeRemoveStockModal();
+    });
+    deleteModal.addEventListener('click', function (e) {
+        if (e.target === deleteModal) closeDeleteProductModal();
     });
 
     // Live Table Search Filter

@@ -637,4 +637,80 @@ class EmployeeAndVendorOrderViewsTestCase(TestCase):
         self.item.refresh_from_db()
         self.assertEqual(self.item.current_stock, initial_stock - Decimal('8'))
 
+    def test_delete_product_when_stock_is_zero_succeeds(self):
+        """
+        Validates that a product with zero stock can be completely removed from inventory.
+        """
+        from django.urls import reverse
+        from inventory.models import Item, ItemType, UnitOfMeasure
+
+        zero_item = Item.objects.create(
+            sku='CB-ZERO-TEST',
+            name='Zero Stock Core Box',
+            type=ItemType.FINISHED_GOOD,
+            unit_of_measure=UnitOfMeasure.PIECE,
+            current_stock=Decimal('0.0000'),
+            weight=Decimal('2.500'),
+            is_active=True
+        )
+
+        response = self.client.post(reverse('add-inventory'), {
+            'action': 'delete_product',
+            'item_id': zero_item.pk
+        })
+        self.assertEqual(response.status_code, 302)
+
+        # Must no longer be active in inventory
+        active_items = Item.objects.filter(is_active=True, pk=zero_item.pk)
+        self.assertFalse(active_items.exists())
+
+        # First GET consumes the success flash message confirming removal
+        first_get = self.client.get(reverse('add-inventory'))
+        self.assertContains(first_get, 'has been completely removed from inventory')
+
+        # Subsequent GET confirms the item is completely absent from the page
+        second_get = self.client.get(reverse('add-inventory'))
+        self.assertNotContains(second_get, 'Zero Stock Core Box')
+        self.assertNotContains(second_get, 'CB-ZERO-TEST')
+
+    def test_delete_product_when_stock_greater_than_zero_fails(self):
+        """
+        Validates that attempting to remove a product with stock > 0 fails and keeps the product.
+        """
+        from django.urls import reverse
+        from inventory.models import Item
+
+        response = self.client.post(reverse('add-inventory'), {
+            'action': 'delete_product',
+            'item_id': self.item.pk  # Has stock 20
+        })
+        self.assertEqual(response.status_code, 302)
+
+        self.item.refresh_from_db()
+        self.assertTrue(self.item.is_active)
+        self.assertEqual(self.item.current_stock, Decimal('20.0000'))
+
+    def test_table_shows_delete_button_for_zero_stock_product(self):
+        """
+        Validates that the table renders the Delete button when product stock is 0.
+        """
+        from django.urls import reverse
+        from inventory.models import Item, ItemType, UnitOfMeasure
+
+        zero_item = Item.objects.create(
+            sku='CB-DISP-ZERO',
+            name='Empty Core Box',
+            type=ItemType.FINISHED_GOOD,
+            unit_of_measure=UnitOfMeasure.PIECE,
+            current_stock=Decimal('0.0000'),
+            weight=Decimal('4.000'),
+            is_active=True
+        )
+
+        response = self.client.get(reverse('add-inventory'))
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, 'Empty Core Box')
+        self.assertContains(response, 'openDeleteProductModal')
+
+
 

@@ -390,6 +390,52 @@ class AddInventoryView(View):
         action = request.POST.get('action', 'add_stock')
 
         # -------------------------------------------------------------
+        # Action: Remove / Delete Complete Product (if stock is zero)
+        # -------------------------------------------------------------
+        if action == 'delete_product':
+            item_id = request.POST.get('item_id')
+            product_name = (request.POST.get('name') or request.POST.get('product_name') or '').strip()
+
+            target_item = None
+            if item_id:
+                target_item = Item.objects.filter(pk=item_id).first()
+            if not target_item and product_name:
+                target_item = Item.objects.filter(name__iexact=product_name).first()
+
+            if not target_item:
+                messages.error(request, "Product not found.")
+                return redirect('add-inventory')
+
+            with transaction.atomic():
+                locked_item = Item.objects.select_for_update().get(pk=target_item.pk)
+
+                if locked_item.current_stock > Decimal('0'):
+                    messages.error(
+                        request,
+                        f"Cannot remove product '{locked_item.name}'. Current stock is {locked_item.current_stock} {locked_item.unit_of_measure}. "
+                        f"The stock must be zero to completely remove the product."
+                    )
+                    return redirect('add-inventory')
+
+                item_name = locked_item.name
+                item_sku = locked_item.sku
+                item_weight = locked_item.weight
+
+                # If protected by immutable audit ledgers, soft-delete via is_active=False
+                try:
+                    locked_item.delete()
+                except Exception:
+                    locked_item.is_active = False
+                    locked_item.save(update_fields=['is_active', 'updated_at'])
+
+                messages.success(
+                    request,
+                    f"Product '{item_name}' (Weight: {item_weight} kg/box, SKU: {item_sku}) has been completely removed from inventory."
+                )
+
+            return redirect('add-inventory')
+
+        # -------------------------------------------------------------
         # Action: Remove / Deduct Stock from Product
         # -------------------------------------------------------------
         if action == 'remove_stock':
@@ -548,6 +594,9 @@ class AddInventoryView(View):
                 new_stock = old_stock + quantity
 
                 update_fields = ['current_stock', 'updated_at']
+                if not locked_item.is_active:
+                    locked_item.is_active = True
+                    update_fields.append('is_active')
 
                 # Recompute WAC if positive cost supplied
                 if unit_cost > Decimal('0'):
