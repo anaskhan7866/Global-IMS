@@ -712,5 +712,68 @@ class EmployeeAndVendorOrderViewsTestCase(TestCase):
         self.assertContains(response, 'Empty Core Box')
         self.assertContains(response, 'openDeleteProductModal')
 
+    def test_edit_product_success(self):
+        """
+        Validates modifying product details (name, quantity, weight) when mistake was made.
+        """
+        from django.urls import reverse
+        from transactions.models import InventoryLedger, TransactionType
+
+        # self.item initially has: name='Test GI Core Box', stock=20, weight=Decimal('0.000')
+        response = self.client.post(reverse('add-inventory'), {
+            'action': 'edit_product',
+            'item_id': self.item.pk,
+            'name': 'Corrected GI Core Box 110mm',
+            'quantity': '35',
+            'weight': '4.250'
+        })
+        self.assertEqual(response.status_code, 302)
+
+        self.item.refresh_from_db()
+        self.assertEqual(self.item.name, 'Corrected GI Core Box 110mm')
+        self.assertEqual(self.item.current_stock, Decimal('35.0000'))
+        self.assertEqual(self.item.weight, Decimal('4.250'))
+
+        # Verify InventoryLedger entry for delta (+15)
+        ledger = InventoryLedger.objects.filter(item=self.item, generic_reference_id='EDIT-CORRECTION').first()
+        self.assertIsNotNone(ledger)
+        self.assertEqual(ledger.quantity_changed, Decimal('15.0000'))
+        self.assertEqual(ledger.transaction_type, TransactionType.IN)
+
+    def test_edit_product_negative_values_rejected(self):
+        """
+        Validates that negative quantity or weight is rejected.
+        """
+        from django.urls import reverse
+
+        initial_name = self.item.name
+        initial_stock = self.item.current_stock
+
+        response = self.client.post(reverse('add-inventory'), {
+            'action': 'edit_product',
+            'item_id': self.item.pk,
+            'name': 'Negative Stock Test',
+            'quantity': '-10',
+            'weight': '3.000'
+        })
+        self.assertEqual(response.status_code, 302)
+
+        self.item.refresh_from_db()
+        self.assertEqual(self.item.name, initial_name)
+        self.assertEqual(self.item.current_stock, initial_stock)
+
+    def test_table_renders_edit_button_and_modal(self):
+        """
+        Validates that the Inventory table renders the Edit button and edit modal.
+        """
+        from django.urls import reverse
+
+        response = self.client.get(reverse('add-inventory'))
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, 'openEditProductModal')
+        self.assertContains(response, 'editProductModal')
+        self.assertContains(response, 'Edit Product Details')
+
+
 
 

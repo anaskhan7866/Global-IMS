@@ -390,6 +390,91 @@ class AddInventoryView(View):
         action = request.POST.get('action', 'add_stock')
 
         # -------------------------------------------------------------
+        # Action: Edit / Modify Product Details (Name, Quantity, Weight)
+        # -------------------------------------------------------------
+        if action == 'edit_product':
+            item_id = request.POST.get('item_id')
+            new_name = (request.POST.get('name') or request.POST.get('product_name') or '').strip()
+            raw_quantity = request.POST.get('quantity')
+            raw_weight = request.POST.get('weight')
+
+            target_item = None
+            if item_id:
+                target_item = Item.objects.filter(pk=item_id).first()
+
+            if not target_item:
+                messages.error(request, "Product not found.")
+                return redirect('add-inventory')
+
+            if not new_name:
+                messages.error(request, "Product name cannot be empty.")
+                return redirect('add-inventory')
+
+            if raw_quantity is None or str(raw_quantity).strip() == '':
+                messages.error(request, "Please enter a valid Quantity.")
+                return redirect('add-inventory')
+
+            try:
+                new_quantity = Decimal(str(raw_quantity).strip())
+                if new_quantity < Decimal('0'):
+                    raise ValueError
+            except (ValueError, TypeError):
+                messages.error(request, "Quantity cannot be negative.")
+                return redirect('add-inventory')
+
+            new_weight = Decimal('0.000')
+            if raw_weight is not None and str(raw_weight).strip() != '':
+                try:
+                    new_weight = Decimal(str(raw_weight).strip())
+                    if new_weight < Decimal('0'):
+                        raise ValueError
+                except (ValueError, TypeError):
+                    messages.error(request, "Weight of the product (core box) cannot be negative.")
+                    return redirect('add-inventory')
+
+            with transaction.atomic():
+                locked_item = Item.objects.select_for_update().get(pk=target_item.pk)
+                old_name = locked_item.name
+                old_stock = locked_item.current_stock
+                old_weight = locked_item.weight
+
+                stock_diff = new_quantity - old_stock
+
+                update_fields = ['name', 'weight', 'current_stock', 'updated_at']
+                locked_item.name = new_name
+                locked_item.weight = new_weight
+                locked_item.current_stock = new_quantity
+                if not locked_item.is_active and new_quantity > Decimal('0'):
+                    locked_item.is_active = True
+                    update_fields.append('is_active')
+
+                locked_item.save(update_fields=update_fields)
+
+                if stock_diff != Decimal('0'):
+                    tx_type = TransactionType.IN if stock_diff > 0 else TransactionType.OUT
+                    narration_text = (
+                        f"Inventory record correction: adjusted stock from {old_stock} to {new_quantity} "
+                        f"({'+' if stock_diff > 0 else ''}{stock_diff} units)."
+                    )
+                    InventoryLedger.objects.create(
+                        item=locked_item,
+                        quantity_changed=stock_diff,
+                        transaction_type=tx_type,
+                        generic_reference_id='EDIT-CORRECTION',
+                        unit_cost=locked_item.moving_average_cost,
+                        total_cost=(abs(stock_diff) * locked_item.moving_average_cost).quantize(Decimal('0.01')),
+                        narration=narration_text
+                    )
+
+                messages.success(
+                    request,
+                    f"Successfully modified product '{locked_item.name}' "
+                    f"(Quantity: {locked_item.current_stock} {locked_item.unit_of_measure}, Weight: {locked_item.weight} kg/box)."
+                )
+
+            return redirect('add-inventory')
+
+        # -------------------------------------------------------------
         # Action: Remove / Delete Complete Product (if stock is zero)
         # -------------------------------------------------------------
         if action == 'delete_product':
