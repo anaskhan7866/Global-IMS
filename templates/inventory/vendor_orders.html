@@ -1,0 +1,210 @@
+{% extends 'base.html' %}
+
+{% block title %}Vendor Purchase Orders | Global-IMS{% endblock %}
+
+{% block content %}
+<div class="space-y-8">
+    <!-- Title & Action Header -->
+    <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+        <div>
+            <div class="flex items-center space-x-3">
+                <h1 class="text-2xl sm:text-3xl font-extrabold tracking-tight text-white">Vendor Purchase Orders</h1>
+                <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold bg-slate-800 text-slate-300 border border-slate-700">
+                    Procurement Ledger
+                </span>
+            </div>
+            <p class="mt-1 text-sm text-slate-400">
+                Inward procurement orders placed with external suppliers for raw materials and component replenishment.
+            </p>
+        </div>
+
+        <div class="flex items-center space-x-3">
+            <a href="{% url 'add-inventory' %}" class="inline-flex items-center space-x-2 px-4 py-2.5 rounded-lg bg-cyan-600 hover:bg-cyan-500 text-white text-sm font-semibold shadow-lg shadow-cyan-900/40 hover:shadow-cyan-900/60 transition">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" />
+                </svg>
+                <span>Receive / Add Stock</span>
+            </a>
+        </div>
+    </div>
+
+    <!-- PO Status Metrics -->
+    <section aria-label="Purchase Order Metrics" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
+        <!-- Total Orders -->
+        <div class="rounded-xl bg-slate-950 p-5 border border-slate-800 shadow-xl">
+            <div class="flex items-center justify-between">
+                <p class="text-xs font-semibold uppercase tracking-wider text-slate-400">Total Purchase Orders</p>
+                <span class="p-2 rounded-lg bg-slate-900 text-slate-300 border border-slate-800">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01" />
+                    </svg>
+                </span>
+            </div>
+            <h3 class="mt-4 text-2xl sm:text-3xl font-extrabold text-white font-mono-code">{{ total_count }}</h3>
+            <p class="mt-1 text-xs text-slate-400">All registered procurement contracts</p>
+        </div>
+
+        <!-- Pending Delivery -->
+        <div class="rounded-xl bg-slate-950 p-5 border border-slate-800 shadow-xl">
+            <div class="flex items-center justify-between">
+                <p class="text-xs font-semibold uppercase tracking-wider text-slate-400">Pending Delivery</p>
+                <span class="p-2 rounded-lg bg-amber-950 text-amber-400 border border-amber-800">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                    </svg>
+                </span>
+            </div>
+            <h3 class="mt-4 text-2xl sm:text-3xl font-extrabold text-amber-300 font-mono-code">{{ pending_count }}</h3>
+            <p class="mt-1 text-xs text-slate-400">Awaiting vendor supplier dispatch</p>
+        </div>
+
+        <!-- Overdue Alerts -->
+        <div class="rounded-xl bg-slate-950 p-5 border border-slate-800 shadow-xl">
+            <div class="flex items-center justify-between">
+                <p class="text-xs font-semibold uppercase tracking-wider text-slate-400">Overdue Deliveries</p>
+                <span class="p-2 rounded-lg bg-rose-950 text-rose-400 border border-rose-800">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                    </svg>
+                </span>
+            </div>
+            <h3 class="mt-4 text-2xl sm:text-3xl font-extrabold font-mono-code {% if overdue_count > 0 %}text-rose-400 animate-pulse{% else %}text-slate-300{% endif %}">
+                {{ overdue_count }}
+            </h3>
+            <p class="mt-1 text-xs text-slate-400">Expected date exceeded (highlighted below)</p>
+        </div>
+
+        <!-- Delivered -->
+        <div class="rounded-xl bg-slate-950 p-5 border border-slate-800 shadow-xl">
+            <div class="flex items-center justify-between">
+                <p class="text-xs font-semibold uppercase tracking-wider text-slate-400">Delivered Orders</p>
+                <span class="p-2 rounded-lg bg-emerald-950 text-emerald-400 border border-emerald-800">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" />
+                    </svg>
+                </span>
+            </div>
+            <h3 class="mt-4 text-2xl sm:text-3xl font-extrabold text-emerald-300 font-mono-code">{{ delivered_count }}</h3>
+            <p class="mt-1 text-xs text-slate-400">Stock received & ledger verified</p>
+        </div>
+    </section>
+
+    <!-- Orders Main Table -->
+    <section aria-label="Purchase Orders Table" class="rounded-xl bg-slate-950 border border-slate-800 shadow-xl overflow-hidden">
+        <div class="p-5 sm:p-6 border-b border-slate-800 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+            <div>
+                <h2 class="text-lg font-bold text-white tracking-tight">Purchase Order Records</h2>
+                <p class="text-xs text-slate-400 mt-0.5">
+                    Orders with status <span class="font-semibold text-rose-400">'Pending'</span> and an expected delivery date in the past are highlighted in light red.
+                </p>
+            </div>
+            <div class="flex items-center space-x-2 text-xs">
+                <span class="inline-flex items-center space-x-1.5 px-2.5 py-1 rounded bg-rose-950/60 border border-rose-800 text-rose-300 font-semibold">
+                    <span class="h-2 w-2 rounded-full bg-rose-500 animate-pulse"></span>
+                    <span>Light Red = Overdue Pending</span>
+                </span>
+            </div>
+        </div>
+
+        <div class="overflow-x-auto">
+            <table class="min-w-full divide-y divide-slate-800 text-left text-sm">
+                <thead class="bg-slate-900/60 text-xs uppercase font-semibold text-slate-400">
+                    <tr>
+                        <th scope="col" class="py-3.5 pl-6 pr-3">Vendor Name</th>
+                        <th scope="col" class="px-3 py-3.5">Product</th>
+                        <th scope="col" class="px-3 py-3.5">Quantity</th>
+                        <th scope="col" class="px-3 py-3.5">Order Date</th>
+                        <th scope="col" class="px-3 py-3.5">Expected Delivery Date</th>
+                        <th scope="col" class="py-3.5 pl-3 pr-6 text-right">Status</th>
+                    </tr>
+                </thead>
+                <tbody class="divide-y divide-slate-800/60 bg-slate-950 text-slate-200">
+                    {% for order in purchase_orders %}
+                    {% if order.is_overdue or order.status == 'Pending' and order.expected_delivery_date < today %}
+                    <!-- Overdue Row: Highlighted in light red -->
+                    <tr class="bg-red-950/40 border-l-4 border-red-500 text-red-100 hover:bg-red-900/50 transition">
+                    {% else %}
+                    <!-- Normal Row -->
+                    <tr class="hover:bg-slate-900/50 transition">
+                    {% endif %}
+                        <!-- 1. Vendor Name -->
+                        <td class="whitespace-nowrap py-4 pl-6 pr-3">
+                            <div class="flex items-center space-x-2">
+                                <span class="font-bold text-white block">{{ order.vendor.company_name }}</span>
+                                {% if order.vendor.GST_number %}
+                                <span class="text-[10px] font-mono-code text-slate-400 bg-slate-900 px-1.5 py-0.5 rounded border border-slate-800">
+                                    {{ order.vendor.GST_number }}
+                                </span>
+                                {% endif %}
+                            </div>
+                        </td>
+
+                        <!-- 2. Product -->
+                        <td class="whitespace-nowrap px-3 py-4">
+                            <span class="font-semibold text-white block">{{ order.item.name }}</span>
+                            <span class="text-xs text-cyan-400 font-mono-code">{{ order.item.sku }}</span>
+                        </td>
+
+                        <!-- 3. Quantity -->
+                        <td class="whitespace-nowrap px-3 py-4 font-mono-code font-bold text-base text-cyan-300">
+                            {{ order.quantity }} <span class="text-xs text-slate-400 font-normal">{{ order.item.unit_of_measure }}</span>
+                        </td>
+
+                        <!-- 4. Order Date -->
+                        <td class="whitespace-nowrap px-3 py-4 font-mono-code text-xs text-slate-300">
+                            {{ order.order_date|date:"Y-m-d" }}
+                        </td>
+
+                        <!-- 5. Expected Delivery Date -->
+                        <td class="whitespace-nowrap px-3 py-4 font-mono-code text-xs">
+                            {% if order.is_overdue or order.status == 'Pending' and order.expected_delivery_date < today %}
+                            <div class="flex items-center space-x-1 text-rose-300 font-bold">
+                                <svg class="w-4 h-4 text-rose-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                </svg>
+                                <span>{{ order.expected_delivery_date|date:"Y-m-d" }}</span>
+                            </div>
+                            {% else %}
+                            <span class="text-slate-300">{{ order.expected_delivery_date|date:"Y-m-d" }}</span>
+                            {% endif %}
+                        </td>
+
+                        <!-- 6. Status -->
+                        <td class="whitespace-nowrap py-4 pl-3 pr-6 text-right text-xs">
+                            {% if order.status == 'Delivered' %}
+                            <span class="inline-flex items-center px-2.5 py-1 rounded-md font-semibold bg-emerald-950 text-emerald-300 border border-emerald-800">
+                                <span class="h-1.5 w-1.5 rounded-full bg-emerald-400 mr-1.5"></span>
+                                Delivered
+                            </span>
+                            {% elif order.is_overdue or order.status == 'Pending' and order.expected_delivery_date < today %}
+                            <span class="inline-flex items-center px-2.5 py-1 rounded-md font-bold bg-rose-900/80 text-rose-200 border border-rose-700 animate-pulse">
+                                <span class="h-1.5 w-1.5 rounded-full bg-rose-400 mr-1.5"></span>
+                                Overdue (Pending)
+                            </span>
+                            {% else %}
+                            <span class="inline-flex items-center px-2.5 py-1 rounded-md font-semibold bg-amber-950 text-amber-300 border border-amber-800">
+                                <span class="h-1.5 w-1.5 rounded-full bg-amber-400 mr-1.5"></span>
+                                Pending
+                            </span>
+                            {% endif %}
+                        </td>
+                    </tr>
+                    {% empty %}
+                    <tr>
+                        <td colspan="6" class="py-12 text-center text-slate-400">
+                            <div class="flex flex-col items-center justify-center">
+                                <svg class="h-10 w-10 text-slate-600 mb-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
+                                </svg>
+                                <p class="text-sm font-bold text-slate-200">No Purchase Orders Found</p>
+                                <p class="text-xs text-slate-500 mt-1 max-w-sm">No procurement orders are currently registered in the system ledger.</p>
+                            </div>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </section>
+</div>
+{% endblock %}

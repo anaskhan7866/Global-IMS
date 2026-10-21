@@ -1,0 +1,384 @@
+{% extends 'base.html' %}
+
+{% block title %}Operations & Financial Analytics | Global-IMS{% endblock %}
+
+{% block content %}
+<div class="space-y-8">
+    <!-- Title & Subtitle Banner -->
+    <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+        <div>
+            <h1 class="text-2xl sm:text-3xl font-extrabold tracking-tight text-white">Operations & Financial Analytics</h1>
+            <p class="mt-1 text-sm text-slate-400">Real-time performance for <span class="text-cyan-400 font-semibold">{{ current_month_name }}</span> based on moving weighted average cost ledgers.</p>
+        </div>
+        <div class="flex items-center space-x-2">
+            <span class="inline-flex items-center px-3 py-1 rounded-md text-xs font-medium bg-slate-800 text-slate-300 border border-slate-700">
+                <svg class="mr-1.5 h-3.5 w-3.5 text-cyan-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                </svg>
+                Current Period: Active Month
+            </span>
+        </div>
+    </div>
+
+    <!-- 1. TOP ROW: 4 KPI CARDS -->
+    <section aria-label="Key Performance Indicators" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
+
+        <!-- Card 1: Revenue -->
+        <div class="relative overflow-hidden rounded-xl bg-slate-950 p-5 border border-slate-800 shadow-xl shadow-slate-950/40 hover:border-emerald-500/50 transition">
+            <div class="absolute top-0 right-0 w-24 h-24 bg-emerald-500/10 rounded-full blur-2xl -mr-6 -mt-6"></div>
+            <div class="flex items-center justify-between">
+                <p class="text-xs font-semibold uppercase tracking-wider text-slate-400">Monthly Revenue</p>
+                <span class="p-2 rounded-lg bg-emerald-950 text-emerald-400 border border-emerald-800">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                    </svg>
+                </span>
+            </div>
+            <div class="mt-4">
+                <h3 class="text-2xl sm:text-3xl font-extrabold text-white font-mono-code">${{ total_revenue|floatformat:2 }}</h3>
+                <p class="mt-1 text-xs text-slate-400 flex items-center">
+                    <span class="text-emerald-400 font-semibold inline-flex items-center mr-1">
+                        <svg class="w-3.5 h-3.5 mr-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 10l7-7m0 0l7 7m-7-7v18"/></svg>
+                        Sales Orders
+                    </span>
+                    Fulfilled this month
+                </p>
+            </div>
+        </div>
+
+        <!-- Card 2: COGS -->
+        <div class="relative overflow-hidden rounded-xl bg-slate-950 p-5 border border-slate-800 shadow-xl shadow-slate-950/40 hover:border-amber-500/50 transition">
+            <div class="absolute top-0 right-0 w-24 h-24 bg-amber-500/10 rounded-full blur-2xl -mr-6 -mt-6"></div>
+            <div class="flex items-center justify-between">
+                <p class="text-xs font-semibold uppercase tracking-wider text-slate-400">Total COGS</p>
+                <span class="p-2 rounded-lg bg-amber-950 text-amber-400 border border-amber-800">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+                    </svg>
+                </span>
+            </div>
+            <div class="mt-4">
+                <h3 class="text-2xl sm:text-3xl font-extrabold text-white font-mono-code">${{ total_cogs|floatformat:2 }}</h3>
+                <p class="mt-1 text-xs text-slate-400 flex items-center">
+                    <span class="text-amber-400 font-semibold mr-1">Cost of Goods Sold</span>
+                    (Moving Avg Basis)
+                </p>
+            </div>
+        </div>
+
+        <!-- Card 3: Gross Profit -->
+        <div class="relative overflow-hidden rounded-xl bg-slate-950 p-5 border border-slate-800 shadow-xl shadow-slate-950/40 hover:border-cyan-500/50 transition">
+            <div class="absolute top-0 right-0 w-24 h-24 bg-cyan-500/10 rounded-full blur-2xl -mr-6 -mt-6"></div>
+            <div class="flex items-center justify-between">
+                <p class="text-xs font-semibold uppercase tracking-wider text-slate-400">Gross Profit</p>
+                <span class="p-2 rounded-lg bg-cyan-950 text-cyan-400 border border-cyan-800">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6" />
+                    </svg>
+                </span>
+            </div>
+            <div class="mt-4">
+                <h3 class="text-2xl sm:text-3xl font-extrabold text-cyan-300 font-mono-code">${{ gross_profit|floatformat:2 }}</h3>
+                <p class="mt-1 text-xs text-slate-400">
+                    Net Margin:
+                    <span class="font-semibold text-slate-200">
+                        {% if total_revenue > 0 %}
+                            (Revenue - COGS)
+                        {% else %}
+                            0.00%
+                        {% endif %}
+                    </span>
+                </p>
+            </div>
+        </div>
+
+        <!-- Card 4: Inventory Value -->
+        <div class="relative overflow-hidden rounded-xl bg-slate-950 p-5 border border-slate-800 shadow-xl shadow-slate-950/40 hover:border-purple-500/50 transition">
+            <div class="absolute top-0 right-0 w-24 h-24 bg-purple-500/10 rounded-full blur-2xl -mr-6 -mt-6"></div>
+            <div class="flex items-center justify-between">
+                <p class="text-xs font-semibold uppercase tracking-wider text-slate-400">Inventory Value</p>
+                <span class="p-2 rounded-lg bg-purple-950 text-purple-400 border border-purple-800">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" />
+                    </svg>
+                </span>
+            </div>
+            <div class="mt-4">
+                <h3 class="text-2xl sm:text-3xl font-extrabold text-white font-mono-code">${{ total_inventory_value|floatformat:2 }}</h3>
+                <p class="mt-1 text-xs text-slate-400">
+                    Total on-hand stock valuation
+                </p>
+            </div>
+        </div>
+
+    </section>
+
+    <!-- 2. MIDDLE SECTION: CHART.JS SALES & PRODUCTION ANALYTICS -->
+    <section aria-label="Financial Trends Chart" class="rounded-xl bg-slate-950 p-6 border border-slate-800 shadow-xl">
+        <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between pb-6 border-b border-slate-800 gap-4">
+            <div>
+                <h2 class="text-lg font-bold text-white tracking-tight">Sales Revenue vs. Cost of Goods Sold</h2>
+                <p class="text-xs text-slate-400 mt-0.5">Comparative 6-month trailing performance curve (USD $)</p>
+            </div>
+            <div class="flex items-center space-x-3 text-xs font-medium">
+                <div class="flex items-center space-x-1.5">
+                    <span class="h-3 w-3 rounded-sm bg-cyan-500"></span>
+                    <span class="text-slate-300">Revenue</span>
+                </div>
+                <div class="flex items-center space-x-1.5">
+                    <span class="h-3 w-3 rounded-sm bg-amber-500"></span>
+                    <span class="text-slate-300">COGS</span>
+                </div>
+                <div class="flex items-center space-x-1.5">
+                    <span class="h-3 w-3 rounded-sm bg-emerald-500"></span>
+                    <span class="text-slate-300">Gross Margin</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- Canvas Container -->
+        <div class="mt-6 relative h-80 w-full">
+            <canvas id="salesChart"></canvas>
+        </div>
+    </section>
+
+    <!-- 3. BOTTOM SECTION: LOW STOCK ALERTS TABLE -->
+    <section aria-label="Inventory Alerts" class="rounded-xl bg-slate-950 border border-slate-800 shadow-xl overflow-hidden">
+        <div class="p-6 border-b border-slate-800 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+            <div>
+                <div class="flex items-center space-x-2">
+                    <h2 class="text-lg font-bold text-white tracking-tight">Low Stock Replenishment Alerts</h2>
+                    <span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold {% if low_stock_count > 0 %}bg-rose-950 text-rose-300 border border-rose-800{% else %}bg-emerald-950 text-emerald-300 border border-emerald-800{% endif %}">
+                        {{ low_stock_count }} Flagged
+                    </span>
+                </div>
+                <p class="text-xs text-slate-400 mt-0.5">Raw materials and finished goods with available stock below the critical threshold (less than 10 units)</p>
+            </div>
+            <div>
+                <a href="/admin/inventory/item/add/" class="inline-flex items-center space-x-1 px-3 py-1.5 rounded-md bg-cyan-600 hover:bg-cyan-500 text-white text-xs font-semibold transition">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" />
+                    </svg>
+                    <span>Create Reorder PO</span>
+                </a>
+            </div>
+        </div>
+
+        <div class="overflow-x-auto">
+            <table class="min-w-full divide-y divide-slate-800 text-left text-sm">
+                <thead class="bg-slate-900/60 text-xs uppercase font-semibold text-slate-400">
+                    <tr>
+                        <th scope="col" class="py-3.5 pl-6 pr-3">SKU</th>
+                        <th scope="col" class="px-3 py-3.5">Item Name</th>
+                        <th scope="col" class="px-3 py-3.5">Classification</th>
+                        <th scope="col" class="px-3 py-3.5">Unit of Measure</th>
+                        <th scope="col" class="px-3 py-3.5">Unit Valuation</th>
+                        <th scope="col" class="px-3 py-3.5">Current Stock</th>
+                        <th scope="col" class="py-3.5 pl-3 pr-6 text-right">Operational Status</th>
+                    </tr>
+                </thead>
+                <tbody class="divide-y divide-slate-800/60 bg-slate-950 text-slate-200">
+                    {% for item in low_stock_alerts %}
+                    <tr class="hover:bg-slate-900/40 transition">
+                        <td class="whitespace-nowrap py-4 pl-6 pr-3 font-mono-code text-xs font-bold text-cyan-400">
+                            {{ item.sku }}
+                        </td>
+                        <td class="whitespace-nowrap px-3 py-4 font-medium text-white">
+                            {{ item.name }}
+                        </td>
+                        <td class="whitespace-nowrap px-3 py-4 text-xs">
+                            {% if item.type == 'Raw Material' %}
+                                <span class="inline-flex items-center px-2 py-0.5 rounded font-medium bg-blue-950 text-blue-300 border border-blue-800">
+                                    Raw Material
+                                </span>
+                            {% else %}
+                                <span class="inline-flex items-center px-2 py-0.5 rounded font-medium bg-emerald-950 text-emerald-300 border border-emerald-800">
+                                    Finished Good
+                                </span>
+                            {% endif %}
+                        </td>
+                        <td class="whitespace-nowrap px-3 py-4 text-xs text-slate-400 font-mono-code">
+                            {{ item.unit_of_measure }}
+                        </td>
+                        <td class="whitespace-nowrap px-3 py-4 font-mono-code text-xs text-slate-300">
+                            ${{ item.moving_average_cost|floatformat:2 }}
+                        </td>
+                        <td class="whitespace-nowrap px-3 py-4 font-mono-code text-sm font-bold {% if item.current_stock < 5 %}text-rose-500 font-extrabold animate-pulse{% else %}text-amber-400{% endif %}">
+                            {{ item.current_stock|floatformat:2 }} {{ item.unit_of_measure }}
+                        </td>
+                        <td class="whitespace-nowrap py-4 pl-3 pr-6 text-right text-xs">
+                            {% if item.current_stock == 0 %}
+                                <span class="inline-flex items-center px-2.5 py-1 rounded-md text-xs font-bold bg-rose-950/80 text-rose-300 border border-rose-800">
+                                    STOCKOUT DANGER
+                                </span>
+                            {% elif item.current_stock < 5 %}
+                                <span class="inline-flex items-center px-2.5 py-1 rounded-md text-xs font-semibold bg-rose-950/50 text-rose-400 border border-rose-900">
+                                    CRITICAL REORDER
+                                </span>
+                            {% else %}
+                                <span class="inline-flex items-center px-2.5 py-1 rounded-md text-xs font-medium bg-amber-950/50 text-amber-300 border border-amber-900">
+                                    LOW STOCK
+                                </span>
+                            {% endif %}
+                        </td>
+                    </tr>
+                    {% empty %}
+                    <tr>
+                        <td colspan="7" class="py-12 text-center text-slate-400">
+                            <div class="flex flex-col items-center justify-center">
+                                <svg class="h-10 w-10 text-emerald-500 mb-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                </svg>
+                                <p class="text-sm font-semibold text-slate-200">No Critical Stock Alerts</p>
+                                <p class="text-xs text-slate-500 mt-1">All catalog components are currently stocked at or above 10 units.</p>
+                            </div>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </section>
+</div>
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+    document.addEventListener('DOMContentLoaded', function () {
+        const ctx = document.getElementById('salesChart').getContext('2d');
+
+        // Gradient backgrounds
+        const revGradient = ctx.createLinearGradient(0, 0, 0, 320);
+        revGradient.addColorStop(0, 'rgba(6, 182, 212, 0.4)');
+        revGradient.addColorStop(1, 'rgba(6, 182, 212, 0.0)');
+
+        const cogsGradient = ctx.createLinearGradient(0, 0, 0, 320);
+        cogsGradient.addColorStop(0, 'rgba(245, 158, 11, 0.3)');
+        cogsGradient.addColorStop(1, 'rgba(245, 158, 11, 0.0)');
+
+        const marginGradient = ctx.createLinearGradient(0, 0, 0, 320);
+        marginGradient.addColorStop(0, 'rgba(16, 185, 129, 0.2)');
+        marginGradient.addColorStop(1, 'rgba(16, 185, 129, 0.0)');
+
+        // Monthly labels (Trailing 6 Months)
+        const labels = ['May 2026', 'Jun 2026', 'Jul 2026', 'Aug 2026', 'Sep 2026', 'Oct 2026'];
+
+        // Baseline data
+        const revenueData = [12500, 15800, 14200, 19400, 17800, 22500];
+        const cogsData = [7200, 9100, 8400, 11200, 10100, 12400];
+        const grossMarginData = revenueData.map((rev, idx) => rev - cogsData[idx]);
+
+        new Chart(ctx, {
+            type: 'line',
+            data: {
+                labels: labels,
+                datasets: [
+                    {
+                        label: 'Revenue ($)',
+                        data: revenueData,
+                        borderColor: '#06b6d4',
+                        backgroundColor: revGradient,
+                        borderWidth: 2.5,
+                        fill: true,
+                        tension: 0.35,
+                        pointBackgroundColor: '#06b6d4',
+                        pointHoverRadius: 6,
+                        pointRadius: 4,
+                    },
+                    {
+                        label: 'COGS ($)',
+                        data: cogsData,
+                        borderColor: '#f59e0b',
+                        backgroundColor: cogsGradient,
+                        borderWidth: 2,
+                        fill: true,
+                        tension: 0.35,
+                        pointBackgroundColor: '#f59e0b',
+                        pointHoverRadius: 5,
+                        pointRadius: 3,
+                    },
+                    {
+                        label: 'Gross Profit ($)',
+                        data: grossMarginData,
+                        borderColor: '#10b981',
+                        backgroundColor: marginGradient,
+                        borderWidth: 2,
+                        borderDash: [5, 5],
+                        fill: false,
+                        tension: 0.35,
+                        pointBackgroundColor: '#10b981',
+                        pointHoverRadius: 5,
+                        pointRadius: 3,
+                    }
+                ]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                interaction: {
+                    mode: 'index',
+                    intersect: false,
+                },
+                plugins: {
+                    legend: {
+                        display: false,
+                    },
+                    tooltip: {
+                        backgroundColor: '#020617',
+                        titleColor: '#f8fafc',
+                        bodyColor: '#e2e8f0',
+                        borderColor: '#334155',
+                        borderWidth: 1,
+                        padding: 12,
+                        boxPadding: 6,
+                        usePointStyle: true,
+                        callbacks: {
+                            label: function(context) {
+                                let label = context.dataset.label || '';
+                                if (label) {
+                                    label += ': ';
+                                }
+                                if (context.parsed.y !== null) {
+                                    label += new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(context.parsed.y);
+                                }
+                                return label;
+                            }
+                        }
+                    }
+                },
+                scales: {
+                    x: {
+                        grid: {
+                            color: 'rgba(51, 65, 85, 0.4)',
+                            drawBorder: false,
+                        },
+                        ticks: {
+                            color: '#94a3b8',
+                            font: {
+                                family: 'Inter',
+                                size: 11
+                            }
+                        }
+                    },
+                    y: {
+                        grid: {
+                            color: 'rgba(51, 65, 85, 0.4)',
+                            drawBorder: false,
+                        },
+                        ticks: {
+                            color: '#94a3b8',
+                            font: {
+                                family: 'JetBrains Mono',
+                                size: 11
+                            },
+                            callback: function(value) {
+                                return '$' + value.toLocaleString();
+                            }
+                        }
+                    }
+                }
+            }
+        });
+    });
+</script>
+{% endblock %}

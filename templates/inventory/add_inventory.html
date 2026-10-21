@@ -1,0 +1,311 @@
+{% extends 'base.html' %}
+
+{% block title %}Add Inventory Stock | Global-IMS{% endblock %}
+
+{% block content %}
+<div class="space-y-8">
+    <!-- Header Banner -->
+    <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+        <div>
+            <div class="flex items-center space-x-3">
+                <h1 class="text-2xl sm:text-3xl font-extrabold tracking-tight text-white">Add Inventory Stock</h1>
+                <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold bg-cyan-950 text-cyan-300 border border-cyan-800">
+                    Stock Inward
+                </span>
+            </div>
+            <p class="mt-1 text-sm text-slate-400">
+                Direct stock receipt and moving weighted average cost adjustment. Commits an immutable audit record to the inventory ledger.
+            </p>
+        </div>
+
+        <div class="flex items-center space-x-3">
+            <a href="/" class="inline-flex items-center space-x-2 px-3 py-2 rounded-lg bg-slate-900 hover:bg-slate-800 text-slate-300 text-xs font-semibold border border-slate-800 transition">
+                <svg class="w-4 h-4 text-cyan-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6"/></svg>
+                <span>Dashboard Overview</span>
+            </a>
+        </div>
+    </div>
+
+    <!-- Main Form & Projection Layout -->
+    <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
+        <!-- Unified Form Card (2 Columns) -->
+        <div class="lg:col-span-2 rounded-xl bg-slate-950 border border-slate-800 shadow-xl overflow-hidden">
+            <div class="p-6 border-b border-slate-800 bg-slate-950">
+                <h2 class="text-lg font-bold text-white tracking-tight">Stock Receipt & Inward Form</h2>
+                <p class="text-xs text-slate-400 mt-0.5">Select any catalog item and specify inbound physical quantity and valuation.</p>
+            </div>
+
+            <form method="post" action="{% url 'add-inventory' %}" class="p-6 space-y-6">
+                {% csrf_token %}
+
+                <!-- 1. Item Selection -->
+                <div>
+                    <label for="item_id" class="block text-xs font-semibold uppercase tracking-wider text-slate-300 mb-1.5">
+                        Target Inventory Item <span class="text-rose-400">*</span>
+                    </label>
+                    <div class="relative">
+                        <select name="item_id" id="item_id" required class="w-full px-3.5 py-3 rounded-lg bg-slate-900 border border-slate-700 text-white text-sm focus:border-cyan-500 focus:ring-1 focus:ring-cyan-500 transition">
+                            <option value="" disabled selected>-- Select an item from catalog --</option>
+                            {% for item in items %}
+                            <option value="{{ item.id }}"
+                                    data-name="{{ item.name }}"
+                                    data-sku="{{ item.sku }}"
+                                    data-type="{{ item.type }}"
+                                    data-stock="{{ item.current_stock }}"
+                                    data-cost="{{ item.moving_average_cost }}"
+                                    data-uom="{{ item.unit_of_measure }}">
+                                [{{ item.sku }}] {{ item.name }} &bull; Current: {{ item.current_stock|floatformat:2 }} {{ item.unit_of_measure }} ({{ item.type }})
+                            </option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <p class="mt-1 text-xs text-slate-500">Includes all approved Raw Materials and Finished Goods.</p>
+                </div>
+
+                <!-- 2. Quantity & Unit Cost Grid -->
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-5">
+                    <div>
+                        <label for="quantity" class="block text-xs font-semibold uppercase tracking-wider text-slate-300 mb-1.5">
+                            Quantity to Add <span class="text-rose-400">*</span>
+                        </label>
+                        <div class="relative">
+                            <input type="number" step="0.0001" min="0.0001" name="quantity" id="quantity" required placeholder="0.0000" class="w-full px-3.5 py-2.5 rounded-lg bg-slate-900 border border-slate-700 text-white placeholder-slate-500 text-sm font-mono-code focus:border-cyan-500 focus:ring-1 focus:ring-cyan-500 transition">
+                            <span id="uomBadge" class="absolute right-3 top-2.5 text-xs text-slate-400 font-mono-code font-bold">units</span>
+                        </div>
+                        <p class="mt-1 text-xs text-slate-500">Strictly positive quantity added to on-hand balance.</p>
+                    </div>
+
+                    <div>
+                        <label for="unit_cost" class="block text-xs font-semibold uppercase tracking-wider text-slate-300 mb-1.5">
+                            Unit Purchase Price / Cost ($)
+                        </label>
+                        <div class="relative">
+                            <span class="absolute left-3 top-2.5 text-xs text-slate-400 font-mono-code">$</span>
+                            <input type="number" step="0.0001" min="0" name="unit_cost" id="unit_cost" placeholder="0.0000" class="w-full pl-7 pr-3.5 py-2.5 rounded-lg bg-slate-900 border border-slate-700 text-white placeholder-slate-500 text-sm font-mono-code focus:border-cyan-500 focus:ring-1 focus:ring-cyan-500 transition">
+                        </div>
+                        <p class="mt-1 text-xs text-slate-500">Recalculates Weighted Average Cost (WAC).</p>
+                    </div>
+                </div>
+
+                <!-- 3. Supplier / Vendor Selection -->
+                <div>
+                    <label for="vendor_id" class="block text-xs font-semibold uppercase tracking-wider text-slate-300 mb-1.5">
+                        Supplier / Vendor (Optional)
+                    </label>
+                    <select name="vendor_id" id="vendor_id" class="w-full px-3.5 py-2.5 rounded-lg bg-slate-900 border border-slate-700 text-white text-sm focus:border-cyan-500 focus:ring-1 focus:ring-cyan-500 transition">
+                        <option value="">-- No Vendor (Internal Transfer / Initial Count Adjustment) --</option>
+                        {% for vendor in vendors %}
+                        <option value="{{ vendor.id }}">
+                            {{ vendor.company_name }} {% if vendor.GST_number %}(GST: {{ vendor.GST_number }}){% endif %}
+                        </option>
+                        {% endfor %}
+                    </select>
+                </div>
+
+                <!-- 4. Reference ID & Narration -->
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-5">
+                    <div>
+                        <label for="reference_id" class="block text-xs font-semibold uppercase tracking-wider text-slate-300 mb-1.5">
+                            Reference Identifier (PO / Invoice / Batch)
+                        </label>
+                        <input type="text" name="reference_id" id="reference_id" placeholder="e.g. PO-10944 or INW-BATCH-02" class="w-full px-3.5 py-2.5 rounded-lg bg-slate-900 border border-slate-700 text-white placeholder-slate-500 text-sm font-mono-code focus:border-cyan-500 focus:ring-1 focus:ring-cyan-500 transition">
+                    </div>
+
+                    <div>
+                        <label for="narration" class="block text-xs font-semibold uppercase tracking-wider text-slate-300 mb-1.5">
+                            Remarks / Batch Notes
+                        </label>
+                        <input type="text" name="narration" id="narration" placeholder="e.g. Received at Dock B, inspected ok" class="w-full px-3.5 py-2.5 rounded-lg bg-slate-900 border border-slate-700 text-white placeholder-slate-500 text-sm focus:border-cyan-500 focus:ring-1 focus:ring-cyan-500 transition">
+                    </div>
+                </div>
+
+                <!-- Submit Action -->
+                <div class="pt-4 border-t border-slate-800 flex items-center justify-end space-x-3">
+                    <button type="reset" class="px-4 py-2.5 rounded-lg bg-slate-900 hover:bg-slate-800 text-slate-300 text-sm font-semibold border border-slate-800 transition">
+                        Clear
+                    </button>
+                    <button type="submit" class="inline-flex items-center space-x-2 px-6 py-2.5 rounded-lg bg-cyan-600 hover:bg-cyan-500 text-white text-sm font-semibold shadow-lg shadow-cyan-900/40 hover:shadow-cyan-900/60 transition focus:outline-none focus:ring-2 focus:ring-cyan-400">
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>
+                        <span>Confirm Stock Inward</span>
+                    </button>
+                </div>
+            </form>
+        </div>
+
+        <!-- Real-Time Stock Projection Sidebar Card (1 Column) -->
+        <div class="rounded-xl bg-slate-950 border border-slate-800 shadow-xl p-6 flex flex-col justify-between space-y-6">
+            <div>
+                <div class="flex items-center space-x-2 text-cyan-400 mb-4">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6" />
+                    </svg>
+                    <h3 class="text-base font-bold text-white tracking-tight">Live Ledger Projection</h3>
+                </div>
+
+                <div id="noSelectionNotice" class="py-8 text-center text-slate-500 text-xs">
+                    <svg class="w-10 h-10 mx-auto text-slate-700 mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4"/></svg>
+                    <p>Select an item to preview real-time stock balance & Moving Weighted Average Cost (WAC) calculations.</p>
+                </div>
+
+                <div id="selectionPreview" class="hidden space-y-4">
+                    <div class="p-3.5 rounded-lg bg-slate-900/70 border border-slate-800">
+                        <span id="previewSku" class="text-xs font-mono-code font-bold text-cyan-400 block">SKU-001</span>
+                        <h4 id="previewName" class="text-sm font-bold text-white mt-0.5">Item Name</h4>
+                        <span id="previewType" class="inline-block mt-2 px-2 py-0.5 rounded text-[10px] font-semibold bg-blue-950 text-blue-300 border border-blue-800">Raw Material</span>
+                    </div>
+
+                    <div class="space-y-3 text-xs">
+                        <div class="flex items-center justify-between pb-2 border-b border-slate-800/80">
+                            <span class="text-slate-400">Current Stock:</span>
+                            <span id="previewCurrentStock" class="font-mono-code font-bold text-slate-200">0.00</span>
+                        </div>
+                        <div class="flex items-center justify-between pb-2 border-b border-slate-800/80">
+                            <span class="text-slate-400">Incoming Units:</span>
+                            <span id="previewIncomingStock" class="font-mono-code font-bold text-cyan-400">+0.00</span>
+                        </div>
+                        <div class="flex items-center justify-between pb-2 border-b border-slate-800/80">
+                            <span class="text-slate-300 font-semibold">Projected Balance:</span>
+                            <span id="previewNewStock" class="font-mono-code font-bold text-emerald-400 text-sm">0.00</span>
+                        </div>
+                        <div class="flex items-center justify-between pt-1">
+                            <span class="text-slate-400">Projected Unit WAC:</span>
+                            <span id="previewNewCost" class="font-mono-code font-bold text-amber-300">$0.00</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- ACID Ledger Concurrency Box -->
+            <div class="p-3.5 rounded-lg bg-slate-900/50 border border-slate-800/80 text-[11px] text-slate-400">
+                <div class="flex items-center space-x-1.5 text-emerald-400 font-semibold mb-1">
+                    <svg class="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd"/></svg>
+                    <span>Double-Entry Guarantee</span>
+                </div>
+                <p>Transactions use <code class="text-cyan-400 font-mono-code">select_for_update()</code> pessimistic row locking to guarantee ledger immutability and atomic stock calculation.</p>
+            </div>
+        </div>
+    </div>
+
+    <!-- Recent Inward Stock Movements -->
+    <section aria-label="Recent Inward Ledger Entries" class="rounded-xl bg-slate-950 border border-slate-800 shadow-xl overflow-hidden">
+        <div class="p-5 sm:p-6 border-b border-slate-800 flex items-center justify-between">
+            <div>
+                <h3 class="text-base font-bold text-white tracking-tight">Recent Inward Stock Receipts</h3>
+                <p class="text-xs text-slate-400 mt-0.5">Audit log of direct purchases and manual adjustments committed to InventoryLedger.</p>
+            </div>
+            <span class="text-xs text-slate-400 font-mono-code">Append-Only Audit</span>
+        </div>
+
+        <div class="overflow-x-auto">
+            <table class="min-w-full divide-y divide-slate-800 text-left text-xs">
+                <thead class="bg-slate-900/60 uppercase font-semibold text-slate-400">
+                    <tr>
+                        <th class="py-3 pl-6 pr-3">Timestamp</th>
+                        <th class="px-3 py-3">Item</th>
+                        <th class="px-3 py-3">Qty Added</th>
+                        <th class="px-3 py-3">Unit Valuation</th>
+                        <th class="px-3 py-3">Vendor / Entity</th>
+                        <th class="py-3 pl-3 pr-6 text-right">Reference ID</th>
+                    </tr>
+                </thead>
+                <tbody class="divide-y divide-slate-800/60 bg-slate-950 text-slate-200">
+                    {% for entry in recent_ledgers %}
+                    <tr class="hover:bg-slate-900/40 transition">
+                        <td class="whitespace-nowrap py-3.5 pl-6 pr-3 font-mono-code text-slate-400">
+                            {{ entry.timestamp|date:"Y-m-d H:i" }}
+                        </td>
+                        <td class="whitespace-nowrap px-3 py-3.5 font-medium text-white">
+                            {{ entry.item.name }}
+                            <span class="text-[10px] text-cyan-400 font-mono-code block">{{ entry.item.sku }}</span>
+                        </td>
+                        <td class="whitespace-nowrap px-3 py-3.5 font-mono-code font-bold text-emerald-400">
+                            +{{ entry.quantity_changed|floatformat:2 }} {{ entry.item.unit_of_measure }}
+                        </td>
+                        <td class="whitespace-nowrap px-3 py-3.5 font-mono-code text-slate-300">
+                            ${{ entry.unit_cost|floatformat:2 }}
+                        </td>
+                        <td class="whitespace-nowrap px-3 py-3.5 text-slate-300">
+                            {{ entry.contact.company_name|default:"Internal Adjustment" }}
+                        </td>
+                        <td class="whitespace-nowrap py-3.5 pl-3 pr-6 text-right font-mono-code text-slate-400">
+                            {{ entry.generic_reference_id|default:"DIRECT-INWARD" }}
+                        </td>
+                    </tr>
+                    {% empty %}
+                    <tr>
+                        <td colspan="6" class="py-8 text-center text-slate-500">
+                            No inward inventory transactions recorded yet.
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </section>
+</div>
+
+<script>
+    document.addEventListener('DOMContentLoaded', function () {
+        const itemSelect = document.getElementById('item_id');
+        const qtyInput = document.getElementById('quantity');
+        const costInput = document.getElementById('unit_cost');
+        const uomBadge = document.getElementById('uomBadge');
+
+        const noSelectionNotice = document.getElementById('noSelectionNotice');
+        const selectionPreview = document.getElementById('selectionPreview');
+        const previewSku = document.getElementById('previewSku');
+        const previewName = document.getElementById('previewName');
+        const previewType = document.getElementById('previewType');
+        const previewCurrentStock = document.getElementById('previewCurrentStock');
+        const previewIncomingStock = document.getElementById('previewIncomingStock');
+        const previewNewStock = document.getElementById('previewNewStock');
+        const previewNewCost = document.getElementById('previewNewCost');
+
+        function updateProjection() {
+            const opt = itemSelect.selectedOptions[0];
+            if (!opt || !opt.value) {
+                noSelectionNotice.classList.remove('hidden');
+                selectionPreview.classList.add('hidden');
+                return;
+            }
+
+            noSelectionNotice.classList.add('hidden');
+            selectionPreview.classList.remove('hidden');
+
+            const sku = opt.getAttribute('data-sku');
+            const name = opt.getAttribute('data-name');
+            const type = opt.getAttribute('data-type');
+            const currentStock = parseFloat(opt.getAttribute('data-stock')) || 0;
+            const currentCost = parseFloat(opt.getAttribute('data-cost')) || 0;
+            const uom = opt.getAttribute('data-uom') || 'units';
+
+            const addQty = parseFloat(qtyInput.value) || 0;
+            const unitPrice = parseFloat(costInput.value) || 0;
+
+            const newStock = currentStock + addQty;
+
+            let newWac = currentCost;
+            if (newStock > 0) {
+                if (unitPrice > 0) {
+                    newWac = (currentStock * currentCost + addQty * unitPrice) / newStock;
+                }
+            } else if (unitPrice > 0) {
+                newWac = unitPrice;
+            }
+
+            uomBadge.textContent = uom;
+            previewSku.textContent = sku;
+            previewName.textContent = name;
+            previewType.textContent = type;
+            previewCurrentStock.textContent = currentStock.toFixed(2) + ' ' + uom;
+            previewIncomingStock.textContent = '+' + addQty.toFixed(2) + ' ' + uom;
+            previewNewStock.textContent = newStock.toFixed(2) + ' ' + uom;
+            previewNewCost.textContent = '$' + newWac.toFixed(2);
+        }
+
+        itemSelect.addEventListener('change', updateProjection);
+        qtyInput.addEventListener('input', updateProjection);
+        costInput.addEventListener('input', updateProjection);
+    });
+</script>
+{% endblock %}
