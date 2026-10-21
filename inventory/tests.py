@@ -412,3 +412,55 @@ class EmployeeAndVendorOrderViewsTestCase(TestCase):
         self.assertIsNotNone(ledger)
         self.assertEqual(ledger.transaction_type, TransactionType.IN)
         self.assertEqual(ledger.quantity_changed, Decimal('30.00'))
+
+    def test_employee_list_log_today_boxes(self):
+        """
+        Validates entering how many boxes an employee manufactured today and saving it.
+        """
+        from django.urls import reverse
+        from inventory.models import ProductionLog
+
+        initial_count = ProductionLog.objects.filter(employee=self.emp1, production_date=self.today).count()
+
+        # POST /employees/ with action='log_production'
+        response = self.client.post(reverse('employee-list'), {
+            'action': 'log_production',
+            'employee_id': self.emp1.pk,
+            'quantity': '42',
+            'item_id': self.item.pk
+        })
+        self.assertEqual(response.status_code, 302)
+
+        # Verify new ProductionLog created
+        new_logs = ProductionLog.objects.filter(employee=self.emp1, production_date=self.today)
+        self.assertEqual(new_logs.count(), initial_count + 1)
+        latest_log = new_logs.latest('id')
+        self.assertEqual(latest_log.quantity, 42)
+        self.assertEqual(latest_log.item, self.item)
+
+        # Verify updated EmployeeListView shows the updated today and month totals
+        get_response = self.client.get(reverse('employee-list'))
+        self.assertEqual(get_response.status_code, 200)
+        # Previous 25 + 42 = 67
+        self.assertContains(get_response, '67')
+
+    def test_employee_list_bulk_log_today_boxes(self):
+        """
+        Validates bulk end-of-day logging across multiple employees.
+        """
+        from django.urls import reverse
+        from inventory.models import ProductionLog
+
+        response = self.client.post(reverse('employee-list'), {
+            'action': 'bulk_log_production',
+            'item_id': self.item.pk,
+            f'boxes_{self.emp1.pk}': '18',
+            f'boxes_{self.emp2.pk}': '35',
+        })
+        self.assertEqual(response.status_code, 302)
+
+        emp1_today = ProductionLog.objects.filter(employee=self.emp1, quantity=18, production_date=self.today)
+        self.assertTrue(emp1_today.exists())
+
+        emp2_today = ProductionLog.objects.filter(employee=self.emp2, quantity=35, production_date=self.today)
+        self.assertTrue(emp2_today.exists())

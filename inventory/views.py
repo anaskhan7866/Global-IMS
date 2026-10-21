@@ -13,11 +13,40 @@ from inventory.models import Employee, ProductionLog, Item
 from transactions.models import PurchaseOrder, Contact, ContactType, InventoryLedger, TransactionType
 
 
+def get_or_resolve_production_item(item_id=None):
+    """
+    Resolves target manufactured item (Finished Good), defaulting gracefully if unset.
+    """
+    from inventory.models import ItemType
+    if item_id:
+        found = Item.objects.filter(pk=item_id).first()
+        if found:
+            return found
+
+    fg = Item.objects.filter(type=ItemType.FINISHED_GOOD, is_active=True).first()
+    if fg:
+        return fg
+
+    any_item = Item.objects.filter(is_active=True).first()
+    if any_item:
+        return any_item
+
+    # Fallback to creating standard finished good if catalog is empty
+    return Item.objects.create(
+        sku='FG-CORE-BOX-01',
+        name='GI Core Box',
+        type=ItemType.FINISHED_GOOD,
+        unit_of_measure='pcs',
+        current_stock=Decimal('0.0000'),
+        moving_average_cost=Decimal('0.0000')
+    )
+
+
 class EmployeeListView(ListView):
     """
     Fetches all active employees and calculates their manufacturing productivity
-    for the current calendar month using Count and Sum annotations.
-    Also handles adding a new employee and deactivating an employee via POST.
+    for the current calendar month and today using Count and Sum annotations.
+    Handles adding employees, logging end-of-day output per employee, bulk logs, and deactivation.
     """
     model = Employee
     context_object_name = 'employees'
@@ -27,11 +56,17 @@ class EmployeeListView(ListView):
         now = timezone.now()
         current_year = now.year
         current_month = now.month
+        today = now.date()
 
         # Month filter for production logs
         current_month_filter = Q(
             production_logs__production_date__year=current_year,
             production_logs__production_date__month=current_month
+        )
+
+        # Today's filter for end-of-day tracking
+        today_filter = Q(
+            production_logs__production_date=today
         )
 
         return (
@@ -45,25 +80,44 @@ class EmployeeListView(ListView):
                     Sum('production_logs__quantity', filter=current_month_filter),
                     Value(0)
                 ),
+                today_boxes=Coalesce(
+                    Sum('production_logs__quantity', filter=today_filter),
+                    Value(0)
+                ),
                 production_count=Count(
                     'production_logs',
                     filter=current_month_filter
                 ),
             )
-            .order_by('-total_boxes', 'last_name', 'first_name')
+            .order_by('-today_boxes', '-total_boxes', 'last_name', 'first_name')
         )
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
         now = timezone.now()
+        today = now.date()
         context['current_month'] = now.month
         context['current_year'] = now.year
+        context['today'] = today
+        context['today_str'] = now.strftime('%A, %b %d, %Y')
         context['current_month_name'] = now.strftime('%B %Y')
+
+        # Catalog finished goods for box logging
+        from inventory.models import ItemType
+        finished_goods = Item.objects.filter(type=ItemType.FINISHED_GOOD, is_active=True).order_by('name')
+        if not finished_goods.exists():
+            finished_goods = Item.objects.filter(is_active=True).order_by('name')
+        context['finished_goods'] = finished_goods
+        context['default_item'] = finished_goods.first() if finished_goods.exists() else None
+
+        employees = context.get('employees', [])
+        context['total_today_boxes'] = sum(e.today_boxes for e in employees)
         return context
 
     def post(self, request, *args, **kwargs):
         action = request.POST.get('action')
 
+        # 1. Add New Employee
         if action == 'add_employee':
             first_name = request.POST.get('first_name', '').strip()
             last_name = request.POST.get('last_name', '').strip()
@@ -78,9 +132,94 @@ class EmployeeListView(ListView):
                 last_name=last_name,
                 is_active=is_active_val
             )
+
+            # Optional: if initial boxes for today were entered when adding the employee
+            initial_boxes_raw = request.POST.get('initial_boxes', '').strip()
+            if initial_boxes_raw:
+                try:
+                    initial_qty = int(initial_boxes_raw)
+                    if initial_qty > 0:
+                        item = get_or_resolve_production_item(request.POST.get('item_id'))
+                        ProductionLog.objects.create(
+                            employee=emp,
+                            item=item,
+                            quantity=initial_qty
+                        )
+                        messages.success(
+                            request,
+                            f"Employee '{emp.full_name}' registered with {initial_qty} boxes built today."
+                        )
+                        return redirect('employee-list')
+                except (ValueError, TypeError):
+                    pass
+
             messages.success(request, f"Employee '{emp.full_name}' was registered successfully.")
             return redirect('employee-list')
 
+        # 2. Log End-of-Day Output for a Single Employee
+        elif action == 'log_production':
+            employee_id = request.POST.get('employee_id')
+            raw_quantity = request.POST.get('quantity')
+            item_id = request.POST.get('item_id')
+
+            emp = get_object_or_404(Employee, pk=employee_id)
+
+            try:
+                quantity = int(raw_quantity)
+                if quantity <= 0:
+                    raise ValueError
+            except (ValueError, TypeError):
+                messages.error(request, f"Please enter a valid positive number of boxes for {emp.full_name}.")
+                return redirect('employee-list')
+
+            item = get_or_resolve_production_item(item_id)
+            ProductionLog.objects.create(
+                employee=emp,
+                item=item,
+                quantity=quantity
+            )
+
+            messages.success(
+                request,
+                f"Saved {quantity} boxes for {emp.full_name} today! ({item.name})"
+            )
+            return redirect('employee-list')
+
+        # 3. Bulk End-of-Day Production Sheet (Multiple Employees at Once)
+        elif action == 'bulk_log_production':
+            item_id = request.POST.get('item_id')
+            item = get_or_resolve_production_item(item_id)
+            logged_count = 0
+            total_boxes_saved = 0
+
+            for key, val in request.POST.items():
+                if key.startswith('boxes_') and val.strip():
+                    try:
+                        emp_id = int(key.split('_')[1])
+                        qty = int(val.strip())
+                        if qty > 0:
+                            emp = Employee.objects.filter(pk=emp_id, is_active=True).first()
+                            if emp:
+                                ProductionLog.objects.create(
+                                    employee=emp,
+                                    item=item,
+                                    quantity=qty
+                                )
+                                logged_count += 1
+                                total_boxes_saved += qty
+                    except (ValueError, IndexError):
+                        continue
+
+            if logged_count > 0:
+                messages.success(
+                    request,
+                    f"Saved end-of-day production: {total_boxes_saved} total boxes recorded across {logged_count} operators."
+                )
+            else:
+                messages.info(request, "No production quantities were entered.")
+            return redirect('employee-list')
+
+        # 4. Deactivate Employee
         elif action == 'deactivate' or action == 'delete':
             employee_id = request.POST.get('employee_id')
             emp = get_object_or_404(Employee, pk=employee_id)
