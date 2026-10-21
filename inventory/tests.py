@@ -553,7 +553,8 @@ class EmployeeAndVendorOrderViewsTestCase(TestCase):
 
     def test_inventory_table_displays_weight_of_one_core_box_without_total_weight(self):
         """
-        Validates the table renders weight of one core box, without total weight calculations.
+        Validates the table renders only Name of Product, Quantity, Weight, and Action,
+        without Classification or total weight calculations.
         """
         from django.urls import reverse
 
@@ -564,9 +565,13 @@ class EmployeeAndVendorOrderViewsTestCase(TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, 'All Products Inventory Details')
         self.assertContains(response, 'Test GI Core Box')
-        self.assertContains(response, 'Weight (One Core Box)')
+        self.assertContains(response, 'Name of Product')
+        self.assertContains(response, 'Quantity')
+        self.assertContains(response, 'Weight')
+        self.assertContains(response, 'Action')
         self.assertContains(response, '3.500')
-        # Total weight calculations must NOT be in the response
+        # Classification and Total weight calculations must NOT be in the response
+        self.assertNotContains(response, 'Classification')
         self.assertNotContains(response, 'Total Weight on Hand')
         self.assertNotContains(response, 'Total Stock Weight')
         self.assertNotContains(response, 'Total Batch Weight')
