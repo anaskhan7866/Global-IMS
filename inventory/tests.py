@@ -149,7 +149,7 @@ class EmployeeAndVendorOrderViewsTestCase(TestCase):
         from inventory.models import Employee, ProductionLog, Item, ItemType, UnitOfMeasure
         from transactions.models import Contact, ContactType, PurchaseOrder
 
-        self.today = timezone.now().date()
+        self.today = timezone.localdate()
         self.current_month = self.today.month
         self.current_year = self.today.year
 
@@ -618,6 +618,75 @@ class EmployeeAndVendorOrderViewsTestCase(TestCase):
 
         emp2_today = ProductionLog.objects.filter(employee=self.emp2, quantity=35, production_date=self.today)
         self.assertTrue(emp2_today.exists())
+
+    def test_today_boxes_resets_on_new_day_and_updates_accurately(self):
+        """
+        Validates that when an employee makes boxes on Day 1 (yesterday),
+        on Day 2 (today / tomorrow):
+        1. It does NOT show yesterday's boxes as today's boxes.
+        2. When boxes are added on Day 2, it updates today's count to strictly
+           what was manufactured on Day 2.
+        3. Month total reflects both days combined.
+        """
+        from datetime import timedelta
+        from django.urls import reverse
+        from inventory.models import Employee, ProductionLog
+        from inventory.views import EmployeeListView
+
+        worker = Employee.objects.create(
+            first_name='DayWorker',
+            last_name='Test',
+            is_active=True
+        )
+
+        yesterday = self.today - timedelta(days=1)
+
+        # Day 1: Employee manufactured 20 boxes yesterday
+        ProductionLog.objects.create(
+            employee=worker,
+            item=self.item,
+            quantity=20,
+            production_date=yesterday
+        )
+
+        # On Day 2 (today): Check EmployeeListView before adding any boxes today
+        view = EmployeeListView()
+        qs = view.get_queryset()
+        worker_state = qs.get(pk=worker.pk)
+
+        # Today boxes must be 0 (NOT 20 from yesterday!)
+        self.assertEqual(worker_state.today_boxes, 0)
+        # Monthly total includes yesterday's 20 boxes (if same month)
+        if yesterday.month == self.today.month:
+            self.assertEqual(worker_state.total_boxes, 20)
+
+        # UI GET /employees/ must not show (20 today) for DayWorker
+        res = self.client.get(reverse('employee-list'))
+        self.assertEqual(res.status_code, 200)
+        self.assertNotContains(res, '(20 today)')
+
+        # Day 2: Now add 15 boxes today
+        post_res = self.client.post(reverse('employee-list'), {
+            'action': 'log_production',
+            'employee_id': worker.pk,
+            'quantity': '15',
+            'box_name': 'Test GI Core Box'
+        })
+        self.assertEqual(post_res.status_code, 302)
+
+        # Today's boxes must now be strictly 15 (NOT 20, and NOT 35!)
+        qs_after = view.get_queryset()
+        worker_after = qs_after.get(pk=worker.pk)
+        self.assertEqual(worker_after.today_boxes, 15)
+
+        # If in same month, total boxes is 20 + 15 = 35
+        if yesterday.month == self.today.month:
+            self.assertEqual(worker_after.total_boxes, 35)
+
+        # UI GET /employees/ must now display (15 today)
+        res_after = self.client.get(reverse('employee-list'))
+        self.assertEqual(res_after.status_code, 200)
+        self.assertContains(res_after, '(15 today)')
 
     def test_add_inventory_new_product_with_three_questions(self):
         """

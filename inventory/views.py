@@ -82,10 +82,9 @@ class EmployeeListView(ListView):
     template_name = 'inventory/employee_list.html'
 
     def get_queryset(self):
-        now = timezone.now()
-        current_year = now.year
-        current_month = now.month
-        today = now.date()
+        today = timezone.localdate()
+        current_year = today.year
+        current_month = today.month
 
         # Month filter for production logs
         current_month_filter = Q(
@@ -123,13 +122,12 @@ class EmployeeListView(ListView):
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
-        now = timezone.now()
-        today = now.date()
-        context['current_month'] = now.month
-        context['current_year'] = now.year
+        today = timezone.localdate()
+        context['current_month'] = today.month
+        context['current_year'] = today.year
         context['today'] = today
-        context['today_str'] = now.strftime('%A, %b %d, %Y')
-        context['current_month_name'] = now.strftime('%B %Y')
+        context['today_str'] = today.strftime('%A, %b %d, %Y')
+        context['current_month_name'] = today.strftime('%B %Y')
 
         # Catalog finished goods for box logging
         from inventory.models import ItemType
@@ -203,10 +201,19 @@ class EmployeeListView(ListView):
                 return redirect('employee-list')
 
             item = get_or_resolve_production_item(item_id=item_id, item_name=box_name)
+            target_date = timezone.localdate()
+            raw_date = request.POST.get('production_date') or request.POST.get('date')
+            if raw_date:
+                try:
+                    target_date = datetime.date.fromisoformat(raw_date.strip())
+                except (ValueError, TypeError):
+                    pass
+
             ProductionLog.objects.create(
                 employee=emp,
                 item=item,
-                quantity=quantity
+                quantity=quantity,
+                production_date=target_date
             )
 
             messages.success(
@@ -233,7 +240,8 @@ class EmployeeListView(ListView):
                                 ProductionLog.objects.create(
                                     employee=emp,
                                     item=item,
-                                    quantity=qty
+                                    quantity=qty,
+                                    production_date=timezone.localdate()
                                 )
                                 logged_count += 1
                                 total_boxes_saved += qty
@@ -310,22 +318,22 @@ class EmployeeDetailView(DetailView):
         employee = self.object
 
         # Resolve target month (URL kwarg or GET parameter, fallback to current month)
-        now = timezone.now()
+        today = timezone.localdate()
         request_get = self.request.GET if hasattr(self, 'request') and self.request else {}
-        raw_month = self.kwargs.get('month') or request_get.get('month', now.month)
+        raw_month = self.kwargs.get('month') or request_get.get('month', today.month)
         try:
             month = int(raw_month)
             if not 1 <= month <= 12:
-                month = now.month
+                month = today.month
         except (ValueError, TypeError):
-            month = now.month
+            month = today.month
 
         # Resolve target year (URL kwarg or GET parameter, fallback to current year)
-        raw_year = self.kwargs.get('year') or request_get.get('year', now.year)
+        raw_year = self.kwargs.get('year') or request_get.get('year', today.year)
         try:
             year = int(raw_year)
         except (ValueError, TypeError):
-            year = now.year
+            year = today.year
 
         # Daily breakdown using values('production_date').annotate(Sum('quantity'))
         daily_breakdown = self.get_daily_breakdown(employee, month, year)
@@ -395,7 +403,7 @@ class EmployeeDetailView(DetailView):
         context['active_days'] = active_days
         context['finished_goods'] = finished_goods
         context['default_item'] = finished_goods.first() if finished_goods.exists() else None
-        context['today'] = timezone.now().date()
+        context['today'] = today
         return context
 
     def post(self, request, *args, **kwargs):
@@ -414,24 +422,22 @@ class EmployeeDetailView(DetailView):
                     raise ValueError
             except (ValueError, TypeError):
                 messages.error(request, f"Please enter a valid positive number of boxes for {self.object.full_name}.")
-                return redirect('employee-detail', pk=self.object.pk, month=self.kwargs.get('month', timezone.now().month))
+                return redirect('employee-detail', pk=self.object.pk, month=self.kwargs.get('month', timezone.localdate().month))
 
             item = get_or_resolve_production_item(item_id=item_id, item_name=box_name)
+            target_date = timezone.localdate()
+            if raw_date:
+                try:
+                    target_date = datetime.date.fromisoformat(raw_date.strip())
+                except (ValueError, TypeError):
+                    pass
+
             log = ProductionLog.objects.create(
                 employee=self.object,
                 item=item,
-                quantity=quantity
+                quantity=quantity,
+                production_date=target_date
             )
-
-            # If user specified a particular date (different from today)
-            if raw_date:
-                try:
-                    custom_date = datetime.date.fromisoformat(raw_date.strip())
-                    if custom_date != log.production_date:
-                        log.production_date = custom_date
-                        log.save(update_fields=['production_date'])
-                except (ValueError, TypeError):
-                    pass
 
             messages.success(
                 request,
@@ -462,7 +468,7 @@ class VendorOrderListView(ListView):
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
-        today = timezone.now().date()
+        today = timezone.localdate()
         orders = list(self.get_queryset())
 
         context['today'] = today

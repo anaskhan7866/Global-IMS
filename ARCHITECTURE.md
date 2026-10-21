@@ -60,6 +60,7 @@ Global-IMS is a high-performance, ACID-compliant Manufacturing Resource Planning
 | **Web Framework** | **Django** | `5.1+ LTS` | Enterprise-grade ORM, mature migration engine, robust security middleware (CSRF, XSS, Clickjacking protection), and administrative interface. |
 | **Database** | **SQLite (Dev) / PostgreSQL 16+ (Prod)** | Native / `psycopg3` | ACID guarantees, row-level locking (`FOR UPDATE`), check constraints, composite indexing, and transactional DDL configured via `django-environ`. |
 | **Configuration** | **django-environ** | `0.11+` | 12-factor application architecture with environment variable extraction (`.env`). |
+| **Localization & Timezone** | **Timezone Aware (IST)** | `default='Asia/Kolkata'` | Uses `timezone.localdate()` so day rollover automatically resets daily box counts at midnight locally. |
 | **Static Assets** | **WhiteNoise** | `6.8+` | Self-contained, highly optimized production static file delivery without separate web server dependencies. |
 | **Styling & UI** | **Tailwind CSS** | `3.4+ CDN` | Sleek dark-mode industrial theme (`bg-slate-900`/`bg-slate-950`), custom modals, responsive grid, and micro-animations. |
 | **Typography** | **Google Fonts** | `Inter & JetBrains Mono` | Clean legibility for operational text and monospaced precision for numbers, SKUs, and weights. |

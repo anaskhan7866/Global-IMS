@@ -1,6 +1,7 @@
 from decimal import Decimal
 from django.db import models
 from django.core.exceptions import ValidationError
+from django.utils import timezone
 from django.utils.translation import gettext_lazy as _
 
 
@@ -290,7 +291,7 @@ class ProductionLog(models.Model):
         help_text=_("Number of completed units produced.")
     )
     production_date = models.DateField(
-        auto_now_add=True,
+        default=timezone.localdate,
         db_index=True,
         help_text=_("Date when production was completed.")
     )

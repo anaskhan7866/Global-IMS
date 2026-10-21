@@ -259,7 +259,7 @@ class PurchaseOrder(models.Model):
         Returns True if the order is still Pending and its expected delivery date is in the past.
         """
         from django.utils import timezone
-        return self.status == PurchaseOrderStatus.PENDING and self.expected_delivery_date < timezone.now().date()
+        return self.status == PurchaseOrderStatus.PENDING and self.expected_delivery_date < timezone.localdate()
 
     def __str__(self) -> str:
         return f"PO #{self.id or 'New'}: {self.vendor.company_name} - {self.quantity} x {self.item.sku} ({self.status})"

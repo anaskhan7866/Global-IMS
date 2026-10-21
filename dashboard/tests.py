@@ -132,10 +132,10 @@ class FinancialDashboardServiceTestCase(TestCase):
         )
 
         # Query metrics for the last 7 days only
-        last_week_start = timezone.now().date() - timedelta(days=7)
+        last_week_start = timezone.localdate() - timedelta(days=7)
         metrics = FinancialDashboardService.get_financial_metrics(
             start_date=last_week_start,
-            end_date=timezone.now().date()
+            end_date=timezone.localdate()
         )
 
         # Only recent sale (10 * 50 = $500) should be included

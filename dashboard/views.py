@@ -20,7 +20,7 @@ class DashboardHomeView(TemplateView):
     def get_context_data(self, **kwargs: Any) -> Dict[str, Any]:
         context = super().get_context_data(**kwargs)
 
-        today = timezone.now().date()
+        today = timezone.localdate()
         month_start = today.replace(day=1)
 
         # Retrieve current-month financial metrics from service layer
