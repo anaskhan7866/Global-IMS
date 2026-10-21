@@ -14,15 +14,38 @@ from inventory.models import Employee, ProductionLog, Item, ItemType
 from transactions.models import PurchaseOrder, Contact, ContactType, InventoryLedger, TransactionType
 
 
-def get_or_resolve_production_item(item_id=None):
+def get_or_resolve_production_item(item_id=None, item_name=None):
     """
-    Resolves target manufactured item (Finished Good), defaulting gracefully if unset.
+    Resolves target manufactured item (Finished Good) by item_id or manual box/item name.
+    If a manual name is entered that doesn't exist, it automatically creates it in the catalog.
     """
     from inventory.models import ItemType
     if item_id:
         found = Item.objects.filter(pk=item_id).first()
         if found:
             return found
+
+    if item_name and str(item_name).strip():
+        clean_name = str(item_name).strip()
+        found = Item.objects.filter(name__iexact=clean_name).first()
+        if found:
+            return found
+        # Auto-create finished good with generated unique SKU
+        clean_slug = re.sub(r'[^A-Za-z0-9]+', '-', clean_name).strip('-').upper()
+        base_sku = f"FG-{clean_slug[:12]}" if clean_slug else "FG-BOX"
+        sku = base_sku
+        counter = 1
+        while Item.objects.filter(sku=sku).exists():
+            sku = f"{base_sku}-{counter:02d}"
+            counter += 1
+        return Item.objects.create(
+            sku=sku,
+            name=clean_name,
+            type=ItemType.FINISHED_GOOD,
+            unit_of_measure='pcs',
+            current_stock=Decimal('0.0000'),
+            moving_average_cost=Decimal('0.0000')
+        )
 
     fg = Item.objects.filter(type=ItemType.FINISHED_GOOD, is_active=True).first()
     if fg:
@@ -162,6 +185,7 @@ class EmployeeListView(ListView):
             employee_id = request.POST.get('employee_id')
             raw_quantity = request.POST.get('quantity')
             item_id = request.POST.get('item_id')
+            box_name = (request.POST.get('box_name') or request.POST.get('name') or request.POST.get('item_name') or '').strip()
 
             emp = get_object_or_404(Employee, pk=employee_id)
 
@@ -173,7 +197,7 @@ class EmployeeListView(ListView):
                 messages.error(request, f"Please enter a valid positive number of boxes for {emp.full_name}.")
                 return redirect('employee-list')
 
-            item = get_or_resolve_production_item(item_id)
+            item = get_or_resolve_production_item(item_id=item_id, item_name=box_name)
             ProductionLog.objects.create(
                 employee=emp,
                 item=item,
@@ -371,6 +395,7 @@ class EmployeeDetailView(DetailView):
         if action == 'log_production':
             raw_quantity = request.POST.get('quantity')
             item_id = request.POST.get('item_id')
+            box_name = (request.POST.get('box_name') or request.POST.get('name') or request.POST.get('item_name') or '').strip()
             raw_date = request.POST.get('production_date')
 
             try:
@@ -381,7 +406,7 @@ class EmployeeDetailView(DetailView):
                 messages.error(request, f"Please enter a valid positive number of boxes for {self.object.full_name}.")
                 return redirect('employee-detail', pk=self.object.pk, month=self.kwargs.get('month', timezone.now().month))
 
-            item = get_or_resolve_production_item(item_id)
+            item = get_or_resolve_production_item(item_id=item_id, item_name=box_name)
             log = ProductionLog.objects.create(
                 employee=self.object,
                 item=item,

@@ -68,7 +68,7 @@
                 <thead class="bg-slate-900/60 text-xs uppercase font-semibold text-slate-400">
                     <tr>
                         <th scope="col" class="py-3.5 pl-6 pr-3">Name of Employee</th>
-                        <th scope="col" class="px-3 py-3.5 min-w-[240px]">Boxes</th>
+                        <th scope="col" class="px-3 py-3.5 min-w-[320px]">Boxes</th>
                         <th scope="col" class="px-3 py-3.5">
                             <span>Current Month Boxes</span>
                             <span class="text-[10px] text-slate-500 font-normal block lowercase tracking-normal">Current Month Production</span>
@@ -91,15 +91,16 @@
                                 {% csrf_token %}
                                 <input type="hidden" name="action" value="log_production">
                                 <input type="hidden" name="employee_id" value="{{ emp.pk }}">
-                                {% if finished_goods|length > 1 %}
-                                <select name="item_id" class="px-2 py-1.5 rounded-lg bg-slate-900 border border-slate-700 text-xs text-slate-200 focus:border-cyan-500 font-medium max-w-[130px] truncate" title="Select manufactured box type">
-                                    {% for fg in finished_goods %}
-                                    <option value="{{ fg.pk }}" {% if fg == default_item %}selected{% endif %}>{{ fg.name }}</option>
-                                    {% endfor %}
-                                </select>
-                                {% else %}
-                                <input type="hidden" name="item_id" value="{{ default_item.pk }}">
-                                {% endif %}
+                                <div class="relative w-36">
+                                    <input
+                                        type="text"
+                                        name="box_name"
+                                        list="boxes_datalist"
+                                        autocomplete="off"
+                                        placeholder="Box type (e.g. Core Box)"
+                                        class="w-full px-2.5 py-1.5 rounded-lg bg-slate-900 border border-slate-700 text-white placeholder-slate-500 text-xs font-medium focus:border-cyan-500 focus:ring-1 focus:ring-cyan-500 transition"
+                                    >
+                                </div>
                                 <div class="relative w-28">
                                     <input
                                         type="number"
@@ -295,6 +296,13 @@
         </form>
     </div>
 </div>
+
+<!-- Datalist for manual box typing suggestions -->
+<datalist id="boxes_datalist">
+    {% for fg in finished_goods %}
+    <option value="{{ fg.name }}">
+    {% endfor %}
+</datalist>
 
 <script>
     // Add Employee Modal

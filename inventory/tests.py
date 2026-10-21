@@ -473,6 +473,41 @@ class EmployeeAndVendorOrderViewsTestCase(TestCase):
         total_polish = ProductionLog.objects.filter(employee=self.emp1, item=polish_box).count()
         self.assertEqual(total_polish, 2)
 
+    def test_manual_box_type_entry_field(self):
+        """
+        Validates that box selection dropdown has been replaced with a manual type field,
+        and manual entry resolves or auto-registers the typed box type.
+        """
+        from django.urls import reverse
+        from inventory.models import Item, ProductionLog
+
+        # 1. GET /employees/ does NOT have select for item_id, has text input for box_name
+        list_res = self.client.get(reverse('employee-list'))
+        self.assertEqual(list_res.status_code, 200)
+        self.assertContains(list_res, 'name="box_name"')
+        self.assertNotContains(list_res, '<select name="item_id"')
+
+        # 2. GET /employees/<pk>/<month>/ does NOT have select for item_id, has text input for box_name
+        detail_res = self.client.get(reverse('employee-detail', kwargs={'pk': self.emp1.pk, 'month': self.current_month}))
+        self.assertEqual(detail_res.status_code, 200)
+        self.assertContains(detail_res, 'name="box_name"')
+        self.assertNotContains(detail_res, '<select name="item_id"')
+
+        # 3. Log boxes on employee-list by manually typing a new box name
+        log_res = self.client.post(reverse('employee-list'), {
+            'action': 'log_production',
+            'employee_id': self.emp1.pk,
+            'box_name': 'Manual Diamond Box',
+            'quantity': '28'
+        })
+        self.assertEqual(log_res.status_code, 302)
+        diamond_item = Item.objects.filter(name='Manual Diamond Box').first()
+        self.assertIsNotNone(diamond_item)
+        log_entry = ProductionLog.objects.filter(employee=self.emp1, item=diamond_item).first()
+        self.assertIsNotNone(log_entry)
+        self.assertEqual(log_entry.quantity, 28)
+
+
 
     def test_vendor_orders_view_template_and_overdue_highlight(self):
         """

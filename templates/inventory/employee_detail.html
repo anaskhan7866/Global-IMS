@@ -269,23 +269,27 @@
                 >
             </div>
 
-            <!-- Box Type / Product Selection -->
+            <!-- Box Type (Manual Entry) -->
             <div class="space-y-1.5">
-                <label for="modal_item_id" class="block text-xs font-bold uppercase tracking-wider text-slate-300">
-                    Box Type / Product <span class="text-rose-400">*</span>
+                <label for="modal_box_name" class="block text-xs font-bold uppercase tracking-wider text-slate-300">
+                    Box Type <span class="text-rose-400">*</span>
                 </label>
-                <select
-                    name="item_id"
-                    id="modal_item_id"
+                <input
+                    type="text"
+                    name="box_name"
+                    id="modal_box_name"
+                    list="modal_boxes_datalist"
                     required
-                    class="w-full px-4 py-2.5 rounded-xl bg-slate-900 border border-slate-700 text-white text-sm focus:border-cyan-500 focus:ring-2 focus:ring-cyan-500/20 transition font-medium"
+                    autocomplete="off"
+                    placeholder="e.g. Core Box, Polish Box, Plastic Box"
+                    class="w-full px-4 py-2.5 rounded-xl bg-slate-900 border border-slate-700 text-white placeholder-slate-500 text-sm focus:border-cyan-500 focus:ring-2 focus:ring-cyan-500/20 transition font-medium"
                 >
+                <datalist id="modal_boxes_datalist">
                     {% for fg in finished_goods %}
-                    <option value="{{ fg.pk }}" {% if fg == default_item %}selected{% endif %}>
-                        {{ fg.name }} {% if fg.weight %}({{ fg.weight }} kg/box){% endif %} [{{ fg.sku }}]
-                    </option>
+                    <option value="{{ fg.name }}">
                     {% endfor %}
-                </select>
+                </datalist>
+                <p class="text-[11px] text-slate-400">Type any box type name manually (e.g. Core Box, Polish Box, Plastic Box).</p>
             </div>
 
             <!-- Quantity of Boxes -->
