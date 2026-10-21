@@ -150,6 +150,10 @@ class DashboardHomeViewTestCase(TestCase):
     """
 
     def setUp(self):
+        from django.contrib.auth.models import User
+        self.user = User.objects.create_user(username='executive', password='ExecPassword123!')
+        self.client.force_login(self.user)
+
         # Create an item with low stock (< 10)
         self.low_stock_item = Item.objects.create(
             type=ItemType.RAW_MATERIAL,
@@ -168,6 +172,13 @@ class DashboardHomeViewTestCase(TestCase):
             current_stock=Decimal('50.0000'),
             moving_average_cost=Decimal('22.0000')
         )
+
+    def test_dashboard_requires_authentication(self):
+        """Assert unauthenticated requests to dashboard redirect to login."""
+        self.client.logout()
+        response = self.client.get('/dashboard/')
+        self.assertEqual(response.status_code, 302)
+        self.assertIn('/admin/login/', response.url)
 
     def test_dashboard_home_view_get(self):
         response = self.client.get('/dashboard/')

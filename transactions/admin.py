@@ -167,11 +167,21 @@ class PurchaseOrderAdmin(admin.ModelAdmin):
     @admin.display(description=_('Status'), ordering='status')
     def status_badge(self, obj: PurchaseOrder) -> str:
         if obj.status == PurchaseOrderStatus.DELIVERED:
+            badge_style = (
+                "background-color: #D1FAE5; color: #065F46; "
+                "font-weight: 600; padding: 2px 8px; border-radius: 9999px;"
+            )
             return format_html(
-                '<span style="background-color: #D1FAE5; color: #065F46; font-weight: 600; padding: 2px 8px; border-radius: 9999px;">{}</span>',
+                '<span style="{}">{}</span>',
+                badge_style,
                 obj.get_status_display()
             )
+        badge_style = (
+            "background-color: #FEF3C7; color: #92400E; "
+            "font-weight: 600; padding: 2px 8px; border-radius: 9999px;"
+        )
         return format_html(
-            '<span style="background-color: #FEF3C7; color: #92400E; font-weight: 600; padding: 2px 8px; border-radius: 9999px;">{}</span>',
+            '<span style="{}">{}</span>',
+            badge_style,
             obj.get_status_display()
         )

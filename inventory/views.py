@@ -1,11 +1,12 @@
 import datetime
 import re
 from decimal import Decimal
-from django.db import transaction
-from django.db.models import Count, Sum, Q, Value
+from django.db import transaction, IntegrityError
+from django.db.models import Count, Sum, Q, Value, ProtectedError
 from django.db.models.functions import Coalesce
 from django.shortcuts import render, redirect, get_object_or_404
 from django.contrib import messages
+from django.contrib.auth.mixins import LoginRequiredMixin
 from django.utils import timezone
 from django.views import View
 from django.views.generic import ListView, DetailView
@@ -15,10 +16,7 @@ from transactions.models import PurchaseOrder, Contact, ContactType, InventoryLe
 
 
 def get_or_resolve_production_item(item_id=None, item_name=None):
-    """
-    Resolves target manufactured item (Finished Good) by item_id or manual box/item name.
-    If a manual name is entered that doesn't exist, it automatically creates it in the catalog.
-    """
+    """Resolve an item from the catalog or auto-create a finished good if newly named."""
     if item_id:
         found = Item.objects.filter(pk=item_id).first()
         if found:
@@ -65,17 +63,8 @@ def get_or_resolve_production_item(item_id=None, item_name=None):
     )
 
 
-class EmployeeListView(ListView):
-    """
-    Workforce productivity controller for shop-floor operators.
-    Provides a streamlined 5-feature table:
-    1. Name of Employee
-    2. Boxes (Manual text input for box type with datalist suggestions + quantity + save)
-    3. Current Month Boxes (Aggregated monthly manufacturing output)
-    4. Daily Log (Direct navigation to date-grouped production logs)
-    5. Delete (Safe deletion / deactivation with modal confirmation)
-    Supports real-time auto-creation of newly typed box types in the Item catalog.
-    """
+class EmployeeListView(LoginRequiredMixin, ListView):
+    """Display active workforce directory and aggregate current-month and daily manufacturing outputs."""
     model = Employee
     context_object_name = 'employees'
     template_name = 'inventory/employee_list.html'
@@ -255,14 +244,14 @@ class EmployeeListView(ListView):
                 messages.info(request, "No production quantities were entered.")
             return redirect('employee-list')
 
-        # 4. Delete / Deactivate Employee
-        elif action == 'deactivate' or action == 'delete':
+        elif action in ('deactivate', 'delete'):
             employee_id = request.POST.get('employee_id')
             emp = get_object_or_404(Employee, pk=employee_id)
             emp_name = emp.full_name
             try:
                 emp.delete()
-            except Exception:
+            except (ProtectedError, IntegrityError):
+                # Fall back to soft-deactivation if historical production logs reference this record
                 emp.is_active = False
                 emp.save(update_fields=['is_active'])
             messages.success(request, f"Employee '{emp_name}' has been deleted.")
@@ -272,17 +261,8 @@ class EmployeeListView(ListView):
         return redirect('employee-list')
 
 
-class EmployeeDetailView(DetailView):
-    """
-    Workforce daily production breakdown controller:
-    - Groups assembly logs by production_date using values('production_date').annotate(Sum('quantity')).
-    - Computes total boxes manufactured per calendar day.
-    - Adaptive detail rendering:
-      * Single Box Type: Displays quantity, name, and unit weight of the manufactured box.
-      * Multiple Box Types (e.g. 50 core box, 10 polish box, 10 plastic box): Displays the
-        exact breakdown of every distinct box type with quantities and unit weights alongside the day's total.
-    - Supports retroactive and on-date logging via manual text entry.
-    """
+class EmployeeDetailView(LoginRequiredMixin, DetailView):
+    """Provide date-grouped daily production log breakdowns for an individual operator."""
     model = Employee
     context_object_name = 'employee'
     template_name = 'inventory/employee_detail.html'
@@ -446,13 +426,8 @@ class EmployeeDetailView(DetailView):
         return redirect('employee-detail', pk=self.object.pk, month=self.kwargs.get('month', timezone.now().month))
 
 
-class VendorOrderListView(ListView):
-    """
-    Vendor & Company Orders Controller:
-    - Add incoming order: Company Name, Core Box Type, Quantity, Delivery Date.
-    - View active company orders (Company, Core Box, Quantity, Delivery Date, Action).
-    - Remove line button: Directly removes that line from vendor orders upon delivery or clearance.
-    """
+class VendorOrderListView(LoginRequiredMixin, ListView):
+    """Manage company purchase orders and delivery fulfillment schedules."""
     model = PurchaseOrder
     context_object_name = 'purchase_orders'
     template_name = 'inventory/vendor_orders.html'
@@ -585,25 +560,8 @@ class VendorOrderListView(ListView):
         return redirect('vendor-order-list')
 
 
-class AddInventoryView(View):
-    """
-    High-performance, streamlined inventory management controller:
-    1. Direct 3-field entry form:
-       - 1. Name of the product
-       - 2. Quantity
-       - 3. Weight of the product (core box) - unit weight of one core box in kg
-    2. Lean 4-column presentation table showing all details of all products:
-       - Name of Product (& unique SKU)
-       - Quantity (Current on-hand stock)
-       - Weight (Unit weight of one core box)
-       - Action:
-         * Add: Quick stock replenishment
-         * Edit: In-place modal to modify product name, quantity, or weight with ledger correction
-         * Remove: Stock deduction with positive balance validation
-         * Delete: Complete product removal (permitted strictly when stock is zero)
-    3. Multi-weight identity: Products sharing the same name but differing unit weights
-       are stored as distinct Item records.
-    """
+class AddInventoryView(LoginRequiredMixin, View):
+    """Manage multi-weight core box inventory, stock additions, and record modifications."""
     template_name = 'inventory/add_inventory.html'
 
     def get(self, request, *args, **kwargs):
@@ -732,7 +690,8 @@ class AddInventoryView(View):
                 if locked_item.current_stock > Decimal('0'):
                     messages.error(
                         request,
-                        f"Cannot remove product '{locked_item.name}'. Current stock is {locked_item.current_stock} {locked_item.unit_of_measure}. "
+                        f"Cannot remove product '{locked_item.name}'. "
+                        f"Current stock is {locked_item.current_stock} {locked_item.unit_of_measure}. "
                         f"The stock must be zero to completely remove the product."
                     )
                     return redirect('add-inventory')
@@ -741,16 +700,17 @@ class AddInventoryView(View):
                 item_sku = locked_item.sku
                 item_weight = locked_item.weight
 
-                # If protected by immutable audit ledgers, soft-delete via is_active=False
+                # Preserve referential integrity if historical ledger movements reference this item
                 try:
                     locked_item.delete()
-                except Exception:
+                except (ProtectedError, IntegrityError):
                     locked_item.is_active = False
                     locked_item.save(update_fields=['is_active', 'updated_at'])
 
                 messages.success(
                     request,
-                    f"Product '{item_name}' (Weight: {item_weight} kg/box, SKU: {item_sku}) has been completely removed from inventory."
+                    f"Product '{item_name}' (Weight: {item_weight} kg/box, SKU: {item_sku}) "
+                    f"has been completely removed from inventory."
                 )
 
             return redirect('add-inventory')
@@ -970,7 +930,10 @@ class AddInventoryView(View):
                     moving_average_cost=unit_cost
                 )
 
-                default_narration = narration or f"Created distinct core box '{new_item.name}' (Weight: {effective_weight} kg/box) with {quantity} units."
+                default_narration = narration or (
+                    f"Created distinct core box '{new_item.name}' "
+                    f"(Weight: {effective_weight} kg/box) with {quantity} units."
+                )
                 InventoryLedger.objects.create(
                     item=new_item,
                     quantity_changed=quantity,
@@ -984,7 +947,8 @@ class AddInventoryView(View):
 
                 messages.success(
                     request,
-                    f"Created distinct product '{new_item.name}' (Weight: {effective_weight} kg/box, SKU: {new_item.sku}) with {quantity} units."
+                    f"Created distinct product '{new_item.name}' "
+                    f"(Weight: {effective_weight} kg/box, SKU: {new_item.sku}) with {quantity} units."
                 )
 
         return redirect('add-inventory')

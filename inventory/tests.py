@@ -145,9 +145,13 @@ class EmployeeAndVendorOrderViewsTestCase(TestCase):
 
     def setUp(self):
         from django.utils import timezone
+        from django.contrib.auth.models import User
         import datetime
         from inventory.models import Employee, ProductionLog, Item, ItemType, UnitOfMeasure
         from transactions.models import Contact, ContactType, PurchaseOrder
+
+        self.user = User.objects.create_user(username='testoperator', password='TestPassword123!')
+        self.client.force_login(self.user)
 
         self.today = timezone.localdate()
         self.current_month = self.today.month
@@ -1078,6 +1082,15 @@ class EmployeeAndVendorOrderViewsTestCase(TestCase):
         self.assertContains(response, 'openEditProductModal')
         self.assertContains(response, 'editProductModal')
         self.assertContains(response, 'Edit Product Details')
+
+    def test_operational_views_require_authentication(self):
+        """Assert unauthenticated requests to operational views redirect to admin login."""
+        from django.urls import reverse
+        self.client.logout()
+        for route_name in ['inventory-home', 'add-inventory', 'employee-list', 'vendor-order-list']:
+            res = self.client.get(reverse(route_name))
+            self.assertEqual(res.status_code, 302)
+            self.assertIn('/admin/login/', res.url)
 
 
 

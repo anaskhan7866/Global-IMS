@@ -18,14 +18,7 @@ def process_purchase_order(
     reference_id: str = "",
     timestamp: Optional[Any] = None
 ) -> InventoryLedger:
-    """
-    Executes a procurement receipt:
-    1. Locks the item row using select_for_update() to prevent concurrent stock corruption.
-    2. Recalculates Moving Weighted Average Cost (WAC) based on existing stock valuation + new purchase value:
-       WAC = (old_stock * old_cost + new_qty * unit_price) / (old_stock + new_qty)
-    3. Increases the item's physical current_stock.
-    4. Records an immutable 'In' entry in InventoryLedger.
-    """
+    """Receive purchased inventory, update moving weighted average cost, and record the ledger receipt."""
     quantity = Decimal(str(quantity))
     unit_price = Decimal(str(unit_price))
 
@@ -79,17 +72,7 @@ def process_manufacturing_order(
     reference_id: str = "",
     employee: Optional[Employee] = None
 ) -> Dict[str, Any]:
-    """
-    Executes a discrete production work order:
-    1. Validates and resolves the active Bill of Materials (BOM) for the finished good.
-    2. Calculates required raw material quantities (including scrap allowance).
-    3. Acquires row-level locks on all raw materials in deterministic order to prevent deadlocks.
-    4. Asserts stock sufficiency for all required raw materials, raising InsufficientStockError if short.
-    5. Deducts required raw material stock and logs 'Out' consumption entries in InventoryLedger.
-    6. Increases finished good stock, updates finished good Moving Average Cost with actual production cost,
-       and logs a 'Manufactured' entry in InventoryLedger.
-    7. Creates a ProductionLog record for the assigned employee operator.
-    """
+    """Execute a manufacturing build against the item's BOM, consume raw materials, and record produced inventory."""
     quantity_to_build = Decimal(str(quantity_to_build))
     if quantity_to_build <= Decimal('0'):
         raise ValidationError("Manufacturing quantity to build must be strictly greater than zero.")
@@ -233,15 +216,7 @@ def process_sales_order(
     reference_id: str = "",
     timestamp: Optional[Any] = None
 ) -> Dict[str, Any]:
-    """
-    Executes a sales order fulfillment & stock dispatch:
-    1. Locks the item row using select_for_update().
-    2. Validates stock availability, raising InsufficientStockError if quantity exceeds on-hand balance.
-    3. Deducts the physical current_stock.
-    4. Computes COGS based on current moving_average_cost and gross revenue based on selling_price.
-    5. Records an immutable 'Out' entry in InventoryLedger.
-    6. Returns a dictionary containing financial metrics: revenue, cogs, gross_profit, and remaining_stock.
-    """
+    """Dispatch sold inventory to a client, compute COGS and revenue, and record the outward ledger entry."""
     quantity = Decimal(str(quantity))
     selling_price = Decimal(str(selling_price))
 
@@ -256,7 +231,8 @@ def process_sales_order(
     if locked_item.current_stock < quantity:
         raise InsufficientStockError(
             f"Insufficient stock for '{locked_item.name}' (SKU: {locked_item.sku}). "
-            f"Requested: {quantity:.4f} {locked_item.unit_of_measure}, Available: {locked_item.current_stock:.4f} {locked_item.unit_of_measure}",
+            f"Requested: {quantity:.4f} {locked_item.unit_of_measure}, "
+            f"Available: {locked_item.current_stock:.4f} {locked_item.unit_of_measure}",
             item_sku=locked_item.sku,
             required_qty=quantity,
             available_qty=locked_item.current_stock
@@ -280,7 +256,10 @@ def process_sales_order(
         'unit_cost': locked_item.moving_average_cost,
         'selling_price': selling_price,
         'total_cost': cogs,
-        'narration': f"Dispatched {quantity:.4f} {locked_item.unit_of_measure} to {client.company_name} (SO Ref: {reference_id or 'N/A'})"
+        'narration': (
+            f"Dispatched {quantity:.4f} {locked_item.unit_of_measure} "
+            f"to {client.company_name} (SO Ref: {reference_id or 'N/A'})"
+        )
     }
     if timestamp:
         ledger_kwargs['timestamp'] = timestamp

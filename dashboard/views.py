@@ -1,6 +1,7 @@
 from decimal import Decimal
 from typing import Any, Dict
 
+from django.contrib.auth.mixins import LoginRequiredMixin
 from django.views.generic import TemplateView
 from django.utils import timezone
 
@@ -8,12 +9,8 @@ from inventory.models import Item
 from dashboard.services import FinancialDashboardService
 
 
-class DashboardHomeView(TemplateView):
-    """
-    Executive MRP & Financial Dashboard View.
-    Renders top-line financial metrics for the current calendar month,
-    visual sales performance analytics, and critical inventory low-stock alerts.
-    """
+class DashboardHomeView(LoginRequiredMixin, TemplateView):
+    """Display current-month financial metrics, revenue analytics, and low-stock warnings."""
     template_name = 'dashboard/home.html'
 
     def get_context_data(self, **kwargs: Any) -> Dict[str, Any]:

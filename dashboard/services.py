@@ -10,11 +10,7 @@ from transactions.models import InventoryLedger, TransactionType
 
 
 class FinancialDashboardService:
-    """
-    Analytics and managerial accounting service:
-    Calculates executive KPIs including Gross Revenue, Cost of Goods Sold (COGS),
-    Gross Profit, and Total Inventory Valuation on hand.
-    """
+    """Compute top-line financial performance metrics and inventory valuation."""
 
     @classmethod
     def get_financial_metrics(
@@ -22,15 +18,7 @@ class FinancialDashboardService:
         start_date: Optional[Any] = None,
         end_date: Optional[Any] = None
     ) -> Dict[str, Decimal]:
-        """
-        Calculates financial performance metrics over a date range:
-        - total_revenue: Total monetary value of fulfilled sales orders.
-        - total_cogs: Total cost of finished goods sold based on moving average cost at dispatch.
-        - gross_profit: total_revenue - total_cogs.
-        - total_inventory_value: Real-time balance sheet value of all inventory on hand.
-
-        Returns Decimal values defaulted to Decimal('0.00') if no records match.
-        """
+        """Aggregate revenue, cost of goods sold, profit, and stock valuation for a date window."""
         # Query InventoryLedger filtering by 'Out' transactions representing commercial sales
         sales_qs = InventoryLedger.objects.filter(
             transaction_type=TransactionType.OUT
