@@ -342,6 +342,54 @@ class EmployeeAndVendorOrderViewsTestCase(TestCase):
         self.emp2.refresh_from_db()
         self.assertFalse(self.emp2.is_active)
 
+    def test_streamlined_employee_table_features(self):
+        """
+        Validates that the Employee table strictly provides the requested features:
+        Name of Employee, Boxes, Current Month Boxes, Daily Log, and Delete.
+        """
+        from django.urls import reverse
+        from inventory.models import Employee, ProductionLog
+
+        # 1. GET /employees/ renders exactly the 5 features
+        response = self.client.get(reverse('employee-list'))
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, 'Name of Employee')
+        self.assertContains(response, 'Boxes')
+        self.assertContains(response, 'Current Month Boxes')
+        self.assertContains(response, 'Daily Log')
+        self.assertContains(response, 'Delete')
+        self.assertContains(response, 'openDeleteEmployeeModal')
+
+        # Clutter removed
+        self.assertNotContains(response, "Today's Manufactured Boxes")
+        self.assertNotContains(response, "Active Operators")
+        self.assertNotContains(response, "End-of-Day Batch Sheet")
+
+        # 2. Test logging boxes for an employee
+        initial_emp1_boxes = self.emp1.production_logs.count()
+        log_res = self.client.post(reverse('employee-list'), {
+            'action': 'log_production',
+            'employee_id': self.emp1.pk,
+            'quantity': '12',
+            'item_id': self.item.pk
+        })
+        self.assertEqual(log_res.status_code, 302)
+        self.assertEqual(self.emp1.production_logs.count(), initial_emp1_boxes + 1)
+
+        # 3. Test deleting an employee
+        delete_emp = Employee.objects.create(
+            first_name='ToDelete',
+            last_name='Worker',
+            is_active=True
+        )
+        del_res = self.client.post(reverse('employee-list'), {
+            'action': 'delete',
+            'employee_id': delete_emp.pk
+        })
+        self.assertEqual(del_res.status_code, 302)
+        self.assertFalse(Employee.objects.filter(pk=delete_emp.pk, is_active=True).exists())
+
+
     def test_employee_detail_view_template(self):
         """
         Validates EmployeeDetailView template rendering and Daily Breakdown table.

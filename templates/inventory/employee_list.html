@@ -1,34 +1,31 @@
 {% extends 'base.html' %}
 
-{% block title %}Workforce & Daily Production Tracking | Global-IMS{% endblock %}
+{% block title %}Employees & Production | Global-IMS{% endblock %}
 
 {% block content %}
-<div class="space-y-8">
+<div class="space-y-6">
     <!-- Header Banner & Action Buttons -->
-    <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-        <div>
-            <div class="flex items-center space-x-3">
-                <h1 class="text-2xl sm:text-3xl font-extrabold tracking-tight text-white">Workforce & Production Tracking</h1>
-                <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold bg-cyan-950 text-cyan-300 border border-cyan-800">
-                    {{ today_str }}
-                </span>
+    <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 pb-2 border-b border-slate-800">
+        <div class="flex items-center space-x-3">
+            <div class="w-10 h-10 rounded-xl bg-gradient-to-br from-cyan-500 to-blue-600 flex items-center justify-center text-white shadow-lg shadow-cyan-900/40">
+                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
+                </svg>
             </div>
-            <p class="mt-1 text-sm text-slate-400">
-                Log daily boxes manufactured per employee, register operators, and review month-to-date output quotas.
-            </p>
+            <div>
+                <h1 class="text-2xl sm:text-3xl font-extrabold tracking-tight text-white">Employee Management</h1>
+                <p class="text-xs sm:text-sm text-slate-400 mt-0.5">Track daily boxes manufactured per employee, monthly output, and production logs.</p>
+            </div>
         </div>
 
-        <div class="flex flex-wrap items-center gap-3">
-            <!-- Toggle Bulk Entry Sheet -->
-            <button id="toggleBulkBtn" type="button" class="inline-flex items-center space-x-2 px-3.5 py-2.5 rounded-lg bg-slate-900 hover:bg-slate-800 text-slate-200 text-sm font-semibold border border-slate-700 hover:border-slate-600 transition">
-                <svg class="w-4 h-4 text-amber-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01" />
-                </svg>
-                <span id="bulkBtnText">End-of-Day Batch Sheet</span>
-            </button>
-
-            <!-- Add Employee Modal Trigger -->
-            <button id="openAddModalBtn" type="button" class="inline-flex items-center space-x-2 px-4 py-2.5 rounded-lg bg-cyan-600 hover:bg-cyan-500 text-white text-sm font-semibold shadow-lg shadow-cyan-900/40 hover:shadow-cyan-900/60 transition focus:outline-none focus:ring-2 focus:ring-cyan-400 focus:ring-offset-2 focus:ring-offset-slate-900">
+        <div>
+            <!-- Add Employee Trigger Button -->
+            <button
+                id="openAddModalBtn"
+                type="button"
+                onclick="openAddEmployeeModal()"
+                class="inline-flex items-center space-x-2 px-4 py-2.5 rounded-xl bg-gradient-to-r from-cyan-600 to-blue-600 hover:from-cyan-500 hover:to-blue-500 text-white text-xs sm:text-sm font-bold shadow-lg shadow-cyan-900/40 hover:shadow-cyan-900/60 transition focus:outline-none focus:ring-2 focus:ring-cyan-400"
+            >
                 <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M18 9v3m0 0v3m0-3h3m-3 0h-3m-2-5a4 4 0 11-8 0 4 4 0 018 0zM3 20a6 6 0 0112 0v1H3v-1z" />
                 </svg>
@@ -37,389 +34,318 @@
         </div>
     </div>
 
-    <!-- Quick Workforce & Today's Production KPIs -->
-    <section aria-label="Workforce Summary KPIs" class="grid grid-cols-1 sm:grid-cols-3 gap-5">
-        <!-- Today's Total Boxes Built -->
-        <div class="rounded-xl bg-slate-950 p-5 border border-slate-800 shadow-xl relative overflow-hidden">
-            <div class="absolute top-0 right-0 w-24 h-24 bg-emerald-500/10 rounded-full blur-2xl -mr-6 -mt-6"></div>
-            <div class="flex items-center justify-between">
-                <p class="text-xs font-semibold uppercase tracking-wider text-slate-400">Today's Manufactured Boxes</p>
-                <span class="p-2 rounded-lg bg-emerald-950 text-emerald-400 border border-emerald-800">
-                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" />
-                    </svg>
-                </span>
-            </div>
-            <h3 class="mt-4 text-3xl font-extrabold text-emerald-400 font-mono-code">{{ total_today_boxes }} <span class="text-sm font-normal text-slate-400">Boxes</span></h3>
-            <p class="mt-1 text-xs text-slate-400">Output logged for {{ today|date:"M d, Y" }}</p>
-        </div>
-
-        <!-- Active Operators -->
-        <div class="rounded-xl bg-slate-950 p-5 border border-slate-800 shadow-xl relative overflow-hidden">
-            <div class="absolute top-0 right-0 w-24 h-24 bg-cyan-500/10 rounded-full blur-2xl -mr-6 -mt-6"></div>
-            <div class="flex items-center justify-between">
-                <p class="text-xs font-semibold uppercase tracking-wider text-slate-400">Active Operators</p>
-                <span class="p-2 rounded-lg bg-cyan-950 text-cyan-400 border border-cyan-800">
-                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
-                    </svg>
-                </span>
-            </div>
-            <h3 class="mt-4 text-3xl font-extrabold text-white font-mono-code">{{ employees|length }}</h3>
-            <p class="mt-1 text-xs text-slate-400">Shop-floor assembly personnel</p>
-        </div>
-
-        <!-- Current Month Period -->
-        <div class="rounded-xl bg-slate-950 p-5 border border-slate-800 shadow-xl relative overflow-hidden">
-            <div class="absolute top-0 right-0 w-24 h-24 bg-purple-500/10 rounded-full blur-2xl -mr-6 -mt-6"></div>
-            <div class="flex items-center justify-between">
-                <p class="text-xs font-semibold uppercase tracking-wider text-slate-400">Current Month</p>
-                <span class="p-2 rounded-lg bg-purple-950 text-purple-400 border border-purple-800">
-                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
-                    </svg>
-                </span>
-            </div>
-            <h3 class="mt-4 text-3xl font-extrabold text-purple-300 font-mono-code">{{ current_month_name }}</h3>
-            <p class="mt-1 text-xs text-slate-400">Cumulative monthly totals tracked</p>
-        </div>
-    </section>
-
-    <!-- Collapsible Bulk End-of-Day Production Sheet -->
-    <section id="bulkSheetContainer" class="hidden rounded-xl bg-slate-950 border-2 border-cyan-500/40 shadow-2xl p-6 transition-all duration-300">
-        <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between pb-4 border-b border-slate-800 gap-3">
+    <!-- Employees Main Table Card -->
+    <div class="rounded-2xl bg-slate-950 border border-slate-800 shadow-xl overflow-hidden">
+        <!-- Table Header & Search -->
+        <div class="p-5 sm:p-6 border-b border-slate-800 flex flex-col md:flex-row md:items-center md:justify-between gap-4 bg-slate-950">
             <div>
                 <div class="flex items-center space-x-2">
-                    <span class="h-2 w-2 rounded-full bg-cyan-400 animate-ping"></span>
-                    <h2 class="text-lg font-bold text-white tracking-tight">End-of-Day Batch Production Sheet</h2>
+                    <h2 class="text-lg font-bold text-white tracking-tight">Active Employees & Production</h2>
+                    <span class="px-2.5 py-0.5 rounded-full text-xs font-semibold bg-slate-900 text-cyan-400 border border-slate-800">
+                        {{ employees|length }} Employees
+                    </span>
                 </div>
-                <p class="text-xs text-slate-400 mt-0.5">Enter the number of boxes built today by each operator and save all in one click.</p>
-            </div>
-            <button type="button" onclick="document.getElementById('toggleBulkBtn').click()" class="text-xs text-slate-400 hover:text-white">
-                ✕ Close Sheet
-            </button>
-        </div>
-
-        <form method="post" action="{% url 'employee-list' %}" class="mt-5 space-y-5">
-            {% csrf_token %}
-            <input type="hidden" name="action" value="bulk_log_production">
-
-            <!-- Target Item selection (if multiple exist) -->
-            {% if finished_goods %}
-            <div class="flex items-center space-x-3 text-xs bg-slate-900/60 p-3 rounded-lg border border-slate-800">
-                <label for="bulk_item_id" class="font-semibold text-slate-300 uppercase">Manufactured Product:</label>
-                <select name="item_id" id="bulk_item_id" class="px-3 py-1.5 rounded-md bg-slate-950 border border-slate-700 text-cyan-300 font-semibold focus:border-cyan-500">
-                    {% for fg in finished_goods %}
-                    <option value="{{ fg.pk }}" {% if fg == default_item %}selected{% endif %}>
-                        [{{ fg.sku }}] {{ fg.name }}
-                    </option>
-                    {% endfor %}
-                </select>
-            </div>
-            {% endif %}
-
-            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                {% for emp in employees %}
-                <div class="p-3.5 rounded-lg bg-slate-900/80 border border-slate-800 hover:border-slate-700 flex items-center justify-between gap-3">
-                    <div class="flex items-center space-x-3 min-w-0">
-                        <div class="h-8 w-8 rounded-full bg-cyan-900/60 text-cyan-300 font-bold text-xs flex items-center justify-center flex-shrink-0 border border-cyan-700">
-                            {{ emp.first_name|slice:":1" }}{{ emp.last_name|slice:":1" }}
-                        </div>
-                        <div class="min-w-0">
-                            <span class="text-sm font-semibold text-white block truncate">{{ emp.full_name }}</span>
-                            <span class="text-[11px] text-slate-400 font-mono-code">Today: {{ emp.today_boxes }} built</span>
-                        </div>
-                    </div>
-                    <div class="flex items-center space-x-1.5 flex-shrink-0">
-                        <input type="number" name="boxes_{{ emp.pk }}" min="0" placeholder="Qty" class="w-20 px-2.5 py-1.5 rounded-md bg-slate-950 border border-slate-700 text-white placeholder-slate-600 text-xs font-mono-code focus:border-cyan-500 focus:ring-1 focus:ring-cyan-500 text-right">
-                        <span class="text-xs text-slate-500">boxes</span>
-                    </div>
-                </div>
-                {% endfor %}
+                <p class="text-xs text-slate-400 mt-1">Enter boxes manufactured today per operator, check monthly totals, and view daily production logs.</p>
             </div>
 
-            <div class="pt-4 border-t border-slate-800 flex justify-end">
-                <button type="submit" class="inline-flex items-center space-x-2 px-6 py-2.5 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white text-sm font-bold shadow-lg shadow-emerald-950 transition">
-                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>
-                    <span>Save All End-of-Day Output</span>
-                </button>
-            </div>
-        </form>
-    </section>
-
-    <!-- Employees Main Table Card -->
-    <section aria-label="Employees Table" class="rounded-xl bg-slate-950 border border-slate-800 shadow-xl overflow-hidden">
-        <div class="p-5 sm:p-6 border-b border-slate-800 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 bg-slate-950">
-            <div>
-                <h2 class="text-lg font-bold text-white tracking-tight">Active Assembly Operators & Daily Output</h2>
-                <p class="text-xs text-slate-400 mt-0.5">
-                    Enter how many boxes each worker built today and click <span class="text-cyan-400 font-semibold">"Save"</span> to update the ledger.
-                </p>
-            </div>
-            <div class="flex items-center space-x-2 text-xs">
-                <span class="px-2.5 py-1 rounded bg-slate-900 border border-slate-800 text-slate-300 font-mono-code">
-                    Date: {{ today|date:"Y-m-d" }}
-                </span>
+            <!-- Search Filter -->
+            <div class="relative w-full md:w-72">
+                <input
+                    type="text"
+                    id="employeeSearch"
+                    placeholder="Search employee name..."
+                    class="w-full pl-9 pr-4 py-2 rounded-xl bg-slate-900 border border-slate-800 text-white placeholder-slate-500 text-xs focus:border-cyan-500 focus:ring-1 focus:ring-cyan-500 transition"
+                >
+                <svg class="w-4 h-4 text-slate-500 absolute left-3 top-2.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                </svg>
             </div>
         </div>
 
+        <!-- Table Display: name of employee | boxes | current month boxes | daily log | delete -->
         <div class="overflow-x-auto">
-            <table class="min-w-full divide-y divide-slate-800 text-left text-sm">
+            <table class="min-w-full divide-y divide-slate-800 text-left text-sm" id="employeesTable">
                 <thead class="bg-slate-900/60 text-xs uppercase font-semibold text-slate-400">
                     <tr>
-                        <th scope="col" class="py-3.5 pl-6 pr-3">Employee Name</th>
-                        <th scope="col" class="px-3 py-3.5">Today's Total</th>
-                        <th scope="col" class="px-3 py-3.5 min-w-[260px]">Log Today's Boxes (End-of-Day)</th>
-                        <th scope="col" class="px-3 py-3.5">Current Month Production</th>
-                        <th scope="col" class="py-3.5 pl-3 pr-6 text-right">Actions</th>
+                        <th scope="col" class="py-3.5 pl-6 pr-3">Name of Employee</th>
+                        <th scope="col" class="px-3 py-3.5 min-w-[240px]">Boxes</th>
+                        <th scope="col" class="px-3 py-3.5">
+                            <span>Current Month Boxes</span>
+                            <span class="text-[10px] text-slate-500 font-normal block lowercase tracking-normal">Current Month Production</span>
+                        </th>
+                        <th scope="col" class="px-3 py-3.5 text-center">Daily Log</th>
+                        <th scope="col" class="py-3.5 pl-3 pr-6 text-right">Delete</th>
                     </tr>
                 </thead>
-                <tbody class="divide-y divide-slate-800/60 bg-slate-950 text-slate-200">
+                <tbody class="divide-y divide-slate-800/60 bg-slate-950 text-slate-200" id="tableBody">
                     {% for emp in employees %}
-                    <tr class="hover:bg-slate-900/40 transition">
-                        <!-- 1. Employee Name & Avatar -->
+                    <tr class="employee-row hover:bg-slate-900/50 transition">
+                        <!-- 1. Name of Employee -->
                         <td class="whitespace-nowrap py-4 pl-6 pr-3">
-                            <a href="{% url 'employee-detail' emp.pk current_month %}" class="flex items-center space-x-3 group">
-                                <div class="h-9 w-9 rounded-full bg-gradient-to-tr from-cyan-600 to-blue-700 flex items-center justify-center text-white font-bold text-xs shadow-md shadow-cyan-900/40 group-hover:ring-2 group-hover:ring-cyan-400 transition">
-                                    {{ emp.first_name|slice:":1" }}{{ emp.last_name|slice:":1" }}
-                                </div>
-                                <div>
-                                    <span class="font-bold text-white group-hover:text-cyan-300 transition block">
-                                        {{ emp.full_name }}
-                                    </span>
-                                    <span class="text-xs text-slate-500 font-mono-code">
-                                        EMP-#{{ emp.pk|stringformat:"04d" }}
-                                    </span>
-                                </div>
-                            </a>
+                            <span class="font-bold text-white text-sm employee-name block">{{ emp.full_name }}</span>
                         </td>
 
-                        <!-- 2. Today's Total Badge -->
-                        <td class="whitespace-nowrap px-3 py-4">
-                            {% if emp.today_boxes > 0 %}
-                            <span class="inline-flex items-center px-2.5 py-1 rounded-md text-xs font-bold font-mono-code bg-emerald-950/80 text-emerald-300 border border-emerald-800">
-                                <span class="h-1.5 w-1.5 rounded-full bg-emerald-400 mr-1.5 animate-pulse"></span>
-                                {{ emp.today_boxes }} Boxes Today
-                            </span>
-                            {% else %}
-                            <span class="inline-flex items-center px-2.5 py-1 rounded-md text-xs font-mono-code text-slate-400 bg-slate-900/60 border border-slate-800">
-                                0 Today
-                            </span>
-                            {% endif %}
-                        </td>
-
-                        <!-- 3. Inline End-of-Day Output Entry Form -->
+                        <!-- 2. Boxes (Enter how many boxes he manufactured today + save) -->
                         <td class="whitespace-nowrap px-3 py-4">
                             <form method="post" action="{% url 'employee-list' %}" class="flex items-center space-x-2">
                                 {% csrf_token %}
                                 <input type="hidden" name="action" value="log_production">
                                 <input type="hidden" name="employee_id" value="{{ emp.pk }}">
-
-                                <!-- Item dropdown if multiple finished goods exist -->
-                                {% if finished_goods|length > 1 %}
-                                <select name="item_id" class="px-2 py-1.5 rounded-md bg-slate-900 border border-slate-700 text-xs text-slate-200 focus:border-cyan-500">
-                                    {% for fg in finished_goods %}
-                                    <option value="{{ fg.pk }}">{{ fg.name }}</option>
-                                    {% endfor %}
-                                </select>
-                                {% else %}
                                 <input type="hidden" name="item_id" value="{{ default_item.pk }}">
-                                {% endif %}
-
                                 <div class="relative w-28">
-                                    <input type="number" name="quantity" min="1" required placeholder="Boxes" class="w-full px-2.5 py-1.5 rounded-md bg-slate-900 border border-slate-700 text-white placeholder-slate-500 text-xs font-mono-code text-right focus:border-cyan-500 focus:ring-1 focus:ring-cyan-500">
+                                    <input
+                                        type="number"
+                                        name="quantity"
+                                        min="1"
+                                        required
+                                        placeholder="Boxes"
+                                        class="w-full px-3 py-1.5 rounded-lg bg-slate-900 border border-slate-700 text-white placeholder-slate-500 text-xs font-mono-code focus:border-cyan-500 focus:ring-1 focus:ring-cyan-500 transition"
+                                    >
                                 </div>
-
-                                <button type="submit" class="inline-flex items-center space-x-1 px-3 py-1.5 rounded-md text-xs font-bold bg-cyan-600 hover:bg-cyan-500 text-white shadow-md shadow-cyan-900/30 transition flex-shrink-0" title="Save today's boxes for {{ emp.full_name }}">
+                                <button
+                                    type="submit"
+                                    class="inline-flex items-center space-x-1 px-3 py-1.5 rounded-lg text-xs font-bold bg-cyan-600 hover:bg-cyan-500 text-white shadow-md shadow-cyan-900/30 transition flex-shrink-0"
+                                    title="Save boxes manufactured by {{ emp.full_name }} today"
+                                >
                                     <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>
                                     <span>Save</span>
                                 </button>
+                                {% if emp.today_boxes > 0 %}
+                                <span class="text-xs text-emerald-400 font-mono-code font-bold ml-1.5" title="Logged today">({{ emp.today_boxes }} today)</span>
+                                {% endif %}
                             </form>
                         </td>
 
-                        <!-- 4. Current Month Total -->
+                        <!-- 3. Current Month Boxes -->
                         <td class="whitespace-nowrap px-3 py-4">
-                            <div class="flex items-baseline space-x-2">
-                                <span class="text-base font-bold font-mono-code text-cyan-400">
-                                    {{ emp.total_boxes }}
-                                </span>
-                                <span class="text-xs text-slate-400 font-mono-code">Boxes Built</span>
-                            </div>
-                            <span class="text-[11px] text-slate-500 font-mono-code block mt-0.5">
-                                {{ emp.production_count }} logged run{{ emp.production_count|pluralize }}
+                            <span class="text-base font-extrabold font-mono-code text-cyan-400">
+                                {{ emp.total_boxes }}
                             </span>
+                            <span class="text-xs text-slate-400 font-mono-code ml-1">Boxes</span>
                         </td>
 
-                        <!-- 5. Actions (Details & Deactivate) -->
-                        <td class="whitespace-nowrap py-4 pl-3 pr-6 text-right text-xs">
-                            <div class="flex items-center justify-end space-x-2">
-                                <a href="{% url 'employee-detail' emp.pk current_month %}" class="inline-flex items-center space-x-1 px-2.5 py-1.5 rounded-md text-xs font-semibold bg-slate-900 hover:bg-slate-800 text-slate-300 hover:text-white border border-slate-800 transition">
-                                    <span>Daily Logs</span>
-                                    <svg class="w-3.5 h-3.5 text-cyan-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/></svg>
-                                </a>
+                        <!-- 4. Daily Log -->
+                        <td class="whitespace-nowrap px-3 py-4 text-center">
+                            <a
+                                href="{% url 'employee-detail' emp.pk current_month %}"
+                                class="inline-flex items-center space-x-1.5 px-3 py-1.5 rounded-lg bg-slate-900 hover:bg-slate-800 text-cyan-400 hover:text-cyan-300 border border-slate-800 hover:border-cyan-800 text-xs font-semibold transition"
+                                title="View daily log breakdown for {{ emp.full_name }}"
+                            >
+                                <svg class="w-3.5 h-3.5 text-cyan-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01" />
+                                </svg>
+                                <span>Daily Log</span>
+                            </a>
+                        </td>
 
-                                <form method="post" action="{% url 'employee-list' %}" onsubmit="return confirm('Deactivate {{ emp.full_name }}? They will be archived from active daily tracking.');" class="inline">
-                                    {% csrf_token %}
-                                    <input type="hidden" name="action" value="deactivate">
-                                    <input type="hidden" name="employee_id" value="{{ emp.pk }}">
-                                    <button type="submit" class="p-1.5 rounded-md text-slate-500 hover:text-rose-400 hover:bg-rose-950/40 border border-transparent hover:border-rose-900/60 transition" title="Deactivate operator">
-                                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                                        </svg>
-                                    </button>
-                                </form>
-                            </div>
+                        <!-- 5. Delete -->
+                        <td class="whitespace-nowrap py-4 pl-3 pr-6 text-right">
+                            <button
+                                type="button"
+                                onclick="openDeleteEmployeeModal('{{ emp.pk }}', '{{ emp.full_name|escapejs }}')"
+                                class="inline-flex items-center space-x-1 px-2.5 py-1.5 rounded-lg bg-rose-950/70 hover:bg-rose-900 text-rose-300 hover:text-white border border-rose-800 text-xs font-semibold transition shadow-sm"
+                                title="Delete employee {{ emp.full_name }}"
+                            >
+                                <svg class="w-3.5 h-3.5 text-rose-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                                </svg>
+                                <span>Delete</span>
+                            </button>
                         </td>
                     </tr>
                     {% empty %}
                     <tr>
-                        <td colspan="5" class="py-12 text-center text-slate-400">
-                            <div class="flex flex-col items-center justify-center">
-                                <svg class="h-12 w-12 text-slate-600 mb-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
-                                </svg>
-                                <p class="text-base font-bold text-slate-200">No Active Employees Found</p>
-                                <p class="text-xs text-slate-500 mt-1 max-w-sm">Use the "+ Add Employee" button above to register shop-floor operators and log their daily boxes.</p>
-                                <button type="button" onclick="document.getElementById('openAddModalBtn').click()" class="mt-4 px-4 py-2 rounded-lg bg-cyan-600 hover:bg-cyan-500 text-white text-xs font-semibold shadow-md transition">
-                                    Register First Employee
-                                </button>
-                            </div>
+                        <td colspan="5" class="py-12 text-center text-slate-500">
+                            <svg class="h-10 w-10 mx-auto text-slate-700 mb-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
+                            </svg>
+                            <p class="text-sm font-semibold text-slate-400">No active employees found.</p>
+                            <p class="text-xs text-slate-500 mt-1">Click the "Add Employee" button above to register an employee.</p>
                         </td>
                     </tr>
                     {% endfor %}
                 </tbody>
             </table>
         </div>
-    </section>
+    </div>
 </div>
 
-<!-- Add Employee Modal Dialog -->
-<div id="addEmployeeModal" class="hidden fixed inset-0 z-50 overflow-y-auto" aria-labelledby="modal-title" role="dialog" aria-modal="true">
-    <div class="fixed inset-0 bg-slate-950/80 backdrop-blur-sm transition-opacity"></div>
-
-    <div class="flex min-h-full items-center justify-center p-4 text-center sm:p-0">
-        <div class="relative transform overflow-hidden rounded-2xl bg-slate-950 border border-slate-800 text-left shadow-2xl transition-all sm:my-8 sm:w-full sm:max-w-lg">
-            <!-- Modal Header -->
-            <div class="px-6 py-5 border-b border-slate-800 flex items-center justify-between bg-slate-950">
-                <div class="flex items-center space-x-3">
-                    <div class="h-9 w-9 rounded-lg bg-cyan-600/20 border border-cyan-500/40 flex items-center justify-center text-cyan-400">
-                        <svg class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M18 9v3m0 0v3m0-3h3m-3 0h-3m-2-5a4 4 0 11-8 0 4 4 0 018 0zM3 20a6 6 0 0112 0v1H3v-1z" />
-                        </svg>
-                    </div>
-                    <div>
-                        <h3 class="text-base font-bold text-white tracking-tight" id="modal-title">Register New Employee</h3>
-                        <p class="text-xs text-slate-400">Add an operator to track daily manufacturing & box assembly.</p>
-                    </div>
+<!-- Modal: Add New Employee -->
+<div id="addEmployeeModal" class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm hidden transition-opacity">
+    <div class="relative w-full max-w-md rounded-2xl bg-slate-950 border border-slate-800 shadow-2xl overflow-hidden p-6 space-y-5">
+        <div class="flex items-center justify-between border-b border-slate-800 pb-3.5">
+            <div class="flex items-center space-x-3">
+                <div class="w-9 h-9 rounded-xl bg-cyan-950 border border-cyan-800 text-cyan-400 flex items-center justify-center">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M18 9v3m0 0v3m0-3h3m-3 0h-3m-2-5a4 4 0 11-8 0 4 4 0 018 0zM3 20a6 6 0 0112 0v1H3v-1z" />
+                    </svg>
                 </div>
-                <button type="button" id="closeAddModalBtn" class="text-slate-400 hover:text-white p-1 rounded-md hover:bg-slate-900 transition">
-                    <svg class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" /></svg>
-                </button>
+                <div>
+                    <h3 class="text-base font-bold text-white tracking-tight">Add New Employee</h3>
+                    <p class="text-xs text-slate-400">Register employee for manufacturing tracking</p>
+                </div>
+            </div>
+            <button type="button" onclick="closeAddEmployeeModal()" class="text-slate-400 hover:text-white transition">
+                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+            </button>
+        </div>
+
+        <form method="post" action="{% url 'employee-list' %}" class="space-y-4">
+            {% csrf_token %}
+            <input type="hidden" name="action" value="add_employee">
+            <input type="hidden" name="is_active" value="on">
+
+            <div class="space-y-1.5">
+                <label for="first_name" class="block text-xs font-bold uppercase tracking-wider text-slate-300">
+                    First Name <span class="text-rose-400">*</span>
+                </label>
+                <input
+                    type="text"
+                    name="first_name"
+                    id="first_name"
+                    required
+                    autocomplete="off"
+                    placeholder="e.g. Marcus"
+                    class="w-full px-4 py-2.5 rounded-xl bg-slate-900 border border-slate-700 text-white placeholder-slate-500 text-sm focus:border-cyan-500 focus:ring-2 focus:ring-cyan-500/20 transition font-medium"
+                >
             </div>
 
-            <!-- Form -->
-            <form method="post" action="{% url 'employee-list' %}" class="p-6 space-y-4">
-                {% csrf_token %}
-                <input type="hidden" name="action" value="add_employee">
+            <div class="space-y-1.5">
+                <label for="last_name" class="block text-xs font-bold uppercase tracking-wider text-slate-300">
+                    Last Name <span class="text-rose-400">*</span>
+                </label>
+                <input
+                    type="text"
+                    name="last_name"
+                    id="last_name"
+                    required
+                    autocomplete="off"
+                    placeholder="e.g. Vance"
+                    class="w-full px-4 py-2.5 rounded-xl bg-slate-900 border border-slate-700 text-white placeholder-slate-500 text-sm focus:border-cyan-500 focus:ring-2 focus:ring-cyan-500/20 transition font-medium"
+                >
+            </div>
 
-                <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                    <div>
-                        <label for="first_name" class="block text-xs font-semibold uppercase tracking-wider text-slate-300 mb-1.5">First Name <span class="text-rose-400">*</span></label>
-                        <input type="text" name="first_name" id="first_name" required placeholder="e.g. Marcus" class="w-full px-3.5 py-2.5 rounded-lg bg-slate-900 border border-slate-700 text-white placeholder-slate-500 text-sm focus:border-cyan-500 focus:ring-1 focus:ring-cyan-500 transition">
-                    </div>
-                    <div>
-                        <label for="last_name" class="block text-xs font-semibold uppercase tracking-wider text-slate-300 mb-1.5">Last Name <span class="text-rose-400">*</span></label>
-                        <input type="text" name="last_name" id="last_name" required placeholder="e.g. Vance" class="w-full px-3.5 py-2.5 rounded-lg bg-slate-900 border border-slate-700 text-white placeholder-slate-500 text-sm focus:border-cyan-500 focus:ring-1 focus:ring-cyan-500 transition">
-                    </div>
-                </div>
+            <div class="pt-3 border-t border-slate-800 flex items-center justify-end space-x-3">
+                <button
+                    type="button"
+                    onclick="closeAddEmployeeModal()"
+                    class="px-4 py-2.5 rounded-xl bg-slate-900 hover:bg-slate-800 text-slate-300 text-xs font-semibold border border-slate-800 transition"
+                >
+                    Cancel
+                </button>
+                <button
+                    type="submit"
+                    class="inline-flex items-center space-x-2 px-6 py-2.5 rounded-xl bg-gradient-to-r from-cyan-600 to-blue-600 hover:from-cyan-500 hover:to-blue-500 text-white text-xs font-bold shadow-lg shadow-cyan-950/50 transition focus:outline-none focus:ring-2 focus:ring-cyan-400"
+                >
+                    <span>Save Employee</span>
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
 
-                <!-- Optional initial boxes for today -->
-                <div class="pt-2">
-                    <label for="initial_boxes" class="block text-xs font-semibold uppercase tracking-wider text-slate-300 mb-1.5">
-                        Boxes Manufactured Today (Optional)
-                    </label>
-                    <input type="number" name="initial_boxes" id="initial_boxes" min="0" placeholder="e.g. 25 (if logging output right now)" class="w-full px-3.5 py-2.5 rounded-lg bg-slate-900 border border-slate-700 text-white placeholder-slate-500 text-sm font-mono-code focus:border-cyan-500 focus:ring-1 focus:ring-cyan-500 transition">
-                    <p class="text-[11px] text-slate-500 mt-1">If provided, this immediately registers today's production for the employee.</p>
+<!-- Modal: Delete Employee Confirmation -->
+<div id="deleteEmployeeModal" class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm hidden transition-opacity">
+    <div class="relative w-full max-w-md rounded-2xl bg-slate-950 border border-rose-900/60 shadow-2xl overflow-hidden p-6 space-y-5">
+        <div class="flex items-center justify-between border-b border-slate-800/80 pb-3.5">
+            <div class="flex items-center space-x-3">
+                <div class="w-9 h-9 rounded-xl bg-rose-950 text-rose-400 flex items-center justify-center border border-rose-800">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg>
                 </div>
-
-                <div class="pt-2">
-                    <label class="relative flex items-start space-x-3 cursor-pointer">
-                        <div class="flex items-center h-5">
-                            <input type="checkbox" name="is_active" id="is_active" checked class="h-4 w-4 rounded border-slate-700 bg-slate-900 text-cyan-600 focus:ring-cyan-500">
-                        </div>
-                        <div class="text-xs">
-                            <span class="font-medium text-slate-200">Active Operator Status</span>
-                            <p class="text-slate-400">Enables this personnel for daily manufacturing tracking.</p>
-                        </div>
-                    </label>
+                <div>
+                    <h3 class="text-base font-bold text-white tracking-tight">Delete Employee</h3>
+                    <p class="text-xs text-rose-400 font-medium">Remove from employee directory</p>
                 </div>
-
-                <!-- Modal Actions -->
-                <div class="pt-5 border-t border-slate-800 flex items-center justify-end space-x-3">
-                    <button type="button" id="cancelAddModalBtn" class="px-4 py-2.5 rounded-lg bg-slate-900 hover:bg-slate-800 text-slate-300 text-sm font-semibold border border-slate-800 transition">
-                        Cancel
-                    </button>
-                    <button type="submit" class="px-5 py-2.5 rounded-lg bg-cyan-600 hover:bg-cyan-500 text-white text-sm font-semibold shadow-lg shadow-cyan-900/40 transition">
-                        Save Employee
-                    </button>
-                </div>
-            </form>
+            </div>
+            <button type="button" onclick="closeDeleteEmployeeModal()" class="text-slate-400 hover:text-white transition">
+                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+            </button>
         </div>
+
+        <p class="text-xs text-slate-300">
+            Are you sure you want to delete employee <span id="deleteModalEmployeeName" class="font-bold text-white"></span>? This will remove them from active tracking.
+        </p>
+
+        <form method="post" action="{% url 'employee-list' %}" class="flex items-center justify-end space-x-3 pt-2 border-t border-slate-800">
+            {% csrf_token %}
+            <input type="hidden" name="action" value="delete">
+            <input type="hidden" name="employee_id" id="deleteModalEmployeeId">
+            <button
+                type="button"
+                onclick="closeDeleteEmployeeModal()"
+                class="px-4 py-2 rounded-xl bg-slate-900 hover:bg-slate-800 text-slate-300 text-xs font-semibold border border-slate-800 transition"
+            >
+                Cancel
+            </button>
+            <button
+                type="submit"
+                class="inline-flex items-center space-x-2 px-5 py-2 rounded-xl bg-rose-600 hover:bg-rose-500 text-white text-xs font-bold shadow-lg shadow-rose-950/60 transition"
+            >
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg>
+                <span>Yes, Delete</span>
+            </button>
+        </form>
     </div>
 </div>
 
 <script>
-    document.addEventListener('DOMContentLoaded', function () {
-        // Modal functionality
-        const modal = document.getElementById('addEmployeeModal');
-        const openBtn = document.getElementById('openAddModalBtn');
-        const closeBtn = document.getElementById('closeAddModalBtn');
-        const cancelBtn = document.getElementById('cancelAddModalBtn');
-        const firstNameInput = document.getElementById('first_name');
+    // Add Employee Modal
+    const addModal = document.getElementById('addEmployeeModal');
+    const firstNameInput = document.getElementById('first_name');
 
-        function openModal() {
-            modal.classList.remove('hidden');
-            setTimeout(() => firstNameInput.focus(), 50);
-        }
+    function openAddEmployeeModal() {
+        addModal.classList.remove('hidden');
+        setTimeout(() => firstNameInput.focus(), 100);
+    }
 
-        function closeModal() {
-            modal.classList.add('hidden');
-        }
+    function closeAddEmployeeModal() {
+        addModal.classList.add('hidden');
+    }
 
-        if (openBtn) openBtn.addEventListener('click', openModal);
-        if (closeBtn) closeBtn.addEventListener('click', closeModal);
-        if (cancelBtn) cancelBtn.addEventListener('click', closeModal);
+    // Delete Employee Modal
+    const deleteModal = document.getElementById('deleteEmployeeModal');
+    const deleteModalEmployeeId = document.getElementById('deleteModalEmployeeId');
+    const deleteModalEmployeeName = document.getElementById('deleteModalEmployeeName');
 
-        document.addEventListener('keydown', function (e) {
-            if (e.key === 'Escape' && !modal.classList.contains('hidden')) {
-                closeModal();
-            }
-        });
+    function openDeleteEmployeeModal(id, name) {
+        deleteModalEmployeeId.value = id;
+        deleteModalEmployeeName.textContent = `"${name}"`;
+        deleteModal.classList.remove('hidden');
+    }
 
-        modal.addEventListener('click', function (e) {
-            if (e.target === modal.firstElementChild) {
-                closeModal();
-            }
-        });
+    function closeDeleteEmployeeModal() {
+        deleteModal.classList.add('hidden');
+    }
 
-        // Bulk sheet toggle
-        const toggleBulkBtn = document.getElementById('toggleBulkBtn');
-        const bulkSheet = document.getElementById('bulkSheetContainer');
-        const bulkBtnText = document.getElementById('bulkBtnText');
-
-        if (toggleBulkBtn && bulkSheet) {
-            toggleBulkBtn.addEventListener('click', function () {
-                const isHidden = bulkSheet.classList.contains('hidden');
-                if (isHidden) {
-                    bulkSheet.classList.remove('hidden');
-                    bulkBtnText.textContent = 'Hide Batch Sheet';
-                    bulkSheet.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
-                } else {
-                    bulkSheet.classList.add('hidden');
-                    bulkBtnText.textContent = 'End-of-Day Batch Sheet';
-                }
-            });
+    // Close on Escape or Outside click
+    window.addEventListener('keydown', function (e) {
+        if (e.key === 'Escape') {
+            if (!addModal.classList.contains('hidden')) closeAddEmployeeModal();
+            if (!deleteModal.classList.contains('hidden')) closeDeleteEmployeeModal();
         }
     });
+    addModal.addEventListener('click', function (e) {
+        if (e.target === addModal) closeAddEmployeeModal();
+    });
+    deleteModal.addEventListener('click', function (e) {
+        if (e.target === deleteModal) closeDeleteEmployeeModal();
+    });
+
+    // Live search filter
+    const searchInput = document.getElementById('employeeSearch');
+    const tableRows = document.querySelectorAll('.employee-row');
+    if (searchInput) {
+        searchInput.addEventListener('input', function () {
+            const query = this.value.toLowerCase().trim();
+            tableRows.forEach(row => {
+                const nameText = row.querySelector('.employee-name')?.textContent.toLowerCase() || '';
+                if (nameText.includes(query)) {
+                    row.style.display = '';
+                } else {
+                    row.style.display = 'none';
+                }
+            });
+        });
+    }
 </script>
 {% endblock %}

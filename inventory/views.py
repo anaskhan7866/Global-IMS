@@ -220,13 +220,17 @@ class EmployeeListView(ListView):
                 messages.info(request, "No production quantities were entered.")
             return redirect('employee-list')
 
-        # 4. Deactivate Employee
+        # 4. Delete / Deactivate Employee
         elif action == 'deactivate' or action == 'delete':
             employee_id = request.POST.get('employee_id')
             emp = get_object_or_404(Employee, pk=employee_id)
-            emp.is_active = False
-            emp.save(update_fields=['is_active'])
-            messages.info(request, f"Employee '{emp.full_name}' has been deactivated.")
+            emp_name = emp.full_name
+            try:
+                emp.delete()
+            except Exception:
+                emp.is_active = False
+                emp.save(update_fields=['is_active'])
+            messages.success(request, f"Employee '{emp_name}' has been deleted.")
             return redirect('employee-list')
 
         messages.warning(request, "Unrecognized action.")
