@@ -68,9 +68,14 @@ def get_or_resolve_production_item(item_id=None, item_name=None):
 
 class EmployeeListView(ListView):
     """
-    Fetches all active employees and calculates their manufacturing productivity
-    for the current calendar month and today using Count and Sum annotations.
-    Handles adding employees, logging end-of-day output per employee, bulk logs, and deactivation.
+    Workforce productivity controller for shop-floor operators.
+    Provides a streamlined 5-feature table:
+    1. Name of Employee
+    2. Boxes (Manual text input for box type with datalist suggestions + quantity + save)
+    3. Current Month Boxes (Aggregated monthly manufacturing output)
+    4. Daily Log (Direct navigation to date-grouped production logs)
+    5. Delete (Safe deletion / deactivation with modal confirmation)
+    Supports real-time auto-creation of newly typed box types in the Item catalog.
     """
     model = Employee
     context_object_name = 'employees'
@@ -263,9 +268,14 @@ class EmployeeListView(ListView):
 
 class EmployeeDetailView(DetailView):
     """
-    Takes an employee ID and a Month parameter.
-    Returns a grouped daily breakdown (using values('production_date').annotate(Sum('quantity')))
-    of what the employee built that month, along with item-level specifics.
+    Workforce daily production breakdown controller:
+    - Groups assembly logs by production_date using values('production_date').annotate(Sum('quantity')).
+    - Computes total boxes manufactured per calendar day.
+    - Adaptive detail rendering:
+      * Single Box Type: Displays quantity, name, and unit weight of the manufactured box.
+      * Multiple Box Types (e.g. 50 core box, 10 polish box, 10 plastic box): Displays the
+        exact breakdown of every distinct box type with quantities and unit weights alongside the day's total.
+    - Supports retroactive and on-date logging via manual text entry.
     """
     model = Employee
     context_object_name = 'employee'
@@ -465,17 +475,22 @@ class VendorOrderListView(ListView):
 
 class AddInventoryView(View):
     """
-    Inventory management view:
-    1. Simple, direct form asking:
-       - Name of the product
-       - Quantity
-       - Weight of the product (core box)
-    2. Comprehensive table displaying all details of all products:
-       - Product Name & SKU
-       - Quantity / Current Stock
-       - Unit Weight of the Product (Core Box)
-       - Total Stock Weight
-       - Moving Average Cost / Status
+    High-performance, streamlined inventory management controller:
+    1. Direct 3-field entry form:
+       - 1. Name of the product
+       - 2. Quantity
+       - 3. Weight of the product (core box) - unit weight of one core box in kg
+    2. Lean 4-column presentation table showing all details of all products:
+       - Name of Product (& unique SKU)
+       - Quantity (Current on-hand stock)
+       - Weight (Unit weight of one core box)
+       - Action:
+         * Add: Quick stock replenishment
+         * Edit: In-place modal to modify product name, quantity, or weight with ledger correction
+         * Remove: Stock deduction with positive balance validation
+         * Delete: Complete product removal (permitted strictly when stock is zero)
+    3. Multi-weight identity: Products sharing the same name but differing unit weights
+       are stored as distinct Item records.
     """
     template_name = 'inventory/add_inventory.html'
 
