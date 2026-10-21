@@ -1,148 +1,202 @@
 {% extends 'base.html' %}
 
-{% block title %}Vendor Purchase Orders | Global-IMS{% endblock %}
+{% block title %}Vendor & Company Orders | Global-IMS{% endblock %}
 
 {% block content %}
-<div class="space-y-8">
+<div class="space-y-6">
     <!-- Title & Action Header -->
-    <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-        <div>
-            <div class="flex items-center space-x-3">
-                <h1 class="text-2xl sm:text-3xl font-extrabold tracking-tight text-white">Vendor Purchase Orders</h1>
-                <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold bg-slate-800 text-slate-300 border border-slate-700">
-                    Procurement Ledger
-                </span>
+    <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 pb-2 border-b border-slate-800">
+        <div class="flex items-center space-x-3">
+            <div class="w-10 h-10 rounded-xl bg-gradient-to-br from-cyan-500 to-blue-600 flex items-center justify-center text-white shadow-lg shadow-cyan-900/40">
+                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01" />
+                </svg>
             </div>
-            <p class="mt-1 text-sm text-slate-400">
-                Inward procurement orders placed with external suppliers for raw materials and component replenishment.
-            </p>
+            <div>
+                <h1 class="text-2xl sm:text-3xl font-extrabold tracking-tight text-white">Vendor & Company Orders</h1>
+                <p class="text-xs sm:text-sm text-slate-400 mt-0.5">
+                    Manage core box orders requested by companies, track delivery dates, deliver stock, and clear completed orders.
+                </p>
+            </div>
         </div>
 
         <div class="flex items-center space-x-3">
-            <a href="{% url 'add-inventory' %}" class="inline-flex items-center space-x-2 px-4 py-2.5 rounded-lg bg-cyan-600 hover:bg-cyan-500 text-white text-sm font-semibold shadow-lg shadow-cyan-900/40 hover:shadow-cyan-900/60 transition">
+            <!-- Add Vendor Profile Button -->
+            <button
+                type="button"
+                onclick="openAddVendorModal()"
+                class="inline-flex items-center space-x-1.5 px-3.5 py-2.5 rounded-xl bg-slate-900 hover:bg-slate-800 text-slate-300 hover:text-white border border-slate-800 text-xs sm:text-sm font-semibold transition"
+            >
+                <svg class="w-4 h-4 text-cyan-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
+                </svg>
+                <span>Add Vendor</span>
+            </button>
+
+            <!-- Add Order Button -->
+            <button
+                type="button"
+                id="openAddOrderBtn"
+                onclick="openAddOrderModal()"
+                class="inline-flex items-center space-x-2 px-4 py-2.5 rounded-xl bg-gradient-to-r from-cyan-600 to-blue-600 hover:from-cyan-500 hover:to-blue-500 text-white text-xs sm:text-sm font-bold shadow-lg shadow-cyan-900/40 hover:shadow-cyan-900/60 transition focus:outline-none focus:ring-2 focus:ring-cyan-400"
+            >
                 <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" />
                 </svg>
-                <span>Receive / Add Stock</span>
-            </a>
+                <span>Add Order</span>
+            </button>
         </div>
     </div>
 
-    <!-- PO Status Metrics -->
-    <section aria-label="Purchase Order Metrics" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
+    <!-- Order Status KPI Cards (Clickable to Filter) -->
+    <section aria-label="Purchase Order Metrics" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         <!-- Total Orders -->
-        <div class="rounded-xl bg-slate-950 p-5 border border-slate-800 shadow-xl">
+        <a href="?status=all" class="rounded-xl bg-slate-950 p-5 border border-slate-800 shadow-xl hover:border-cyan-800/80 transition block group">
             <div class="flex items-center justify-between">
-                <p class="text-xs font-semibold uppercase tracking-wider text-slate-400">Total Purchase Orders</p>
-                <span class="p-2 rounded-lg bg-slate-900 text-slate-300 border border-slate-800">
+                <p class="text-xs font-semibold uppercase tracking-wider text-slate-400 group-hover:text-cyan-400 transition">Total Orders</p>
+                <span class="p-2 rounded-lg bg-slate-900 text-slate-300 border border-slate-800 group-hover:border-cyan-800">
                     <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01" />
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
                     </svg>
                 </span>
             </div>
-            <h3 class="mt-4 text-2xl sm:text-3xl font-extrabold text-white font-mono-code">{{ total_count }}</h3>
-            <p class="mt-1 text-xs text-slate-400">All registered procurement contracts</p>
-        </div>
+            <h3 class="mt-3 text-2xl sm:text-3xl font-extrabold text-white font-mono-code">{{ total_count }}</h3>
+            <p class="mt-1 text-xs text-slate-500">All registered company orders</p>
+        </a>
 
         <!-- Pending Delivery -->
-        <div class="rounded-xl bg-slate-950 p-5 border border-slate-800 shadow-xl">
+        <a href="?status=pending" class="rounded-xl bg-slate-950 p-5 border border-slate-800 shadow-xl hover:border-amber-800/80 transition block group">
             <div class="flex items-center justify-between">
-                <p class="text-xs font-semibold uppercase tracking-wider text-slate-400">Pending Delivery</p>
-                <span class="p-2 rounded-lg bg-amber-950 text-amber-400 border border-amber-800">
+                <p class="text-xs font-semibold uppercase tracking-wider text-slate-400 group-hover:text-amber-400 transition">Pending Delivery</p>
+                <span class="p-2 rounded-lg bg-amber-950/60 text-amber-400 border border-amber-800/60">
                     <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
                     </svg>
                 </span>
             </div>
-            <h3 class="mt-4 text-2xl sm:text-3xl font-extrabold text-amber-300 font-mono-code">{{ pending_count }}</h3>
-            <p class="mt-1 text-xs text-slate-400">Awaiting vendor supplier dispatch</p>
-        </div>
+            <h3 class="mt-3 text-2xl sm:text-3xl font-extrabold text-amber-400 font-mono-code">{{ pending_count }}</h3>
+            <p class="mt-1 text-xs text-slate-500">Orders waiting to be delivered</p>
+        </a>
 
-        <!-- Overdue Alerts -->
+        <!-- Overdue Deliveries -->
         <div class="rounded-xl bg-slate-950 p-5 border border-slate-800 shadow-xl">
             <div class="flex items-center justify-between">
                 <p class="text-xs font-semibold uppercase tracking-wider text-slate-400">Overdue Deliveries</p>
-                <span class="p-2 rounded-lg bg-rose-950 text-rose-400 border border-rose-800">
+                <span class="p-2 rounded-lg bg-rose-950/60 text-rose-400 border border-rose-800/60">
                     <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
                     </svg>
                 </span>
             </div>
-            <h3 class="mt-4 text-2xl sm:text-3xl font-extrabold font-mono-code {% if overdue_count > 0 %}text-rose-400 animate-pulse{% else %}text-slate-300{% endif %}">
+            <h3 class="mt-3 text-2xl sm:text-3xl font-extrabold font-mono-code {% if overdue_count > 0 %}text-rose-400 animate-pulse{% else %}text-slate-300{% endif %}">
                 {{ overdue_count }}
             </h3>
-            <p class="mt-1 text-xs text-slate-400">Expected date exceeded (highlighted below)</p>
+            <p class="mt-1 text-xs text-slate-500">Expected delivery date passed</p>
         </div>
 
-        <!-- Delivered -->
-        <div class="rounded-xl bg-slate-950 p-5 border border-slate-800 shadow-xl">
+        <!-- Delivered Orders -->
+        <a href="?status=delivered" class="rounded-xl bg-slate-950 p-5 border border-slate-800 shadow-xl hover:border-emerald-800/80 transition block group">
             <div class="flex items-center justify-between">
-                <p class="text-xs font-semibold uppercase tracking-wider text-slate-400">Delivered Orders</p>
-                <span class="p-2 rounded-lg bg-emerald-950 text-emerald-400 border border-emerald-800">
+                <p class="text-xs font-semibold uppercase tracking-wider text-slate-400 group-hover:text-emerald-400 transition">Delivered Orders</p>
+                <span class="p-2 rounded-lg bg-emerald-950/60 text-emerald-400 border border-emerald-800/60">
                     <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" />
                     </svg>
                 </span>
             </div>
-            <h3 class="mt-4 text-2xl sm:text-3xl font-extrabold text-emerald-300 font-mono-code">{{ delivered_count }}</h3>
-            <p class="mt-1 text-xs text-slate-400">Stock received & ledger verified</p>
-        </div>
+            <h3 class="mt-3 text-2xl sm:text-3xl font-extrabold text-emerald-400 font-mono-code">{{ delivered_count }}</h3>
+            <p class="mt-1 text-xs text-slate-500">Fulfilled & delivered to company</p>
+        </a>
     </section>
 
-    <!-- Orders Main Table -->
-    <section aria-label="Purchase Orders Table" class="rounded-xl bg-slate-950 border border-slate-800 shadow-xl overflow-hidden">
-        <div class="p-5 sm:p-6 border-b border-slate-800 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-            <div>
-                <h2 class="text-lg font-bold text-white tracking-tight">Purchase Order Records</h2>
-                <p class="text-xs text-slate-400 mt-0.5">
-                    Orders with status <span class="font-semibold text-rose-400">'Pending'</span> and an expected delivery date in the past are highlighted in light red.
-                </p>
+    <!-- Orders Main Table Card -->
+    <section aria-label="Purchase Orders Table" class="rounded-2xl bg-slate-950 border border-slate-800 shadow-xl overflow-hidden">
+        <!-- Table Header, Tabs & Live Search -->
+        <div class="p-5 sm:p-6 border-b border-slate-800 flex flex-col md:flex-row md:items-center md:justify-between gap-4 bg-slate-950">
+            <!-- Filter Tabs -->
+            <div class="inline-flex rounded-xl p-1 bg-slate-900 border border-slate-800 self-start">
+                <a
+                    href="?status=all"
+                    class="px-3.5 py-1.5 rounded-lg text-xs font-bold transition {% if current_status == 'all' %}bg-cyan-600 text-white shadow{% else %}text-slate-400 hover:text-slate-200{% endif %}"
+                >
+                    All Orders ({{ total_count }})
+                </a>
+                <a
+                    href="?status=pending"
+                    class="px-3.5 py-1.5 rounded-lg text-xs font-bold transition {% if current_status == 'pending' %}bg-amber-600 text-white shadow{% else %}text-slate-400 hover:text-slate-200{% endif %}"
+                >
+                    Pending ({{ pending_count }})
+                </a>
+                <a
+                    href="?status=delivered"
+                    class="px-3.5 py-1.5 rounded-lg text-xs font-bold transition {% if current_status == 'delivered' %}bg-emerald-600 text-white shadow{% else %}text-slate-400 hover:text-slate-200{% endif %}"
+                >
+                    Delivered ({{ delivered_count }})
+                </a>
             </div>
-            <div class="flex items-center space-x-2 text-xs">
-                <span class="inline-flex items-center space-x-1.5 px-2.5 py-1 rounded bg-rose-950/60 border border-rose-800 text-rose-300 font-semibold">
-                    <span class="h-2 w-2 rounded-full bg-rose-500 animate-pulse"></span>
-                    <span>Light Red = Overdue Pending</span>
-                </span>
+
+            <!-- Live Search Bar -->
+            <div class="relative w-full md:w-80">
+                <input
+                    type="text"
+                    id="orderSearch"
+                    placeholder="Search company, product, or SKU..."
+                    class="w-full pl-9 pr-4 py-2 rounded-xl bg-slate-900 border border-slate-800 text-white placeholder-slate-500 text-xs focus:border-cyan-500 focus:ring-1 focus:ring-cyan-500 transition"
+                >
+                <svg class="w-4 h-4 text-slate-500 absolute left-3 top-2.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                </svg>
             </div>
         </div>
 
         <div class="overflow-x-auto">
-            <table class="min-w-full divide-y divide-slate-800 text-left text-sm">
+            <table class="min-w-full divide-y divide-slate-800 text-left text-sm" id="ordersTable">
                 <thead class="bg-slate-900/60 text-xs uppercase font-semibold text-slate-400">
                     <tr>
-                        <th scope="col" class="py-3.5 pl-6 pr-3">Vendor Name</th>
-                        <th scope="col" class="px-3 py-3.5">Product</th>
+                        <th scope="col" class="py-3.5 pl-6 pr-3">Company / Vendor</th>
+                        <th scope="col" class="px-3 py-3.5">Core Box Type</th>
                         <th scope="col" class="px-3 py-3.5">Quantity</th>
                         <th scope="col" class="px-3 py-3.5">Order Date</th>
                         <th scope="col" class="px-3 py-3.5">Expected Delivery Date</th>
-                        <th scope="col" class="py-3.5 pl-3 pr-6 text-right">Status</th>
+                        <th scope="col" class="px-3 py-3.5 text-center">Status</th>
+                        <th scope="col" class="py-3.5 pl-3 pr-6 text-right">Action</th>
                     </tr>
                 </thead>
-                <tbody class="divide-y divide-slate-800/60 bg-slate-950 text-slate-200">
+                <tbody class="divide-y divide-slate-800/60 bg-slate-950 text-slate-200" id="tableBody">
                     {% for order in purchase_orders %}
                     {% if order.is_overdue or order.status == 'Pending' and order.expected_delivery_date < today %}
                     <!-- Overdue Row: Highlighted in light red -->
-                    <tr class="bg-red-950/40 border-l-4 border-red-500 text-red-100 hover:bg-red-900/50 transition">
+                    <tr class="order-row bg-red-950/40 border-l-4 border-red-500 text-red-100 hover:bg-red-900/50 transition">
                     {% else %}
                     <!-- Normal Row -->
-                    <tr class="hover:bg-slate-900/50 transition">
+                    <tr class="order-row hover:bg-slate-900/50 transition">
                     {% endif %}
-                        <!-- 1. Vendor Name -->
+                        <!-- 1. Company / Vendor Name -->
                         <td class="whitespace-nowrap py-4 pl-6 pr-3">
                             <div class="flex items-center space-x-2">
-                                <span class="font-bold text-white block">{{ order.vendor.company_name }}</span>
+                                <span class="font-bold text-white block order-company">{{ order.vendor.company_name }}</span>
                                 {% if order.vendor.GST_number %}
                                 <span class="text-[10px] font-mono-code text-slate-400 bg-slate-900 px-1.5 py-0.5 rounded border border-slate-800">
                                     {{ order.vendor.GST_number }}
                                 </span>
                                 {% endif %}
                             </div>
+                            {% if order.vendor.contact_person or order.vendor.phone %}
+                            <span class="text-xs text-slate-400 block mt-0.5">
+                                {{ order.vendor.contact_person }}{% if order.vendor.phone %} &bull; {{ order.vendor.phone }}{% endif %}
+                            </span>
+                            {% endif %}
                         </td>
 
-                        <!-- 2. Product -->
+                        <!-- 2. Core Box Type / Product -->
                         <td class="whitespace-nowrap px-3 py-4">
-                            <span class="font-semibold text-white block">{{ order.item.name }}</span>
-                            <span class="text-xs text-cyan-400 font-mono-code">{{ order.item.sku }}</span>
+                            <span class="font-semibold text-white block order-product">{{ order.item.name }}</span>
+                            <div class="flex items-center space-x-2 mt-0.5">
+                                <span class="text-xs text-cyan-400 font-mono-code order-sku">{{ order.item.sku }}</span>
+                                {% if order.item.weight %}
+                                <span class="text-[11px] text-slate-400 font-mono-code">({{ order.item.weight }} kg/box)</span>
+                                {% endif %}
+                            </div>
                         </td>
 
                         <!-- 3. Quantity -->
@@ -164,13 +218,14 @@
                                 </svg>
                                 <span>{{ order.expected_delivery_date|date:"Y-m-d" }}</span>
                             </div>
+                            <span class="text-[10px] text-rose-400 block font-semibold mt-0.5">Overdue</span>
                             {% else %}
                             <span class="text-slate-300">{{ order.expected_delivery_date|date:"Y-m-d" }}</span>
                             {% endif %}
                         </td>
 
                         <!-- 6. Status -->
-                        <td class="whitespace-nowrap py-4 pl-3 pr-6 text-right text-xs">
+                        <td class="whitespace-nowrap px-3 py-4 text-center text-xs">
                             {% if order.status == 'Delivered' %}
                             <span class="inline-flex items-center px-2.5 py-1 rounded-md font-semibold bg-emerald-950 text-emerald-300 border border-emerald-800">
                                 <span class="h-1.5 w-1.5 rounded-full bg-emerald-400 mr-1.5"></span>
@@ -188,16 +243,49 @@
                             </span>
                             {% endif %}
                         </td>
+
+                        <!-- 7. Action: Deliver & Clear -->
+                        <td class="whitespace-nowrap py-4 pl-3 pr-6 text-right">
+                            <div class="flex items-center justify-end space-x-2">
+                                {% if order.status == 'Pending' %}
+                                <!-- Deliver Stock Button -->
+                                <button
+                                    type="button"
+                                    onclick="openDeliverModal('{{ order.id }}', '{{ order.vendor.company_name|escapejs }}', '{{ order.item.name|escapejs }}', '{{ order.quantity }}', '{{ order.item.current_stock|floatformat:0 }}')"
+                                    class="inline-flex items-center space-x-1 px-3 py-1.5 rounded-lg bg-emerald-950/80 hover:bg-emerald-900 text-emerald-300 border border-emerald-800 hover:border-emerald-700 text-xs font-bold transition shadow-sm"
+                                    title="Deliver stock to {{ order.vendor.company_name }}"
+                                >
+                                    <svg class="w-3.5 h-3.5 text-emerald-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" />
+                                    </svg>
+                                    <span>Deliver</span>
+                                </button>
+                                {% endif %}
+
+                                <!-- Clear Order Button -->
+                                <button
+                                    type="button"
+                                    onclick="openClearOrderModal('{{ order.id }}', '{{ order.vendor.company_name|escapejs }}', '{{ order.item.name|escapejs }}', '{{ order.quantity }}')"
+                                    class="inline-flex items-center space-x-1 px-2.5 py-1.5 rounded-lg bg-slate-900 hover:bg-rose-950 text-slate-400 hover:text-rose-300 border border-slate-800 hover:border-rose-800 text-xs font-medium transition"
+                                    title="Clear order from list"
+                                >
+                                    <svg class="w-3.5 h-3.5 text-rose-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                                    </svg>
+                                    <span>Clear</span>
+                                </button>
+                            </div>
+                        </td>
                     </tr>
                     {% empty %}
                     <tr>
-                        <td colspan="6" class="py-12 text-center text-slate-400">
+                        <td colspan="7" class="py-12 text-center text-slate-400">
                             <div class="flex flex-col items-center justify-center">
                                 <svg class="h-10 w-10 text-slate-600 mb-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
                                 </svg>
-                                <p class="text-sm font-bold text-slate-200">No Purchase Orders Found</p>
-                                <p class="text-xs text-slate-500 mt-1 max-w-sm">No procurement orders are currently registered in the system ledger.</p>
+                                <p class="text-sm font-bold text-slate-200">No Orders Found</p>
+                                <p class="text-xs text-slate-500 mt-1 max-w-sm">Use the "Add Order" button above to register an incoming company order.</p>
                             </div>
                         </td>
                     </tr>
@@ -207,4 +295,472 @@
         </div>
     </section>
 </div>
+
+<!-- ========================================================================= -->
+<!-- MODAL 1: ADD COMPANY / VENDOR ORDER                                        -->
+<!-- ========================================================================= -->
+<div id="addOrderModal" class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm hidden transition-opacity">
+    <div class="relative w-full max-w-lg rounded-2xl bg-slate-950 border border-slate-800 shadow-2xl overflow-hidden p-6 sm:p-7 space-y-6">
+        <div class="flex items-center justify-between border-b border-slate-800/80 pb-4">
+            <div class="flex items-center space-x-3">
+                <div class="w-9 h-9 rounded-xl bg-cyan-950/80 border border-cyan-800/60 text-cyan-400 flex items-center justify-center">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
+                    </svg>
+                </div>
+                <div>
+                    <h3 class="text-base font-bold text-white tracking-tight">Add Company / Vendor Order</h3>
+                    <p class="text-xs text-slate-400 mt-0.5">Register an order received from a company for core boxes.</p>
+                </div>
+            </div>
+            <button type="button" onclick="closeAddOrderModal()" class="text-slate-400 hover:text-white transition">
+                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+            </button>
+        </div>
+
+        <form method="post" action="{% url 'vendor-order-list' %}" class="space-y-4">
+            {% csrf_token %}
+            <input type="hidden" name="action" value="add_order">
+
+            <!-- 1. Company / Vendor Name -->
+            <div class="space-y-1.5">
+                <label for="company_name" class="block text-xs font-bold uppercase tracking-wider text-cyan-400">
+                    Company / Vendor Name <span class="text-rose-400">*</span>
+                </label>
+                <input
+                    type="text"
+                    name="company_name"
+                    id="company_name"
+                    list="vendors_datalist"
+                    required
+                    autocomplete="off"
+                    placeholder="e.g. Apex Metals, Premier Construction Ltd"
+                    class="w-full px-4 py-2.5 rounded-xl bg-slate-900 border border-slate-700 text-white placeholder-slate-500 text-sm focus:border-cyan-500 focus:ring-1 focus:ring-cyan-500 transition font-medium"
+                >
+                <datalist id="vendors_datalist">
+                    {% for v in vendors %}
+                    <option value="{{ v.company_name }}">{{ v.company_name }}{% if v.GST_number %} ({{ v.GST_number }}){% endif %}</option>
+                    {% endfor %}
+                </datalist>
+                <p class="text-[11px] text-slate-500">Pick an existing vendor or type a new company name to register it automatically.</p>
+            </div>
+
+            <!-- 2. Type of Core Box -->
+            <div class="space-y-1.5">
+                <label for="box_name" class="block text-xs font-bold uppercase tracking-wider text-cyan-400">
+                    Type of Core Box <span class="text-rose-400">*</span>
+                </label>
+                <input
+                    type="text"
+                    name="box_name"
+                    id="box_name"
+                    list="items_datalist"
+                    required
+                    autocomplete="off"
+                    placeholder="e.g. GI Core Box 100mm, Polish Box"
+                    class="w-full px-4 py-2.5 rounded-xl bg-slate-900 border border-slate-700 text-white placeholder-slate-500 text-sm focus:border-cyan-500 focus:ring-1 focus:ring-cyan-500 transition font-medium"
+                >
+                <datalist id="items_datalist">
+                    {% for item in items %}
+                    <option value="{{ item.name }}">{{ item.name }} ({{ item.weight }} kg/box, Stock: {{ item.current_stock|floatformat:0 }})</option>
+                    {% endfor %}
+                </datalist>
+            </div>
+
+            <!-- 3. Quantity & 4. Expected Delivery Date Grid -->
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div class="space-y-1.5">
+                    <label for="order_quantity" class="block text-xs font-bold uppercase tracking-wider text-cyan-400">
+                        Quantity Needed <span class="text-rose-400">*</span>
+                    </label>
+                    <input
+                        type="number"
+                        name="quantity"
+                        id="order_quantity"
+                        min="1"
+                        required
+                        placeholder="e.g. 100"
+                        class="w-full px-4 py-2.5 rounded-xl bg-slate-900 border border-slate-700 text-white placeholder-slate-500 text-sm font-mono-code focus:border-cyan-500 focus:ring-1 focus:ring-cyan-500 transition"
+                    >
+                </div>
+
+                <div class="space-y-1.5">
+                    <label for="expected_delivery_date" class="block text-xs font-bold uppercase tracking-wider text-cyan-400">
+                        Delivery Date <span class="text-rose-400">*</span>
+                    </label>
+                    <input
+                        type="date"
+                        name="expected_delivery_date"
+                        id="expected_delivery_date"
+                        value="{{ default_delivery_date }}"
+                        required
+                        class="w-full px-4 py-2.5 rounded-xl bg-slate-900 border border-slate-700 text-white text-sm font-mono-code focus:border-cyan-500 focus:ring-1 focus:ring-cyan-500 transition"
+                    >
+                </div>
+            </div>
+
+            <div class="flex items-center justify-end space-x-3 pt-3 border-t border-slate-800">
+                <button
+                    type="button"
+                    onclick="closeAddOrderModal()"
+                    class="px-4 py-2.5 rounded-xl bg-slate-900 hover:bg-slate-800 text-slate-300 text-xs font-semibold border border-slate-800 transition"
+                >
+                    Cancel
+                </button>
+                <button
+                    type="submit"
+                    class="px-5 py-2.5 rounded-xl bg-gradient-to-r from-cyan-600 to-blue-600 hover:from-cyan-500 hover:to-blue-500 text-white text-xs font-bold shadow-lg shadow-cyan-900/40 transition"
+                >
+                    Create Order
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- ========================================================================= -->
+<!-- MODAL 2: ADD VENDOR / COMPANY PROFILE                                      -->
+<!-- ========================================================================= -->
+<div id="addVendorModal" class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm hidden transition-opacity">
+    <div class="relative w-full max-w-lg rounded-2xl bg-slate-950 border border-slate-800 shadow-2xl overflow-hidden p-6 sm:p-7 space-y-6">
+        <div class="flex items-center justify-between border-b border-slate-800/80 pb-4">
+            <div class="flex items-center space-x-3">
+                <div class="w-9 h-9 rounded-xl bg-slate-900 text-cyan-400 border border-slate-800 flex items-center justify-center">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
+                    </svg>
+                </div>
+                <div>
+                    <h3 class="text-base font-bold text-white tracking-tight">Add Vendor / Company</h3>
+                    <p class="text-xs text-slate-400 mt-0.5">Register a commercial client or supplier profile.</p>
+                </div>
+            </div>
+            <button type="button" onclick="closeAddVendorModal()" class="text-slate-400 hover:text-white transition">
+                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+            </button>
+        </div>
+
+        <form method="post" action="{% url 'vendor-order-list' %}" class="space-y-4">
+            {% csrf_token %}
+            <input type="hidden" name="action" value="add_vendor">
+
+            <div class="space-y-1.5">
+                <label for="new_vendor_name" class="block text-xs font-bold uppercase tracking-wider text-cyan-400">
+                    Company Name <span class="text-rose-400">*</span>
+                </label>
+                <input
+                    type="text"
+                    name="company_name"
+                    id="new_vendor_name"
+                    required
+                    placeholder="e.g. Apex Metals Ltd"
+                    class="w-full px-4 py-2.5 rounded-xl bg-slate-900 border border-slate-700 text-white placeholder-slate-500 text-sm focus:border-cyan-500 focus:ring-1 focus:ring-cyan-500 transition font-medium"
+                >
+            </div>
+
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div class="space-y-1.5">
+                    <label for="new_vendor_contact" class="block text-xs font-bold uppercase tracking-wider text-slate-400">
+                        Contact Person
+                    </label>
+                    <input
+                        type="text"
+                        name="contact_person"
+                        id="new_vendor_contact"
+                        placeholder="e.g. David Miller"
+                        class="w-full px-4 py-2.5 rounded-xl bg-slate-900 border border-slate-700 text-white placeholder-slate-500 text-sm focus:border-cyan-500 focus:ring-1 focus:ring-cyan-500 transition"
+                    >
+                </div>
+
+                <div class="space-y-1.5">
+                    <label for="new_vendor_phone" class="block text-xs font-bold uppercase tracking-wider text-slate-400">
+                        Phone Number
+                    </label>
+                    <input
+                        type="text"
+                        name="phone"
+                        id="new_vendor_phone"
+                        placeholder="e.g. +91 98765 43210"
+                        class="w-full px-4 py-2.5 rounded-xl bg-slate-900 border border-slate-700 text-white placeholder-slate-500 text-sm focus:border-cyan-500 focus:ring-1 focus:ring-cyan-500 transition"
+                    >
+                </div>
+            </div>
+
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div class="space-y-1.5">
+                    <label for="new_vendor_email" class="block text-xs font-bold uppercase tracking-wider text-slate-400">
+                        Email
+                    </label>
+                    <input
+                        type="email"
+                        name="email"
+                        id="new_vendor_email"
+                        placeholder="orders@company.com"
+                        class="w-full px-4 py-2.5 rounded-xl bg-slate-900 border border-slate-700 text-white placeholder-slate-500 text-sm focus:border-cyan-500 focus:ring-1 focus:ring-cyan-500 transition"
+                    >
+                </div>
+
+                <div class="space-y-1.5">
+                    <label for="new_vendor_gst" class="block text-xs font-bold uppercase tracking-wider text-slate-400">
+                        GST Number
+                    </label>
+                    <input
+                        type="text"
+                        name="GST_number"
+                        id="new_vendor_gst"
+                        placeholder="e.g. 07AABCS1429B1Z1"
+                        class="w-full px-4 py-2.5 rounded-xl bg-slate-900 border border-slate-700 text-white placeholder-slate-500 text-sm uppercase font-mono-code focus:border-cyan-500 focus:ring-1 focus:ring-cyan-500 transition"
+                    >
+                </div>
+            </div>
+
+            <div class="space-y-1.5">
+                <label for="new_vendor_address" class="block text-xs font-bold uppercase tracking-wider text-slate-400">
+                    Address
+                </label>
+                <textarea
+                    name="address"
+                    id="new_vendor_address"
+                    rows="2"
+                    placeholder="Billing / Delivery address"
+                    class="w-full px-4 py-2 rounded-xl bg-slate-900 border border-slate-700 text-white placeholder-slate-500 text-xs focus:border-cyan-500 focus:ring-1 focus:ring-cyan-500 transition"
+                ></textarea>
+            </div>
+
+            <div class="flex items-center justify-end space-x-3 pt-3 border-t border-slate-800">
+                <button
+                    type="button"
+                    onclick="closeAddVendorModal()"
+                    class="px-4 py-2.5 rounded-xl bg-slate-900 hover:bg-slate-800 text-slate-300 text-xs font-semibold border border-slate-800 transition"
+                >
+                    Cancel
+                </button>
+                <button
+                    type="submit"
+                    class="px-5 py-2.5 rounded-xl bg-cyan-600 hover:bg-cyan-500 text-white text-xs font-bold transition shadow-md shadow-cyan-900/30"
+                >
+                    Save Vendor
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- ========================================================================= -->
+<!-- MODAL 3: DELIVER ORDER & DEDUCT/CLEAR STOCK                                -->
+<!-- ========================================================================= -->
+<div id="deliverModal" class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm hidden transition-opacity">
+    <div class="relative w-full max-w-lg rounded-2xl bg-slate-950 border border-slate-800 shadow-2xl overflow-hidden p-6 sm:p-7 space-y-6">
+        <div class="flex items-center justify-between border-b border-slate-800/80 pb-4">
+            <div class="flex items-center space-x-3">
+                <div class="w-9 h-9 rounded-xl bg-emerald-950 text-emerald-400 border border-emerald-800 flex items-center justify-center">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" />
+                    </svg>
+                </div>
+                <div>
+                    <h3 class="text-base font-bold text-white tracking-tight">Deliver Stock to Company</h3>
+                    <p class="text-xs text-slate-400 mt-0.5">Confirm dispatch and delivery of requested core boxes.</p>
+                </div>
+            </div>
+            <button type="button" onclick="closeDeliverModal()" class="text-slate-400 hover:text-white transition">
+                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+            </button>
+        </div>
+
+        <form method="post" action="{% url 'vendor-order-list' %}" class="space-y-4">
+            {% csrf_token %}
+            <input type="hidden" name="action" value="deliver_order">
+            <input type="hidden" name="order_id" id="deliverOrderId">
+
+            <!-- Summary Card -->
+            <div class="p-4 rounded-xl bg-slate-900/80 border border-slate-800 space-y-2 text-xs">
+                <div class="flex items-center justify-between">
+                    <span class="text-slate-400 uppercase tracking-wider font-semibold">Company:</span>
+                    <span class="text-white font-bold" id="deliverCompanyTitle">-</span>
+                </div>
+                <div class="flex items-center justify-between">
+                    <span class="text-slate-400 uppercase tracking-wider font-semibold">Core Box Type:</span>
+                    <span class="text-cyan-400 font-bold" id="deliverProductTitle">-</span>
+                </div>
+                <div class="flex items-center justify-between">
+                    <span class="text-slate-400 uppercase tracking-wider font-semibold">Order Quantity:</span>
+                    <span class="text-emerald-400 font-extrabold font-mono-code text-sm" id="deliverOrderQty">-</span>
+                </div>
+                <div class="flex items-center justify-between pt-2 border-t border-slate-800/80">
+                    <span class="text-slate-400 uppercase tracking-wider font-semibold">Available Stock on Hand:</span>
+                    <span class="text-white font-bold font-mono-code" id="deliverStockAvail">-</span>
+                </div>
+            </div>
+
+            <!-- Checkbox: Deduct Stock -->
+            <div class="p-3.5 rounded-xl bg-slate-900/40 border border-slate-800 space-y-3">
+                <label class="flex items-start space-x-3 cursor-pointer">
+                    <input
+                        type="checkbox"
+                        name="deduct_stock"
+                        id="deductStockCheck"
+                        checked
+                        class="mt-0.5 h-4 w-4 rounded bg-slate-900 border-slate-700 text-emerald-600 focus:ring-emerald-500"
+                    >
+                    <span class="text-xs text-slate-300">
+                        <strong class="text-white block font-semibold">Deduct from inventory stock</strong>
+                        Automatically reduce the on-hand stock of this core box and record an OUT ledger transaction.
+                    </span>
+                </label>
+
+                <!-- Checkbox: Clear Immediately -->
+                <label class="flex items-start space-x-3 cursor-pointer pt-2 border-t border-slate-800/60">
+                    <input
+                        type="checkbox"
+                        name="clear_immediately"
+                        id="clearImmediatelyCheck"
+                        class="mt-0.5 h-4 w-4 rounded bg-slate-900 border-slate-700 text-cyan-600 focus:ring-cyan-500"
+                    >
+                    <span class="text-xs text-slate-300">
+                        <strong class="text-white block font-semibold">Clear order from list upon delivery</strong>
+                        Remove this completed order row so it no longer shows in the active orders view.
+                    </span>
+                </label>
+            </div>
+
+            <div class="flex items-center justify-end space-x-3 pt-3 border-t border-slate-800">
+                <button
+                    type="button"
+                    onclick="closeDeliverModal()"
+                    class="px-4 py-2.5 rounded-xl bg-slate-900 hover:bg-slate-800 text-slate-300 text-xs font-semibold border border-slate-800 transition"
+                >
+                    Cancel
+                </button>
+                <button
+                    type="submit"
+                    class="px-5 py-2.5 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white text-xs font-bold shadow-lg shadow-emerald-900/30 transition"
+                >
+                    Confirm Delivery
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- ========================================================================= -->
+<!-- MODAL 4: CLEAR ORDER CONFIRMATION                                          -->
+<!-- ========================================================================= -->
+<div id="clearOrderModal" class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm hidden transition-opacity">
+    <div class="relative w-full max-w-md rounded-2xl bg-slate-950 border border-slate-800 shadow-2xl overflow-hidden p-6 sm:p-7 space-y-6">
+        <div class="flex items-center justify-between border-b border-slate-800/80 pb-4">
+            <div class="flex items-center space-x-3">
+                <div class="w-9 h-9 rounded-xl bg-rose-950 text-rose-400 border border-rose-800 flex items-center justify-center">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                    </svg>
+                </div>
+                <div>
+                    <h3 class="text-base font-bold text-white tracking-tight">Clear Order</h3>
+                    <p class="text-xs text-slate-400 mt-0.5">Remove order from the vendor orders view.</p>
+                </div>
+            </div>
+            <button type="button" onclick="closeClearOrderModal()" class="text-slate-400 hover:text-white transition">
+                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+            </button>
+        </div>
+
+        <form method="post" action="{% url 'vendor-order-list' %}" class="space-y-4">
+            {% csrf_token %}
+            <input type="hidden" name="action" value="clear_order">
+            <input type="hidden" name="order_id" id="clearOrderId">
+
+            <p class="text-sm text-slate-300">
+                Are you sure you want to clear this order for <strong class="text-white" id="clearCompanyTitle">-</strong>?
+            </p>
+            <div class="p-3 rounded-xl bg-slate-900 border border-slate-800 text-xs text-slate-400">
+                <span id="clearProductDetails">-</span>
+            </div>
+
+            <div class="flex items-center justify-end space-x-3 pt-3 border-t border-slate-800">
+                <button
+                    type="button"
+                    onclick="closeClearOrderModal()"
+                    class="px-4 py-2.5 rounded-xl bg-slate-900 hover:bg-slate-800 text-slate-300 text-xs font-semibold border border-slate-800 transition"
+                >
+                    Cancel
+                </button>
+                <button
+                    type="submit"
+                    class="px-5 py-2.5 rounded-xl bg-rose-600 hover:bg-rose-500 text-white text-xs font-bold transition shadow-md shadow-rose-900/30"
+                >
+                    Clear Order
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<script>
+    // Live Search Filter
+    document.getElementById('orderSearch')?.addEventListener('input', function(e) {
+        const query = e.target.value.toLowerCase().trim();
+        const rows = document.querySelectorAll('#tableBody .order-row');
+        rows.forEach(row => {
+            const company = row.querySelector('.order-company')?.textContent.toLowerCase() || '';
+            const product = row.querySelector('.order-product')?.textContent.toLowerCase() || '';
+            const sku = row.querySelector('.order-sku')?.textContent.toLowerCase() || '';
+            if (company.includes(query) || product.includes(query) || sku.includes(query)) {
+                row.style.display = '';
+            } else {
+                row.style.display = 'none';
+            }
+        });
+    });
+
+    // Modal Control: Add Order
+    function openAddOrderModal() {
+        document.getElementById('addOrderModal').classList.remove('hidden');
+    }
+    function closeAddOrderModal() {
+        document.getElementById('addOrderModal').classList.add('hidden');
+    }
+
+    // Modal Control: Add Vendor
+    function openAddVendorModal() {
+        document.getElementById('addVendorModal').classList.remove('hidden');
+    }
+    function closeAddVendorModal() {
+        document.getElementById('addVendorModal').classList.add('hidden');
+    }
+
+    // Modal Control: Deliver Order
+    function openDeliverModal(orderId, companyName, productName, quantity, stockAvail) {
+        document.getElementById('deliverOrderId').value = orderId;
+        document.getElementById('deliverCompanyTitle').textContent = companyName;
+        document.getElementById('deliverProductTitle').textContent = productName;
+        document.getElementById('deliverOrderQty').textContent = `${quantity} boxes`;
+        document.getElementById('deliverStockAvail').textContent = `${stockAvail} boxes available`;
+        document.getElementById('deliverModal').classList.remove('hidden');
+    }
+    function closeDeliverModal() {
+        document.getElementById('deliverModal').classList.add('hidden');
+    }
+
+    // Modal Control: Clear Order
+    function openClearOrderModal(orderId, companyName, productName, quantity) {
+        document.getElementById('clearOrderId').value = orderId;
+        document.getElementById('clearCompanyTitle').textContent = companyName;
+        document.getElementById('clearProductDetails').textContent = `${quantity} boxes of ${productName}`;
+        document.getElementById('clearOrderModal').classList.remove('hidden');
+    }
+    function closeClearOrderModal() {
+        document.getElementById('clearOrderModal').classList.add('hidden');
+    }
+
+    // Close on escape key
+    document.addEventListener('keydown', function(e) {
+        if (e.key === 'Escape') {
+            closeAddOrderModal();
+            closeAddVendorModal();
+            closeDeliverModal();
+            closeClearOrderModal();
+        }
+    });
+</script>
 {% endblock %}

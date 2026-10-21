@@ -534,6 +534,102 @@ class EmployeeAndVendorOrderViewsTestCase(TestCase):
         # Row highlight class
         self.assertContains(response, 'bg-red-950/40 border-l-4 border-red-500')
 
+    def test_vendor_orders_add_order_deliver_and_clear_workflow(self):
+        """
+        Validates the complete Company/Vendor Order lifecycle:
+        1. Add order from a company specifying quantity, core box type, and delivery date.
+        2. Deliver the stock to them with atomic stock deduction and ledger logging.
+        3. Clear the order from the list.
+        """
+        import datetime
+        from django.urls import reverse
+        from transactions.models import PurchaseOrder, PurchaseOrderStatus, InventoryLedger, TransactionType
+        from inventory.models import Item
+
+        # Initial inventory stock for self.item is 20 units
+        initial_stock = self.item.current_stock  # 20
+
+        # 1. POST add_order: Company 'Steel Corp' needs 8 boxes of 'Test GI Core Box'
+        future_date = (self.today + datetime.timedelta(days=5)).isoformat()
+        add_res = self.client.post(reverse('vendor-order-list'), {
+            'action': 'add_order',
+            'company_name': 'Steel Corp',
+            'box_name': 'Test GI Core Box',
+            'quantity': '8',
+            'expected_delivery_date': future_date
+        })
+        self.assertEqual(add_res.status_code, 302)
+
+        order = PurchaseOrder.objects.filter(vendor__company_name='Steel Corp').first()
+        self.assertIsNotNone(order)
+        self.assertEqual(order.quantity, 8)
+        self.assertEqual(order.item, self.item)
+        self.assertEqual(order.status, PurchaseOrderStatus.PENDING)
+        self.assertEqual(order.expected_delivery_date.isoformat(), future_date)
+
+        # GET /vendor-orders/ renders the order and action buttons
+        get_res = self.client.get(reverse('vendor-order-list'))
+        self.assertEqual(get_res.status_code, 200)
+        self.assertContains(get_res, 'Steel Corp')
+        self.assertContains(get_res, 'Test GI Core Box')
+        self.assertContains(get_res, 'openDeliverModal')
+        self.assertContains(get_res, 'openClearOrderModal')
+
+        # 2. POST deliver_order: Deliver the 8 boxes to Steel Corp with stock deduction
+        deliver_res = self.client.post(reverse('vendor-order-list'), {
+            'action': 'deliver_order',
+            'order_id': order.pk,
+            'deduct_stock': 'on'
+        })
+        self.assertEqual(deliver_res.status_code, 302)
+
+        order.refresh_from_db()
+        self.assertEqual(order.status, PurchaseOrderStatus.DELIVERED)
+
+        # Stock deducted from 20 to 12
+        self.item.refresh_from_db()
+        self.assertEqual(self.item.current_stock, initial_stock - Decimal('8'))
+
+        # Ledger OUT entry created
+        ledger = InventoryLedger.objects.filter(
+            generic_reference_id=f"DELIVERY-PO-{order.id}",
+            transaction_type=TransactionType.OUT
+        ).first()
+        self.assertIsNotNone(ledger)
+        self.assertEqual(ledger.quantity_changed, Decimal('-8'))
+
+        # 3. POST clear_order: Clear order from the list
+        clear_res = self.client.post(reverse('vendor-order-list'), {
+            'action': 'clear_order',
+            'order_id': order.pk
+        })
+        self.assertEqual(clear_res.status_code, 302)
+        self.assertFalse(PurchaseOrder.objects.filter(pk=order.pk).exists())
+
+    def test_vendor_orders_add_vendor_profile(self):
+        """
+        Validates registering a new vendor/company profile directly.
+        """
+        from django.urls import reverse
+        from transactions.models import Contact, ContactType
+
+        response = self.client.post(reverse('vendor-order-list'), {
+            'action': 'add_vendor',
+            'company_name': 'Precision Engineering Works',
+            'contact_person': 'Ramesh Kumar',
+            'phone': '+91 9988776655',
+            'email': 'orders@precisioneng.com',
+            'GST_number': '07AABCP1122D1Z4',
+            'address': 'Plot 44, Okhla Phase 3, New Delhi'
+        })
+        self.assertEqual(response.status_code, 302)
+
+        vendor = Contact.objects.filter(company_name='Precision Engineering Works').first()
+        self.assertIsNotNone(vendor)
+        self.assertEqual(vendor.contact_person, 'Ramesh Kumar')
+        self.assertEqual(vendor.GST_number, '07AABCP1122D1Z4')
+        self.assertEqual(vendor.type, ContactType.VENDOR)
+
     def test_add_inventory_view_get_and_post(self):
         """
         Validates AddInventoryView GET template and atomic stock inward POST.

@@ -76,7 +76,7 @@ graph TD
         UI_Inv["Inventory Section (/ & /add-inventory/)<br/>• 3-Question Form<br/>• 4-Column Table<br/>• Add/Edit/Remove/Delete Actions"]
         UI_Emp["Workforce Section (/employees/)<br/>• 5-Feature Operator Table<br/>• Manual Box Typing + Auto-Create<br/>• Month & Today Outputs"]
         UI_Log["Daily Breakdown Section (/employees/:id/:month/)<br/>• Date-Grouped Logs<br/>• Total Boxes per Date<br/>• Single-Detail vs. Multi-Box Breakdown"]
-        UI_Vend["Procurement Section (/vendor-orders/)<br/>• Purchase Orders Overview<br/>• Overdue Detection & Indicators"]
+        UI_Vend["Procurement & Vendor Orders (/vendor-orders/)<br/>• Order Intake (Company, Core Box, Qty, Date)<br/>• Add Vendor Profile<br/>• Deliver Stock (Ledger OUT) & Clear Actions"]
         UI_Dash["Executive Dashboard (/dashboard/)<br/>• Revenue, COGS, Profit, Valuation"]
     end
 
@@ -84,7 +84,7 @@ graph TD
         V_AddInv["AddInventoryView<br/>(Atomic Stock Mutations & Corrections)"]
         V_EmpList["EmployeeListView<br/>(Productivity Aggregations & Manual Box Input)"]
         V_EmpDetail["EmployeeDetailView<br/>(values('production_date').annotate(Sum('quantity')))"]
-        V_POList["VendorOrderListView<br/>(select_related Optimized PO Query)"]
+        V_POList["VendorOrderListView<br/>(Add Order, Add Vendor, Deliver Stock, Clear Order)"]
     end
 
     subgraph Service_Domain["Domain Services Layer (transactions/services.py & dashboard/services.py)"]
@@ -277,10 +277,24 @@ All physical inventory mutations pass through `InventoryLedger`:
 Receipt of purchased goods executes within `@transaction.atomic` using pessimistic locking:
 $$\text{WAC}_{\text{new}} = \frac{(\text{Stock}_{\text{old}} \times \text{Cost}_{\text{old}}) + (\text{Qty}_{\text{new}} \times \text{Price}_{\text{new}})}{\text{Stock}_{\text{old}} + \text{Qty}_{\text{new}}}$$
 
-#### Purchase Orders Lifecycle
-`PurchaseOrder` manages procurement fulfillment:
-- Statuses: `Pending` and `Delivered`.
-- Overdue Detection: Highlights in light red (`bg-red-950/40 border-l-4 border-red-500`) when `status == Pending` and `expected_delivery_date < today`.
+#### Vendor Orders & Procurement Fulfillment Lifecycle
+`PurchaseOrder` manages company/vendor demand and procurement fulfillment (`VendorOrderListView`):
+- **Order Intake**: Add incoming orders from companies with:
+  - Company / Vendor Name (selectable from existing contacts or typed on-the-fly)
+  - Core Box Type (resolved against catalog via `get_or_resolve_production_item`)
+  - Required Quantity
+  - Target Delivery Date
+- **Vendor Registration**: Direct creation of company/vendor profiles (`Contact` model with company name, contact person, phone, email, GST, and address).
+- **Delivery Execution (`deliver_order`)**:
+  - Atomically marks the order as `Delivered`.
+  - Optional **Stock Deduction**: Deducts dispatched units from `Item.current_stock` using `select_for_update()` row-level locking, ensuring stock never goes negative.
+  - Automatically writes an immutable audit record to `InventoryLedger` with transaction type `OUT` and reference `DELIVERY-PO-<id>`.
+  - Supports immediate clearance upon delivery.
+- **Order Clearing (`clear_order`)**: Removes completed or cancelled order records from the active schedule.
+- **Status Lifecycle & Visual Signals**:
+  - `Pending`: Active order awaiting delivery. Highlights in light red (`bg-red-950/40 border-l-4 border-red-500`) when `expected_delivery_date < today` (Overdue).
+  - `Delivered`: Completed order with green badge confirmation.
+  - Filter tabs: `All Orders`, `Pending`, and `Delivered`.
 
 ---
 
@@ -335,7 +349,7 @@ Calculates key industrial accounting metrics for the current calendar period:
 | `/add-inventory/` | `AddInventoryView` | `inventory/add_inventory.html` | Explicit route for inventory stock operations. |
 | `/employees/` | `EmployeeListView` | `inventory/employee_list.html` | **Workforce Operations**: 5-feature operator table, manual box typing, today's output logging. |
 | `/employees/<pk>/<month>/` | `EmployeeDetailView` | `inventory/employee_detail.html` | **Daily Productivity Breakdown**: Date-grouped breakdown showing single vs. multi-box type outputs. |
-| `/vendor-orders/` | `VendorOrderListView` | `inventory/vendor_orders.html` | **Procurement**: Purchase orders overview with pending/overdue indicators. |
+| `/vendor-orders/` | `VendorOrderListView` | `inventory/vendor_orders.html` | **Vendor Orders & Procurement**: Order intake (Company, Core Box, Qty, Delivery Date), vendor registration, stock delivery deduction, and order clearing. |
 | `/dashboard/` | `DashboardHomeView` | `dashboard/home.html` | **Executive Analytics**: Top-line revenue, COGS, inventory valuation, and sales charts. |
 | `/admin/` | Django Admin | Admin Default | Administrative data management with custom badges and audit locks. |
 
@@ -357,6 +371,11 @@ The system includes automated tests covering all critical operational pathways:
    - Tests manufacturing order atomic rollbacks under stock shortages (verifying raw material balances remain intact).
    - Tests sales dispatch with accurate COGS and revenue computations.
 6. **Immutable Ledger Preservations**: Asserts that update and delete attempts on `InventoryLedger` raise `ValidationError`.
+7. **Vendor Orders & Fulfillment Lifecycle**:
+   - Tests company order creation with auto-resolution of core box items.
+   - Tests vendor/company profile creation (`Contact`).
+   - Tests delivery fulfillment with atomic stock deduction and ledger `OUT` verification.
+   - Tests clearing/deleting orders from the database.
 
 ---
 
@@ -374,3 +393,4 @@ The system includes automated tests covering all critical operational pathways:
 | **v1.7** | Manual Typing for Box Types | Removed `<select>` dropdowns; implemented manual text input with `<datalist>` and automatic catalog creation. |
 | **v1.8** | Date-Grouped Multi-Box Daily Logs Engine | Grouped logs by date showing day's total boxes with adaptive single-type detail or multi-box type breakdown. |
 | **v1.9** | Architectural Document & Codebase Synchronization | Fully audited codebase and aligned `ARCHITECTURE.md` with operational reality. |
+| **v2.0** | Vendor Orders Full Lifecycle & Delivery Engine | Added company order intake, vendor registration, atomic stock delivery deduction with double-entry ledger logging, and clear order actions. |
