@@ -59,6 +59,13 @@ class Item(models.Model):
         default=Decimal('0.0000'),
         help_text=_("Real-time physical stock on hand. Controlled via InventoryLedger transactions.")
     )
+    weight = models.DecimalField(
+        max_digits=12,
+        decimal_places=3,
+        default=Decimal('0.000'),
+        verbose_name=_('Weight (kg)'),
+        help_text=_("Unit weight of the product / core box in kilograms (kg).")
+    )
     moving_average_cost = models.DecimalField(
         max_digits=14,
         decimal_places=4,
@@ -82,6 +89,10 @@ class Item(models.Model):
                 name='item_current_stock_non_negative'
             ),
             models.CheckConstraint(
+                condition=models.Q(weight__gte=0),
+                name='item_weight_non_negative'
+            ),
+            models.CheckConstraint(
                 condition=models.Q(moving_average_cost__gte=0),
                 name='item_moving_avg_cost_non_negative'
             )
@@ -90,6 +101,15 @@ class Item(models.Model):
             models.Index(fields=['sku', 'type']),
             models.Index(fields=['created_at']),
         ]
+
+    @property
+    def total_weight(self) -> Decimal:
+        """
+        Total weight of physical on-hand stock in kilograms (kg).
+        """
+        if self.weight and self.current_stock:
+            return (self.current_stock * self.weight).quantize(Decimal('0.001'))
+        return Decimal('0.000')
 
     def clean(self):
         super().clean()

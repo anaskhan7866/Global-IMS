@@ -21,6 +21,7 @@ class ItemAdmin(admin.ModelAdmin):
         'type_badge',
         'unit_of_measure',
         'formatted_stock',
+        'formatted_weight',
         'formatted_moving_cost',
         'is_active',
         'updated_at',
@@ -43,7 +44,7 @@ class ItemAdmin(admin.ModelAdmin):
             'fields': ('sku', 'name', 'type', 'unit_of_measure', 'is_active', 'description')
         }),
         (_('Inventory & Financial Valuation'), {
-            'fields': ('current_stock', 'moving_average_cost'),
+            'fields': ('current_stock', 'weight', 'moving_average_cost'),
             'description': _('Current stock levels are modified via transaction ledgers.')
         }),
         (_('Audit Timestamps'), {
@@ -64,6 +65,10 @@ class ItemAdmin(admin.ModelAdmin):
     @admin.display(description=_('Current Stock'), ordering='current_stock')
     def formatted_stock(self, obj: Item) -> str:
         return f"{obj.current_stock:,.2f} {obj.unit_of_measure}"
+
+    @admin.display(description=_('Weight (kg)'), ordering='weight')
+    def formatted_weight(self, obj: Item) -> str:
+        return f"{obj.weight:,.3f} kg"
 
     @admin.display(description=_('Moving Avg Cost'), ordering='moving_average_cost')
     def formatted_moving_cost(self, obj: Item) -> str:

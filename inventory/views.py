@@ -1,4 +1,5 @@
 import datetime
+import re
 from decimal import Decimal
 from django.db import transaction
 from django.db.models import Count, Sum, Q, Value
@@ -9,7 +10,7 @@ from django.utils import timezone
 from django.views import View
 from django.views.generic import ListView, DetailView
 
-from inventory.models import Employee, ProductionLog, Item
+from inventory.models import Employee, ProductionLog, Item, ItemType
 from transactions.models import PurchaseOrder, Contact, ContactType, InventoryLedger, TransactionType
 
 
@@ -354,14 +355,29 @@ class VendorOrderListView(ListView):
 
 class AddInventoryView(View):
     """
-    Unified page and handler allowing the user to select an Item and add stock directly.
-    Recalculates Moving Weighted Average Cost and writes an immutable entry to InventoryLedger.
+    Inventory management view:
+    1. Simple, direct form asking:
+       - Name of the product
+       - Quantity
+       - Weight of the product (core box)
+    2. Comprehensive table displaying all details of all products:
+       - Product Name & SKU
+       - Quantity / Current Stock
+       - Unit Weight of the Product (Core Box)
+       - Total Stock Weight
+       - Moving Average Cost / Status
     """
     template_name = 'inventory/add_inventory.html'
 
     def get(self, request, *args, **kwargs):
-        items = Item.objects.filter(is_active=True).order_by('type', 'name')
+        items = Item.objects.filter(is_active=True).order_by('name')
         vendors = Contact.objects.filter(type=ContactType.VENDOR, is_active=True).order_by('company_name')
+
+        # Summary calculations for KPI badges
+        total_items_count = items.count()
+        total_units = sum(item.current_stock for item in items)
+        total_weight = sum(item.total_weight for item in items)
+
         recent_ledgers = (
             InventoryLedger.objects.filter(transaction_type=TransactionType.IN)
             .select_related('item', 'contact')
@@ -369,80 +385,162 @@ class AddInventoryView(View):
         )
         return render(request, self.template_name, {
             'items': items,
+            'total_items_count': total_items_count,
+            'total_units': total_units,
+            'total_weight': total_weight,
             'vendors': vendors,
             'recent_ledgers': recent_ledgers,
         })
 
     def post(self, request, *args, **kwargs):
-        item_id = request.POST.get('item_id')
+        # 1. Name of the product
+        product_name = (request.POST.get('name') or request.POST.get('product_name') or '').strip()
+        # 2. Quantity
         raw_quantity = request.POST.get('quantity')
+        # 3. Weight of the product (core box)
+        raw_weight = request.POST.get('weight')
+
+        # Optional auxiliary inputs (graceful fallback/backward compatibility)
+        item_id = request.POST.get('item_id')
         raw_unit_cost = request.POST.get('unit_cost', '0.00')
         vendor_id = request.POST.get('vendor_id')
         reference_id = request.POST.get('reference_id', '').strip()
         narration = request.POST.get('narration', '').strip()
 
-        # Validation
-        if not item_id:
-            messages.error(request, "Please select an inventory item.")
+        # If product_name wasn't supplied directly but item_id was, resolve item
+        target_item = None
+        if item_id:
+            target_item = Item.objects.filter(pk=item_id).first()
+            if target_item and not product_name:
+                product_name = target_item.name
+
+        # Validate Product Name
+        if not product_name:
+            messages.error(request, "Please enter the Name of the product.")
             return redirect('add-inventory')
 
+        # Validate Quantity
+        if not raw_quantity:
+            messages.error(request, "Please enter the Quantity.")
+            return redirect('add-inventory')
         try:
-            quantity = Decimal(str(raw_quantity))
+            quantity = Decimal(str(raw_quantity).strip())
             if quantity <= Decimal('0'):
                 raise ValueError
         except (ValueError, TypeError):
-            messages.error(request, "Please enter a valid positive quantity to add.")
+            messages.error(request, "Please enter a valid positive Quantity.")
             return redirect('add-inventory')
 
+        # Validate Weight of the product (core box)
+        weight = None
+        if raw_weight is not None and str(raw_weight).strip() != '':
+            try:
+                weight = Decimal(str(raw_weight).strip())
+                if weight < Decimal('0'):
+                    raise ValueError
+            except (ValueError, TypeError):
+                messages.error(request, "Weight of the product (core box) cannot be negative.")
+                return redirect('add-inventory')
+
+        # Optional unit cost
         try:
-            unit_cost = Decimal(str(raw_unit_cost)) if raw_unit_cost else Decimal('0.0000')
+            unit_cost = Decimal(str(raw_unit_cost).strip()) if raw_unit_cost else Decimal('0.0000')
             if unit_cost < Decimal('0'):
-                raise ValueError
+                unit_cost = Decimal('0.0000')
         except (ValueError, TypeError):
-            messages.error(request, "Unit cost cannot be negative.")
-            return redirect('add-inventory')
+            unit_cost = Decimal('0.0000')
 
         vendor = None
         if vendor_id:
             vendor = Contact.objects.filter(pk=vendor_id, type=ContactType.VENDOR).first()
 
         with transaction.atomic():
-            locked_item = Item.objects.select_for_update().get(pk=item_id)
+            # Check if item exists either by target_item or case-insensitive name
+            if not target_item:
+                target_item = Item.objects.filter(name__iexact=product_name).first()
 
-            old_stock = locked_item.current_stock
-            old_cost = locked_item.moving_average_cost
-            old_total_val = old_stock * old_cost
-            new_purchase_val = quantity * unit_cost
-            new_stock = old_stock + quantity
+            if target_item:
+                # Existing item: increment stock & update weight
+                locked_item = Item.objects.select_for_update().get(pk=target_item.pk)
+                old_stock = locked_item.current_stock
+                old_cost = locked_item.moving_average_cost
+                new_stock = old_stock + quantity
 
-            # Recalculate moving average cost if positive cost supplied, otherwise preserve previous
-            if new_stock > Decimal('0'):
+                update_fields = ['current_stock', 'updated_at']
+                if weight is not None:
+                    locked_item.weight = weight
+                    update_fields.append('weight')
+
+                # Recompute WAC if positive cost supplied
                 if unit_cost > Decimal('0'):
+                    old_total_val = old_stock * old_cost
+                    new_purchase_val = quantity * unit_cost
                     new_wac = (old_total_val + new_purchase_val) / new_stock
-                else:
-                    new_wac = old_cost
+                    locked_item.moving_average_cost = new_wac.quantize(Decimal('0.0001'))
+                    update_fields.append('moving_average_cost')
+
+                locked_item.current_stock = new_stock
+                locked_item.save(update_fields=update_fields)
+
+                weight_info = f" | Unit Weight: {locked_item.weight} kg" if locked_item.weight else ""
+                default_narration = narration or f"Stock inward addition of {quantity} units for '{locked_item.name}'."
+                effective_cost = unit_cost if unit_cost > 0 else locked_item.moving_average_cost
+
+                InventoryLedger.objects.create(
+                    item=locked_item,
+                    quantity_changed=quantity,
+                    transaction_type=TransactionType.IN,
+                    contact=vendor,
+                    generic_reference_id=reference_id or 'DIRECT-INWARD',
+                    unit_cost=effective_cost,
+                    total_cost=(quantity * effective_cost).quantize(Decimal('0.01')),
+                    narration=default_narration
+                )
+
+                messages.success(
+                    request,
+                    f"Successfully updated '{locked_item.name}'! Added +{quantity} units. "
+                    f"New On-Hand Stock: {locked_item.current_stock} {locked_item.unit_of_measure}{weight_info}"
+                )
             else:
-                new_wac = unit_cost
+                # New Product (Core Box / Finished Good)
+                clean_slug = re.sub(r'[^A-Za-z0-9]+', '-', product_name).strip('-').upper()
+                base_sku = f"CB-{clean_slug[:12]}" if clean_slug else "CB-PROD"
+                sku = base_sku
+                counter = 1
+                while Item.objects.filter(sku=sku).exists():
+                    sku = f"{base_sku}-{counter:02d}"
+                    counter += 1
 
-            locked_item.current_stock = new_stock
-            locked_item.moving_average_cost = new_wac.quantize(Decimal('0.0001'))
-            locked_item.save(update_fields=['current_stock', 'moving_average_cost', 'updated_at'])
+                item_weight = weight if weight is not None else Decimal('0.000')
 
-            default_narration = narration or f"Manual stock inward addition of {quantity} {locked_item.unit_of_measure}."
-            InventoryLedger.objects.create(
-                item=locked_item,
-                quantity_changed=quantity,
-                transaction_type=TransactionType.IN,
-                contact=vendor,
-                generic_reference_id=reference_id or 'DIRECT-INWARD',
-                unit_cost=unit_cost,
-                total_cost=new_purchase_val,
-                narration=default_narration
-            )
+                new_item = Item.objects.create(
+                    sku=sku,
+                    name=product_name,
+                    type=ItemType.FINISHED_GOOD,
+                    unit_of_measure='pcs',
+                    current_stock=quantity,
+                    weight=item_weight,
+                    moving_average_cost=unit_cost
+                )
 
-        messages.success(
-            request,
-            f"Successfully added +{quantity} {locked_item.unit_of_measure} to '{locked_item.name}' (SKU: {locked_item.sku}). "
-            f"New Stock: {locked_item.current_stock} | Updated WAC: ${locked_item.moving_average_cost:.2f}"
-        )
+                default_narration = narration or f"Initial product creation and inward receipt of {quantity} units. Unit weight: {item_weight} kg."
+                InventoryLedger.objects.create(
+                    item=new_item,
+                    quantity_changed=quantity,
+                    transaction_type=TransactionType.IN,
+                    contact=vendor,
+                    generic_reference_id=reference_id or 'INIT-INWARD',
+                    unit_cost=unit_cost,
+                    total_cost=(quantity * unit_cost).quantize(Decimal('0.01')),
+                    narration=default_narration
+                )
+
+                messages.success(
+                    request,
+                    f"New product '{new_item.name}' (SKU: {new_item.sku}) added to inventory! "
+                    f"Stock: {quantity} pcs | Weight: {item_weight} kg"
+                )
+
         return redirect('add-inventory')
+

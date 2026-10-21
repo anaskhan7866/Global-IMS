@@ -1,21 +1,23 @@
 {% extends 'base.html' %}
 
-{% block title %}Inventory & Stock Control | Global-IMS{% endblock %}
+{% block title %}Inventory & Products | Global-IMS{% endblock %}
 
 {% block content %}
 <div class="space-y-8">
-    <!-- Header Banner -->
-    <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+    <!-- Header & Quick KPIs -->
+    <div class="flex flex-col md:flex-row md:items-center md:justify-between gap-4 pb-2 border-b border-slate-800">
         <div>
             <div class="flex items-center space-x-3">
-                <h1 class="text-2xl sm:text-3xl font-extrabold tracking-tight text-white">Inventory & Stock Control</h1>
-                <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold bg-cyan-950 text-cyan-300 border border-cyan-800">
-                    Stock & Ledger Hub
-                </span>
+                <div class="w-10 h-10 rounded-xl bg-gradient-to-br from-cyan-500 to-blue-600 flex items-center justify-center text-white shadow-lg shadow-cyan-900/40">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" />
+                    </svg>
+                </div>
+                <div>
+                    <h1 class="text-2xl sm:text-3xl font-extrabold tracking-tight text-white">Inventory Management</h1>
+                    <p class="text-xs sm:text-sm text-slate-400 mt-0.5">Manage Core Box products, record inbound stock quantities, and track item weights.</p>
+                </div>
             </div>
-            <p class="mt-1 text-sm text-slate-400">
-                Direct Add Inventory Stock receipt and moving weighted average cost adjustment. Commits an immutable audit record to the inventory ledger.
-            </p>
         </div>
 
         <div class="flex items-center space-x-3">
@@ -30,279 +32,278 @@
         </div>
     </div>
 
-    <!-- Main Form & Projection Layout -->
-    <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
-        <!-- Unified Form Card (2 Columns) -->
-        <div class="lg:col-span-2 rounded-xl bg-slate-950 border border-slate-800 shadow-xl overflow-hidden">
-            <div class="p-6 border-b border-slate-800 bg-slate-950">
-                <h2 class="text-lg font-bold text-white tracking-tight">Stock Receipt & Inward Form</h2>
-                <p class="text-xs text-slate-400 mt-0.5">Select any catalog item and specify inbound physical quantity and valuation.</p>
+    <!-- Metric KPI Cards -->
+    <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
+        <div class="p-5 rounded-xl bg-slate-950 border border-slate-800 shadow-lg relative overflow-hidden">
+            <div class="flex items-center justify-between">
+                <div>
+                    <p class="text-xs font-semibold uppercase tracking-wider text-slate-400">Total Products</p>
+                    <h3 class="text-2xl font-extrabold text-white mt-1">{{ total_items_count }}</h3>
+                    <p class="text-[11px] text-slate-500 mt-1">Catalog items tracked in inventory</p>
+                </div>
+                <div class="w-12 h-12 rounded-lg bg-cyan-950/60 border border-cyan-800/60 flex items-center justify-center text-cyan-400">
+                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"/></svg>
+                </div>
             </div>
-
-            <form method="post" action="{% url 'add-inventory' %}" class="p-6 space-y-6">
-                {% csrf_token %}
-
-                <!-- 1. Item Selection -->
-                <div>
-                    <label for="item_id" class="block text-xs font-semibold uppercase tracking-wider text-slate-300 mb-1.5">
-                        Target Inventory Item <span class="text-rose-400">*</span>
-                    </label>
-                    <div class="relative">
-                        <select name="item_id" id="item_id" required class="w-full px-3.5 py-3 rounded-lg bg-slate-900 border border-slate-700 text-white text-sm focus:border-cyan-500 focus:ring-1 focus:ring-cyan-500 transition">
-                            <option value="" disabled selected>-- Select an item from catalog --</option>
-                            {% for item in items %}
-                            <option value="{{ item.id }}"
-                                    data-name="{{ item.name }}"
-                                    data-sku="{{ item.sku }}"
-                                    data-type="{{ item.type }}"
-                                    data-stock="{{ item.current_stock }}"
-                                    data-cost="{{ item.moving_average_cost }}"
-                                    data-uom="{{ item.unit_of_measure }}">
-                                [{{ item.sku }}] {{ item.name }} &bull; Current: {{ item.current_stock|floatformat:2 }} {{ item.unit_of_measure }} ({{ item.type }})
-                            </option>
-                            {% endfor %}
-                        </select>
-                    </div>
-                    <p class="mt-1 text-xs text-slate-500">Includes all approved Raw Materials and Finished Goods.</p>
-                </div>
-
-                <!-- 2. Quantity & Unit Cost Grid -->
-                <div class="grid grid-cols-1 sm:grid-cols-2 gap-5">
-                    <div>
-                        <label for="quantity" class="block text-xs font-semibold uppercase tracking-wider text-slate-300 mb-1.5">
-                            Quantity to Add <span class="text-rose-400">*</span>
-                        </label>
-                        <div class="relative">
-                            <input type="number" step="0.0001" min="0.0001" name="quantity" id="quantity" required placeholder="0.0000" class="w-full px-3.5 py-2.5 rounded-lg bg-slate-900 border border-slate-700 text-white placeholder-slate-500 text-sm font-mono-code focus:border-cyan-500 focus:ring-1 focus:ring-cyan-500 transition">
-                            <span id="uomBadge" class="absolute right-3 top-2.5 text-xs text-slate-400 font-mono-code font-bold">units</span>
-                        </div>
-                        <p class="mt-1 text-xs text-slate-500">Strictly positive quantity added to on-hand balance.</p>
-                    </div>
-
-                    <div>
-                        <label for="unit_cost" class="block text-xs font-semibold uppercase tracking-wider text-slate-300 mb-1.5">
-                            Unit Purchase Price / Cost ($)
-                        </label>
-                        <div class="relative">
-                            <span class="absolute left-3 top-2.5 text-xs text-slate-400 font-mono-code">$</span>
-                            <input type="number" step="0.0001" min="0" name="unit_cost" id="unit_cost" placeholder="0.0000" class="w-full pl-7 pr-3.5 py-2.5 rounded-lg bg-slate-900 border border-slate-700 text-white placeholder-slate-500 text-sm font-mono-code focus:border-cyan-500 focus:ring-1 focus:ring-cyan-500 transition">
-                        </div>
-                        <p class="mt-1 text-xs text-slate-500">Recalculates Weighted Average Cost (WAC).</p>
-                    </div>
-                </div>
-
-                <!-- 3. Supplier / Vendor Selection -->
-                <div>
-                    <label for="vendor_id" class="block text-xs font-semibold uppercase tracking-wider text-slate-300 mb-1.5">
-                        Supplier / Vendor (Optional)
-                    </label>
-                    <select name="vendor_id" id="vendor_id" class="w-full px-3.5 py-2.5 rounded-lg bg-slate-900 border border-slate-700 text-white text-sm focus:border-cyan-500 focus:ring-1 focus:ring-cyan-500 transition">
-                        <option value="">-- No Vendor (Internal Transfer / Initial Count Adjustment) --</option>
-                        {% for vendor in vendors %}
-                        <option value="{{ vendor.id }}">
-                            {{ vendor.company_name }} {% if vendor.GST_number %}(GST: {{ vendor.GST_number }}){% endif %}
-                        </option>
-                        {% endfor %}
-                    </select>
-                </div>
-
-                <!-- 4. Reference ID & Narration -->
-                <div class="grid grid-cols-1 sm:grid-cols-2 gap-5">
-                    <div>
-                        <label for="reference_id" class="block text-xs font-semibold uppercase tracking-wider text-slate-300 mb-1.5">
-                            Reference Identifier (PO / Invoice / Batch)
-                        </label>
-                        <input type="text" name="reference_id" id="reference_id" placeholder="e.g. PO-10944 or INW-BATCH-02" class="w-full px-3.5 py-2.5 rounded-lg bg-slate-900 border border-slate-700 text-white placeholder-slate-500 text-sm font-mono-code focus:border-cyan-500 focus:ring-1 focus:ring-cyan-500 transition">
-                    </div>
-
-                    <div>
-                        <label for="narration" class="block text-xs font-semibold uppercase tracking-wider text-slate-300 mb-1.5">
-                            Remarks / Batch Notes
-                        </label>
-                        <input type="text" name="narration" id="narration" placeholder="e.g. Received at Dock B, inspected ok" class="w-full px-3.5 py-2.5 rounded-lg bg-slate-900 border border-slate-700 text-white placeholder-slate-500 text-sm focus:border-cyan-500 focus:ring-1 focus:ring-cyan-500 transition">
-                    </div>
-                </div>
-
-                <!-- Submit Action -->
-                <div class="pt-4 border-t border-slate-800 flex items-center justify-end space-x-3">
-                    <button type="reset" class="px-4 py-2.5 rounded-lg bg-slate-900 hover:bg-slate-800 text-slate-300 text-sm font-semibold border border-slate-800 transition">
-                        Clear
-                    </button>
-                    <button type="submit" class="inline-flex items-center space-x-2 px-6 py-2.5 rounded-lg bg-cyan-600 hover:bg-cyan-500 text-white text-sm font-semibold shadow-lg shadow-cyan-900/40 hover:shadow-cyan-900/60 transition focus:outline-none focus:ring-2 focus:ring-cyan-400">
-                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>
-                        <span>Confirm Stock Inward</span>
-                    </button>
-                </div>
-            </form>
         </div>
 
-        <!-- Real-Time Stock Projection Sidebar Card (1 Column) -->
-        <div class="rounded-xl bg-slate-950 border border-slate-800 shadow-xl p-6 flex flex-col justify-between space-y-6">
-            <div>
-                <div class="flex items-center space-x-2 text-cyan-400 mb-4">
-                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6" />
-                    </svg>
-                    <h3 class="text-base font-bold text-white tracking-tight">Live Ledger Projection</h3>
+        <div class="p-5 rounded-xl bg-slate-950 border border-slate-800 shadow-lg relative overflow-hidden">
+            <div class="flex items-center justify-between">
+                <div>
+                    <p class="text-xs font-semibold uppercase tracking-wider text-slate-400">Total Units in Stock</p>
+                    <h3 class="text-2xl font-extrabold text-emerald-400 mt-1 font-mono-code">{{ total_units|floatformat:0 }}</h3>
+                    <p class="text-[11px] text-slate-500 mt-1">Physical units available on floor</p>
                 </div>
-
-                <div id="noSelectionNotice" class="py-8 text-center text-slate-500 text-xs">
-                    <svg class="w-10 h-10 mx-auto text-slate-700 mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4"/></svg>
-                    <p>Select an item to preview real-time stock balance & Moving Weighted Average Cost (WAC) calculations.</p>
-                </div>
-
-                <div id="selectionPreview" class="hidden space-y-4">
-                    <div class="p-3.5 rounded-lg bg-slate-900/70 border border-slate-800">
-                        <span id="previewSku" class="text-xs font-mono-code font-bold text-cyan-400 block">SKU-001</span>
-                        <h4 id="previewName" class="text-sm font-bold text-white mt-0.5">Item Name</h4>
-                        <span id="previewType" class="inline-block mt-2 px-2 py-0.5 rounded text-[10px] font-semibold bg-blue-950 text-blue-300 border border-blue-800">Raw Material</span>
-                    </div>
-
-                    <div class="space-y-3 text-xs">
-                        <div class="flex items-center justify-between pb-2 border-b border-slate-800/80">
-                            <span class="text-slate-400">Current Stock:</span>
-                            <span id="previewCurrentStock" class="font-mono-code font-bold text-slate-200">0.00</span>
-                        </div>
-                        <div class="flex items-center justify-between pb-2 border-b border-slate-800/80">
-                            <span class="text-slate-400">Incoming Units:</span>
-                            <span id="previewIncomingStock" class="font-mono-code font-bold text-cyan-400">+0.00</span>
-                        </div>
-                        <div class="flex items-center justify-between pb-2 border-b border-slate-800/80">
-                            <span class="text-slate-300 font-semibold">Projected Balance:</span>
-                            <span id="previewNewStock" class="font-mono-code font-bold text-emerald-400 text-sm">0.00</span>
-                        </div>
-                        <div class="flex items-center justify-between pt-1">
-                            <span class="text-slate-400">Projected Unit WAC:</span>
-                            <span id="previewNewCost" class="font-mono-code font-bold text-amber-300">$0.00</span>
-                        </div>
-                    </div>
+                <div class="w-12 h-12 rounded-lg bg-emerald-950/60 border border-emerald-800/60 flex items-center justify-center text-emerald-400">
+                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z"/></svg>
                 </div>
             </div>
+        </div>
 
-            <!-- ACID Ledger Concurrency Box -->
-            <div class="p-3.5 rounded-lg bg-slate-900/50 border border-slate-800/80 text-[11px] text-slate-400">
-                <div class="flex items-center space-x-1.5 text-emerald-400 font-semibold mb-1">
-                    <svg class="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd"/></svg>
-                    <span>Double-Entry Guarantee</span>
+        <div class="p-5 rounded-xl bg-slate-950 border border-slate-800 shadow-lg relative overflow-hidden">
+            <div class="flex items-center justify-between">
+                <div>
+                    <p class="text-xs font-semibold uppercase tracking-wider text-slate-400">Total Stock Weight</p>
+                    <h3 class="text-2xl font-extrabold text-cyan-300 mt-1 font-mono-code">{{ total_weight|floatformat:2 }} <span class="text-sm font-normal text-slate-400">kg</span></h3>
+                    <p class="text-[11px] text-slate-500 mt-1">Aggregate Core Box weight</p>
                 </div>
-                <p>Transactions use <code class="text-cyan-400 font-mono-code">select_for_update()</code> pessimistic row locking to guarantee ledger immutability and atomic stock calculation.</p>
+                <div class="w-12 h-12 rounded-lg bg-blue-950/60 border border-blue-800/60 flex items-center justify-center text-cyan-400">
+                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 6l3 1m0 0l-3 9a5.002 5.002 0 006.001 0M6 7l3 9M6 7l6-2m6 2l3-1m-3 1l-3 9a5.002 5.002 0 006.001 0M18 7l3 9m-3-9l-6-2m0-2v2m0 16V5m0 16H9m3 0h3"/></svg>
+                </div>
             </div>
         </div>
     </div>
 
-    <!-- Recent Inward Stock Movements -->
-    <section aria-label="Recent Inward Ledger Entries" class="rounded-xl bg-slate-950 border border-slate-800 shadow-xl overflow-hidden">
-        <div class="p-5 sm:p-6 border-b border-slate-800 flex items-center justify-between">
+    <!-- Add Inventory Form Section -->
+    <div id="addInventoryCard" class="rounded-2xl bg-slate-950 border border-slate-800 shadow-2xl overflow-hidden">
+        <div class="p-6 border-b border-slate-800 bg-gradient-to-r from-slate-900 to-slate-950 flex items-center justify-between">
+            <div class="flex items-center space-x-3">
+                <div class="w-8 h-8 rounded-lg bg-cyan-500/20 text-cyan-400 flex items-center justify-center">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"/></svg>
+                </div>
+                <div>
+                    <h2 class="text-lg font-bold text-white tracking-tight">Add Inventory Stock</h2>
+                    <p class="text-xs text-slate-400">Fill in the product details to add new inventory stock or create a new core box product.</p>
+                </div>
+            </div>
+            <span class="inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold bg-cyan-950 text-cyan-300 border border-cyan-800">
+                Simple Entry Form
+            </span>
+        </div>
+
+        <form method="post" action="{% url 'add-inventory' %}" id="inventoryForm" class="p-6 sm:p-8 space-y-6">
+            {% csrf_token %}
+
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+                <!-- Question 1: Name of the product -->
+                <div class="space-y-2">
+                    <label for="product_name" class="block text-xs font-bold uppercase tracking-wider text-cyan-400 flex items-center space-x-1.5">
+                        <span class="w-5 h-5 rounded-full bg-cyan-900/60 text-cyan-300 flex items-center justify-center text-[11px] font-bold">1</span>
+                        <span>Name of the Product <span class="text-rose-400">*</span></span>
+                    </label>
+                    <div class="relative">
+                        <input
+                            type="text"
+                            name="name"
+                            id="product_name"
+                            list="product_datalist"
+                            required
+                            autocomplete="off"
+                            placeholder="e.g. GI Core Box 100mm, Standard Core Box"
+                            class="w-full px-4 py-3 rounded-xl bg-slate-900 border border-slate-700 text-white placeholder-slate-500 text-sm focus:border-cyan-500 focus:ring-2 focus:ring-cyan-500/20 transition font-medium"
+                        >
+                        <datalist id="product_datalist">
+                            {% for item in items %}
+                            <option value="{{ item.name }}" data-weight="{{ item.weight }}" data-stock="{{ item.current_stock }}" data-sku="{{ item.sku }}">
+                                [{{ item.sku }}] Stock: {{ item.current_stock|floatformat:0 }} | Weight: {{ item.weight }} kg
+                            </option>
+                            {% endfor %}
+                        </datalist>
+                    </div>
+                    <p class="text-[11px] text-slate-400">Type a new product name or pick an existing product from the catalog.</p>
+                </div>
+
+                <!-- Question 2: Quantity -->
+                <div class="space-y-2">
+                    <label for="quantity" class="block text-xs font-bold uppercase tracking-wider text-cyan-400 flex items-center space-x-1.5">
+                        <span class="w-5 h-5 rounded-full bg-cyan-900/60 text-cyan-300 flex items-center justify-center text-[11px] font-bold">2</span>
+                        <span>Quantity <span class="text-rose-400">*</span></span>
+                    </label>
+                    <div class="relative">
+                        <input
+                            type="number"
+                            step="1"
+                            min="1"
+                            name="quantity"
+                            id="quantity"
+                            required
+                            placeholder="e.g. 50"
+                            class="w-full px-4 py-3 rounded-xl bg-slate-900 border border-slate-700 text-white placeholder-slate-500 text-sm font-mono-code focus:border-cyan-500 focus:ring-2 focus:ring-cyan-500/20 transition"
+                        >
+                        <span class="absolute right-3.5 top-3 text-xs text-slate-400 font-mono-code font-bold pointer-events-none">units</span>
+                    </div>
+                    <p class="text-[11px] text-slate-400">Number of core boxes / units to add into inventory.</p>
+                </div>
+
+                <!-- Question 3: Weight of the product (core box) -->
+                <div class="space-y-2">
+                    <label for="weight" class="block text-xs font-bold uppercase tracking-wider text-cyan-400 flex items-center space-x-1.5">
+                        <span class="w-5 h-5 rounded-full bg-cyan-900/60 text-cyan-300 flex items-center justify-center text-[11px] font-bold">3</span>
+                        <span>Weight of the Product (Core Box) <span class="text-rose-400">*</span></span>
+                    </label>
+                    <div class="relative">
+                        <input
+                            type="number"
+                            step="0.001"
+                            min="0"
+                            name="weight"
+                            id="weight"
+                            required
+                            placeholder="e.g. 3.250"
+                            class="w-full px-4 py-3 rounded-xl bg-slate-900 border border-slate-700 text-white placeholder-slate-500 text-sm font-mono-code focus:border-cyan-500 focus:ring-2 focus:ring-cyan-500/20 transition"
+                        >
+                        <span class="absolute right-3.5 top-3 text-xs text-slate-400 font-mono-code font-bold pointer-events-none">kg / box</span>
+                    </div>
+                    <p class="text-[11px] text-slate-400">Unit weight per individual core box in kilograms (kg).</p>
+                </div>
+            </div>
+
+            <!-- Dynamic Batch Calculation Preview Banner -->
+            <div id="previewBanner" class="p-4 rounded-xl bg-slate-900/80 border border-slate-800 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 text-xs transition">
+                <div class="flex items-center space-x-3">
+                    <div class="w-8 h-8 rounded-lg bg-cyan-950 text-cyan-400 flex items-center justify-center font-bold">
+                        &sum;
+                    </div>
+                    <div>
+                        <span class="font-bold text-white block">Batch Summary Projection</span>
+                        <span id="previewStatusText" class="text-slate-400">Enter product name, quantity, and weight above to compute batch stats.</span>
+                    </div>
+                </div>
+
+                <div class="flex items-center space-x-6 font-mono-code">
+                    <div>
+                        <span class="text-slate-400 block text-[10px] uppercase">Batch Quantity</span>
+                        <span id="calcQuantity" class="text-white font-bold text-sm">0 units</span>
+                    </div>
+                    <div>
+                        <span class="text-slate-400 block text-[10px] uppercase">Unit Weight</span>
+                        <span id="calcUnitWeight" class="text-cyan-400 font-bold text-sm">0.000 kg</span>
+                    </div>
+                    <div>
+                        <span class="text-slate-400 block text-[10px] uppercase">Total Batch Weight</span>
+                        <span id="calcTotalWeight" class="text-emerald-400 font-bold text-base">0.000 kg</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Action Buttons -->
+            <div class="flex items-center justify-end space-x-3 pt-2">
+                <button
+                    type="reset"
+                    id="resetBtn"
+                    class="px-5 py-3 rounded-xl bg-slate-900 hover:bg-slate-800 text-slate-300 text-xs font-semibold border border-slate-800 transition"
+                >
+                    Reset Form
+                </button>
+                <button
+                    type="submit"
+                    id="submitBtn"
+                    class="inline-flex items-center space-x-2 px-8 py-3 rounded-xl bg-gradient-to-r from-cyan-600 to-blue-600 hover:from-cyan-500 hover:to-blue-500 text-white text-sm font-bold shadow-lg shadow-cyan-900/40 hover:shadow-cyan-900/60 transition focus:outline-none focus:ring-2 focus:ring-cyan-400"
+                >
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"/></svg>
+                    <span>Add Inventory</span>
+                </button>
+            </div>
+        </form>
+    </div>
+
+    <!-- Products Table Section -->
+    <div class="rounded-2xl bg-slate-950 border border-slate-800 shadow-xl overflow-hidden">
+        <!-- Table Header & Live Search Bar -->
+        <div class="p-5 sm:p-6 border-b border-slate-800 flex flex-col md:flex-row md:items-center md:justify-between gap-4 bg-slate-950">
             <div>
-                <h3 class="text-base font-bold text-white tracking-tight">Recent Inward Stock Receipts</h3>
-                <p class="text-xs text-slate-400 mt-0.5">Audit log of direct purchases and manual adjustments committed to InventoryLedger.</p>
+                <div class="flex items-center space-x-2">
+                    <h2 class="text-lg font-bold text-white tracking-tight">All Products Inventory Details</h2>
+                    <span class="px-2.5 py-0.5 rounded-full text-xs font-semibold bg-slate-900 text-cyan-400 border border-slate-800">
+                        {{ items|length }} Items
+                    </span>
+                </div>
+                <p class="text-xs text-slate-400 mt-1">Live overview of product stock quantities, core box unit weights, total weights, and inventory status.</p>
             </div>
-            <span class="text-xs text-slate-400 font-mono-code">Append-Only Audit</span>
+
+            <!-- Search Filter -->
+            <div class="relative w-full md:w-72">
+                <input
+                    type="text"
+                    id="tableSearch"
+                    placeholder="Search product name or SKU..."
+                    class="w-full pl-9 pr-4 py-2 rounded-xl bg-slate-900 border border-slate-800 text-white placeholder-slate-500 text-xs focus:border-cyan-500 focus:ring-1 focus:ring-cyan-500 transition"
+                >
+                <svg class="w-4 h-4 text-slate-500 absolute left-3 top-2.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                </svg>
+            </div>
         </div>
 
+        <!-- Table Display of All Products -->
         <div class="overflow-x-auto">
-            <table class="min-w-full divide-y divide-slate-800 text-left text-xs">
-                <thead class="bg-slate-900/60 uppercase font-semibold text-slate-400">
-                    <tr>
-                        <th class="py-3 pl-6 pr-3">Timestamp</th>
-                        <th class="px-3 py-3">Item</th>
-                        <th class="px-3 py-3">Qty Added</th>
-                        <th class="px-3 py-3">Unit Valuation</th>
-                        <th class="px-3 py-3">Vendor / Entity</th>
-                        <th class="py-3 pl-3 pr-6 text-right">Reference ID</th>
-                    </tr>
-                </thead>
-                <tbody class="divide-y divide-slate-800/60 bg-slate-950 text-slate-200">
-                    {% for entry in recent_ledgers %}
-                    <tr class="hover:bg-slate-900/40 transition">
-                        <td class="whitespace-nowrap py-3.5 pl-6 pr-3 font-mono-code text-slate-400">
-                            {{ entry.timestamp|date:"Y-m-d H:i" }}
-                        </td>
-                        <td class="whitespace-nowrap px-3 py-3.5 font-medium text-white">
-                            {{ entry.item.name }}
-                            <span class="text-[10px] text-cyan-400 font-mono-code block">{{ entry.item.sku }}</span>
-                        </td>
-                        <td class="whitespace-nowrap px-3 py-3.5 font-mono-code font-bold text-emerald-400">
-                            +{{ entry.quantity_changed|floatformat:2 }} {{ entry.item.unit_of_measure }}
-                        </td>
-                        <td class="whitespace-nowrap px-3 py-3.5 font-mono-code text-slate-300">
-                            ${{ entry.unit_cost|floatformat:2 }}
-                        </td>
-                        <td class="whitespace-nowrap px-3 py-3.5 text-slate-300">
-                            {{ entry.contact.company_name|default:"Internal Adjustment" }}
-                        </td>
-                        <td class="whitespace-nowrap py-3.5 pl-3 pr-6 text-right font-mono-code text-slate-400">
-                            {{ entry.generic_reference_id|default:"DIRECT-INWARD" }}
-                        </td>
-                    </tr>
-                    {% empty %}
-                    <tr>
-                        <td colspan="6" class="py-8 text-center text-slate-500">
-                            No inward inventory transactions recorded yet.
-                        </td>
-                    </tr>
-                    {% endfor %}
-                </tbody>
-            </table>
-        </div>
-    </section>
-
-    <!-- Complete On-Hand Stock Catalog -->
-    <section id="stockCatalog" aria-label="Current Stock Catalog" class="rounded-xl bg-slate-950 border border-slate-800 shadow-xl overflow-hidden">
-        <div class="p-5 sm:p-6 border-b border-slate-800 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-            <div>
-                <h3 class="text-base font-bold text-white tracking-tight">On-Hand Inventory Catalog & Stock Balances</h3>
-                <p class="text-xs text-slate-400 mt-0.5">Physical stock, unit of measure, and moving weighted average cost valuation.</p>
-            </div>
-            <div class="flex items-center space-x-2 text-xs">
-                <span class="px-2.5 py-1 rounded bg-slate-900 border border-slate-800 text-slate-300 font-mono-code">
-                    {{ items|length }} Items Registered
-                </span>
-            </div>
-        </div>
-
-        <div class="overflow-x-auto">
-            <table class="min-w-full divide-y divide-slate-800 text-left text-sm">
+            <table class="min-w-full divide-y divide-slate-800 text-left text-sm" id="productsTable">
                 <thead class="bg-slate-900/60 text-xs uppercase font-semibold text-slate-400">
                     <tr>
-                        <th class="py-3.5 pl-6 pr-3">SKU</th>
-                        <th class="px-3 py-3.5">Item Name</th>
+                        <th class="py-3.5 pl-6 pr-3">Product Name & SKU</th>
                         <th class="px-3 py-3.5">Classification</th>
-                        <th class="px-3 py-3.5">Current Stock</th>
-                        <th class="px-3 py-3.5">Unit Cost (WAC)</th>
-                        <th class="py-3.5 pl-3 pr-6 text-right">Status</th>
+                        <th class="px-3 py-3.5">Quantity (Stock)</th>
+                        <th class="px-3 py-3.5">Weight (Core Box)</th>
+                        <th class="px-3 py-3.5">Total Weight on Hand</th>
+                        <th class="px-3 py-3.5">Status</th>
+                        <th class="py-3.5 pl-3 pr-6 text-right">Action</th>
                     </tr>
                 </thead>
-                <tbody class="divide-y divide-slate-800/60 bg-slate-950 text-slate-200">
+                <tbody class="divide-y divide-slate-800/60 bg-slate-950 text-slate-200" id="tableBody">
                     {% for item in items %}
-                    <tr class="hover:bg-slate-900/40 transition">
-                        <td class="whitespace-nowrap py-4 pl-6 pr-3 font-mono-code text-xs font-bold text-cyan-400">
-                            {{ item.sku }}
+                    <tr class="product-row hover:bg-slate-900/50 transition">
+                        <!-- 1. Name of the product & SKU -->
+                        <td class="whitespace-nowrap py-4 pl-6 pr-3">
+                            <div class="font-bold text-white text-sm product-name">{{ item.name }}</div>
+                            <span class="text-[11px] font-mono-code font-bold text-cyan-400 block product-sku">{{ item.sku }}</span>
                         </td>
-                        <td class="whitespace-nowrap px-3 py-4 font-medium text-white">
-                            {{ item.name }}
-                        </td>
+
+                        <!-- Classification -->
                         <td class="whitespace-nowrap px-3 py-4 text-xs">
-                            {% if item.type == 'Raw Material' %}
-                            <span class="inline-flex items-center px-2 py-0.5 rounded font-medium bg-blue-950 text-blue-300 border border-blue-800">
-                                Raw Material
+                            {% if item.type == 'Finished Good' %}
+                            <span class="inline-flex items-center px-2.5 py-0.5 rounded-full font-medium bg-emerald-950/80 text-emerald-300 border border-emerald-800">
+                                Core Box / FG
                             </span>
                             {% else %}
-                            <span class="inline-flex items-center px-2 py-0.5 rounded font-medium bg-emerald-950 text-emerald-300 border border-emerald-800">
-                                Finished Good
+                            <span class="inline-flex items-center px-2.5 py-0.5 rounded-full font-medium bg-blue-950/80 text-blue-300 border border-blue-800">
+                                Raw Material
                             </span>
                             {% endif %}
                         </td>
-                        <td class="whitespace-nowrap px-3 py-4 font-mono-code font-bold text-sm {% if item.current_stock < 5 %}text-rose-400{% elif item.current_stock < 10 %}text-amber-400{% else %}text-white{% endif %}">
-                            {{ item.current_stock|floatformat:2 }} <span class="text-xs text-slate-400 font-normal">{{ item.unit_of_measure }}</span>
+
+                        <!-- 2. Quantity -->
+                        <td class="whitespace-nowrap px-3 py-4 font-mono-code">
+                            <span class="text-base font-extrabold {% if item.current_stock == 0 %}text-rose-400{% elif item.current_stock < 10 %}text-amber-400{% else %}text-emerald-400{% endif %}">
+                                {{ item.current_stock|floatformat:0 }}
+                            </span>
+                            <span class="text-xs text-slate-400 ml-1">{{ item.unit_of_measure }}</span>
                         </td>
-                        <td class="whitespace-nowrap px-3 py-4 font-mono-code text-xs text-slate-300">
-                            ${{ item.moving_average_cost|floatformat:2 }}
+
+                        <!-- 3. Weight of the product (core box) -->
+                        <td class="whitespace-nowrap px-3 py-4 font-mono-code text-cyan-300 font-bold">
+                            {{ item.weight|floatformat:3 }} <span class="text-xs font-normal text-slate-400">kg</span>
                         </td>
-                        <td class="whitespace-nowrap py-4 pl-3 pr-6 text-right text-xs">
+
+                        <!-- Total Weight (Quantity * Weight) -->
+                        <td class="whitespace-nowrap px-3 py-4 font-mono-code text-white font-semibold">
+                            {{ item.total_weight|floatformat:2 }} <span class="text-xs font-normal text-slate-400">kg</span>
+                        </td>
+
+                        <!-- Status Badge -->
+                        <td class="whitespace-nowrap px-3 py-4 text-xs">
                             {% if item.current_stock == 0 %}
                             <span class="inline-flex items-center px-2.5 py-1 rounded-md text-xs font-bold bg-rose-950/80 text-rose-300 border border-rose-800">
-                                Stockout Danger
+                                Out of Stock
                             </span>
                             {% elif item.current_stock < 10 %}
                             <span class="inline-flex items-center px-2.5 py-1 rounded-md text-xs font-medium bg-amber-950/60 text-amber-300 border border-amber-800">
@@ -314,82 +315,191 @@
                             </span>
                             {% endif %}
                         </td>
+
+                        <!-- Quick Action -->
+                        <td class="whitespace-nowrap py-4 pl-3 pr-6 text-right">
+                            <button
+                                type="button"
+                                onclick="fillQuickAdd('{{ item.name|escapejs }}', '{{ item.weight }}')"
+                                class="inline-flex items-center space-x-1 px-3 py-1.5 rounded-lg bg-slate-900 hover:bg-cyan-950 text-slate-300 hover:text-cyan-300 border border-slate-800 hover:border-cyan-700 text-xs font-medium transition"
+                                title="Quick fill this product in the form above"
+                            >
+                                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>
+                                <span>Add Stock</span>
+                            </button>
+                        </td>
                     </tr>
                     {% empty %}
-                    <tr>
-                        <td colspan="6" class="py-8 text-center text-slate-500">
-                            No catalog items found.
+                    <tr id="emptyTableRow">
+                        <td colspan="7" class="py-12 text-center text-slate-500">
+                            <svg class="w-10 h-10 mx-auto text-slate-700 mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4"/></svg>
+                            <p class="text-sm font-semibold text-slate-400">No products found in inventory.</p>
+                            <p class="text-xs text-slate-500 mt-1">Use the "Add Inventory" form above to create your first product.</p>
                         </td>
                     </tr>
                     {% endfor %}
                 </tbody>
             </table>
         </div>
-    </section>
+    </div>
+
+    <!-- Recent Inward Stock Movements (Audit Trail) -->
+    <div class="rounded-xl bg-slate-950 border border-slate-800/80 shadow-lg overflow-hidden">
+        <div class="p-5 border-b border-slate-800/80 flex items-center justify-between">
+            <div>
+                <h3 class="text-sm font-bold text-white tracking-tight">Recent Inward Stock Movements</h3>
+                <p class="text-xs text-slate-400 mt-0.5">Audit log of direct additions and stock inward entries committed to InventoryLedger.</p>
+            </div>
+            <span class="text-xs text-slate-400 font-mono-code">Audit Trail</span>
+        </div>
+
+        <div class="overflow-x-auto">
+            <table class="min-w-full divide-y divide-slate-800 text-left text-xs">
+                <thead class="bg-slate-900/60 uppercase font-semibold text-slate-400">
+                    <tr>
+                        <th class="py-3 pl-6 pr-3">Timestamp</th>
+                        <th class="px-3 py-3">Product Name</th>
+                        <th class="px-3 py-3">Quantity Added</th>
+                        <th class="px-3 py-3">Unit Valuation</th>
+                        <th class="py-3 pl-3 pr-6 text-right">Reference</th>
+                    </tr>
+                </thead>
+                <tbody class="divide-y divide-slate-800/60 bg-slate-950 text-slate-200">
+                    {% for entry in recent_ledgers %}
+                    <tr class="hover:bg-slate-900/40 transition">
+                        <td class="whitespace-nowrap py-3 pl-6 pr-3 font-mono-code text-slate-400">
+                            {{ entry.timestamp|date:"Y-m-d H:i" }}
+                        </td>
+                        <td class="whitespace-nowrap px-3 py-3 font-medium text-white">
+                            {{ entry.item.name }}
+                            <span class="text-[10px] text-cyan-400 font-mono-code block">{{ entry.item.sku }}</span>
+                        </td>
+                        <td class="whitespace-nowrap px-3 py-3 font-mono-code font-bold text-emerald-400">
+                            +{{ entry.quantity_changed|floatformat:0 }} {{ entry.item.unit_of_measure }}
+                        </td>
+                        <td class="whitespace-nowrap px-3 py-3 font-mono-code text-slate-300">
+                            ${{ entry.unit_cost|floatformat:2 }}
+                        </td>
+                        <td class="whitespace-nowrap py-3 pl-3 pr-6 text-right font-mono-code text-slate-400">
+                            {{ entry.generic_reference_id|default:"DIRECT-INWARD" }}
+                        </td>
+                    </tr>
+                    {% empty %}
+                    <tr>
+                        <td colspan="5" class="py-6 text-center text-slate-500">
+                            No recent stock transactions recorded yet.
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
 </div>
 
+<!-- Interactive Client-side Scripting -->
 <script>
-    document.addEventListener('DOMContentLoaded', function () {
-        const itemSelect = document.getElementById('item_id');
-        const qtyInput = document.getElementById('quantity');
-        const costInput = document.getElementById('unit_cost');
-        const uomBadge = document.getElementById('uomBadge');
+    // Live Calculation & Autofill
+    const productNameInput = document.getElementById('product_name');
+    const quantityInput = document.getElementById('quantity');
+    const weightInput = document.getElementById('weight');
+    const datalist = document.getElementById('product_datalist');
 
-        const noSelectionNotice = document.getElementById('noSelectionNotice');
-        const selectionPreview = document.getElementById('selectionPreview');
-        const previewSku = document.getElementById('previewSku');
-        const previewName = document.getElementById('previewName');
-        const previewType = document.getElementById('previewType');
-        const previewCurrentStock = document.getElementById('previewCurrentStock');
-        const previewIncomingStock = document.getElementById('previewIncomingStock');
-        const previewNewStock = document.getElementById('previewNewStock');
-        const previewNewCost = document.getElementById('previewNewCost');
+    const previewStatusText = document.getElementById('previewStatusText');
+    const calcQuantity = document.getElementById('calcQuantity');
+    const calcUnitWeight = document.getElementById('calcUnitWeight');
+    const calcTotalWeight = document.getElementById('calcTotalWeight');
 
-        function updateProjection() {
-            const opt = itemSelect.selectedOptions[0];
-            if (!opt || !opt.value) {
-                noSelectionNotice.classList.remove('hidden');
-                selectionPreview.classList.add('hidden');
-                return;
-            }
+    function updateCalculations() {
+        const valName = productNameInput.value.trim();
+        const qty = parseFloat(quantityInput.value) || 0;
+        const wt = parseFloat(weightInput.value) || 0;
 
-            noSelectionNotice.classList.add('hidden');
-            selectionPreview.classList.remove('hidden');
+        calcQuantity.textContent = qty > 0 ? `${qty.toFixed(0)} units` : '0 units';
+        calcUnitWeight.textContent = `${wt.toFixed(3)} kg`;
 
-            const sku = opt.getAttribute('data-sku');
-            const name = opt.getAttribute('data-name');
-            const type = opt.getAttribute('data-type');
-            const currentStock = parseFloat(opt.getAttribute('data-stock')) || 0;
-            const currentCost = parseFloat(opt.getAttribute('data-cost')) || 0;
-            const uom = opt.getAttribute('data-uom') || 'units';
+        const totalBatchWeight = qty * wt;
+        calcTotalWeight.textContent = `${totalBatchWeight.toFixed(3)} kg`;
 
-            const addQty = parseFloat(qtyInput.value) || 0;
-            const unitPrice = parseFloat(costInput.value) || 0;
-
-            const newStock = currentStock + addQty;
-
-            let newWac = currentCost;
-            if (newStock > 0) {
-                if (unitPrice > 0) {
-                    newWac = (currentStock * currentCost + addQty * unitPrice) / newStock;
-                }
-            } else if (unitPrice > 0) {
-                newWac = unitPrice;
-            }
-
-            uomBadge.textContent = uom;
-            previewSku.textContent = sku;
-            previewName.textContent = name;
-            previewType.textContent = type;
-            previewCurrentStock.textContent = currentStock.toFixed(2) + ' ' + uom;
-            previewIncomingStock.textContent = '+' + addQty.toFixed(2) + ' ' + uom;
-            previewNewStock.textContent = newStock.toFixed(2) + ' ' + uom;
-            previewNewCost.textContent = '$' + newWac.toFixed(2);
+        if (valName && qty > 0 && wt > 0) {
+            previewStatusText.innerHTML = `<span class="text-emerald-400 font-medium">Ready:</span> Adding ${qty} units of "${valName}" (~${totalBatchWeight.toFixed(2)} kg batch weight).`;
+        } else if (valName) {
+            previewStatusText.innerHTML = `Configuring stock inward for <span class="text-white font-medium">"${valName}"</span>.`;
+        } else {
+            previewStatusText.textContent = 'Enter product name, quantity, and weight above to compute batch stats.';
         }
+    }
 
-        itemSelect.addEventListener('change', updateProjection);
-        qtyInput.addEventListener('input', updateProjection);
-        costInput.addEventListener('input', updateProjection);
+    // When product name is typed or selected from datalist, auto-fill weight if known
+    productNameInput.addEventListener('input', function () {
+        const enteredName = this.value.trim().toLowerCase();
+        if (datalist && datalist.options) {
+            for (let i = 0; i < datalist.options.length; i++) {
+                const opt = datalist.options[i];
+                if (opt.value.trim().toLowerCase() === enteredName) {
+                    const knownWeight = opt.getAttribute('data-weight');
+                    if (knownWeight && (!weightInput.value || weightInput.value === '0' || weightInput.value === '0.000')) {
+                        weightInput.value = parseFloat(knownWeight).toFixed(3);
+                    }
+                    break;
+                }
+            }
+        }
+        updateCalculations();
     });
+
+    quantityInput.addEventListener('input', updateCalculations);
+    weightInput.addEventListener('input', updateCalculations);
+
+    // Quick Add button from table row
+    function fillQuickAdd(name, weight) {
+        productNameInput.value = name;
+        if (weight && parseFloat(weight) > 0) {
+            weightInput.value = parseFloat(weight).toFixed(3);
+        }
+        quantityInput.focus();
+        updateCalculations();
+
+        // Smooth scroll to form
+        const formCard = document.getElementById('addInventoryCard');
+        if (formCard) {
+            formCard.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            formCard.classList.add('ring-2', 'ring-cyan-500');
+            setTimeout(() => {
+                formCard.classList.remove('ring-2', 'ring-cyan-500');
+            }, 1200);
+        }
+    }
+
+    // Live Table Search Filter
+    const searchInput = document.getElementById('tableSearch');
+    const tableRows = document.querySelectorAll('.product-row');
+
+    if (searchInput) {
+        searchInput.addEventListener('input', function () {
+            const query = this.value.toLowerCase().trim();
+            let matches = 0;
+
+            tableRows.forEach(row => {
+                const nameText = row.querySelector('.product-name')?.textContent.toLowerCase() || '';
+                const skuText = row.querySelector('.product-sku')?.textContent.toLowerCase() || '';
+
+                if (nameText.includes(query) || skuText.includes(query)) {
+                    row.style.display = '';
+                    matches++;
+                } else {
+                    row.style.display = 'none';
+                }
+            });
+        });
+    }
+
+    // Reset button handler
+    const resetBtn = document.getElementById('resetBtn');
+    if (resetBtn) {
+        resetBtn.addEventListener('click', function () {
+            setTimeout(updateCalculations, 50);
+        });
+    }
 </script>
 {% endblock %}

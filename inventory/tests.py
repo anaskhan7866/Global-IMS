@@ -464,3 +464,77 @@ class EmployeeAndVendorOrderViewsTestCase(TestCase):
 
         emp2_today = ProductionLog.objects.filter(employee=self.emp2, quantity=35, production_date=self.today)
         self.assertTrue(emp2_today.exists())
+
+    def test_add_inventory_new_product_with_three_questions(self):
+        """
+        Validates the simple 3-question form:
+        1. Name of the product
+        2. Quantity
+        3. Weight of the product (core box)
+        Successfully creates the new item, assigns weight, stock, and records in ledger.
+        """
+        from django.urls import reverse
+        from inventory.models import Item, ItemType
+        from transactions.models import InventoryLedger, TransactionType
+
+        response = self.client.post(reverse('add-inventory'), {
+            'name': 'GI Industrial Core Box 300mm',
+            'quantity': '40',
+            'weight': '6.250'
+        })
+        self.assertEqual(response.status_code, 302)
+
+        # Verify Item created
+        new_item = Item.objects.filter(name='GI Industrial Core Box 300mm').first()
+        self.assertIsNotNone(new_item)
+        self.assertEqual(new_item.current_stock, Decimal('40.0000'))
+        self.assertEqual(new_item.weight, Decimal('6.250'))
+        self.assertEqual(new_item.type, ItemType.FINISHED_GOOD)
+        self.assertTrue(new_item.sku.startswith('CB-'))
+        self.assertEqual(new_item.total_weight, Decimal('250.000'))  # 40 * 6.250
+
+        # Verify ledger
+        ledger = InventoryLedger.objects.filter(item=new_item).first()
+        self.assertIsNotNone(ledger)
+        self.assertEqual(ledger.transaction_type, TransactionType.IN)
+        self.assertEqual(ledger.quantity_changed, Decimal('40.0000'))
+
+    def test_add_inventory_existing_product_increments_stock_and_updates_weight(self):
+        """
+        Validates submitting an existing product name increments current_stock and updates weight.
+        """
+        from django.urls import reverse
+        from inventory.models import Item
+
+        initial_stock = self.item.current_stock  # 20.0000
+
+        response = self.client.post(reverse('add-inventory'), {
+            'name': 'Test GI Core Box',
+            'quantity': '15',
+            'weight': '4.800'
+        })
+        self.assertEqual(response.status_code, 302)
+
+        self.item.refresh_from_db()
+        self.assertEqual(self.item.current_stock, initial_stock + Decimal('15'))
+        self.assertEqual(self.item.weight, Decimal('4.800'))
+        self.assertEqual(self.item.total_weight, Decimal('168.000'))  # 35 * 4.800
+
+    def test_inventory_table_displays_all_product_details(self):
+        """
+        Validates the table renders all product details:
+        name, quantity, weight of product (core box), and total weight.
+        """
+        from django.urls import reverse
+
+        self.item.weight = Decimal('3.500')
+        self.item.save(update_fields=['weight'])
+
+        response = self.client.get(reverse('add-inventory'))
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, 'All Products Inventory Details')
+        self.assertContains(response, 'Test GI Core Box')
+        self.assertContains(response, 'Weight (Core Box)')
+        self.assertContains(response, 'Total Weight on Hand')
+        self.assertContains(response, '3.500')
+
