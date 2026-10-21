@@ -370,19 +370,19 @@ class AddInventoryView(View):
     template_name = 'inventory/add_inventory.html'
 
     def get(self, request, *args, **kwargs):
-        items = Item.objects.filter(is_active=True).order_by('name')
+        items = Item.objects.filter(is_active=True).order_by('name', 'weight')
         vendors = Contact.objects.filter(type=ContactType.VENDOR, is_active=True).order_by('company_name')
 
-        # Summary calculations for KPI badges
+        # Summary calculations for KPI badges (no total weight calculation)
         total_items_count = items.count()
         total_units = sum(item.current_stock for item in items)
-        total_weight = sum(item.total_weight for item in items)
+        low_stock_count = sum(1 for item in items if item.current_stock < 10)
 
         return render(request, self.template_name, {
             'items': items,
             'total_items_count': total_items_count,
             'total_units': total_units,
-            'total_weight': total_weight,
+            'low_stock_count': low_stock_count,
             'vendors': vendors,
         })
 
@@ -396,13 +396,23 @@ class AddInventoryView(View):
             product_name = (request.POST.get('name') or request.POST.get('product_name') or '').strip()
             item_id = request.POST.get('item_id')
             raw_quantity = request.POST.get('quantity')
+            raw_weight = request.POST.get('weight')
             reason = request.POST.get('reason', '').strip() or request.POST.get('narration', '').strip()
 
             target_item = None
             if item_id:
                 target_item = Item.objects.filter(pk=item_id).first()
             if not target_item and product_name:
-                target_item = Item.objects.filter(name__iexact=product_name).first()
+                weight_val = None
+                if raw_weight:
+                    try:
+                        weight_val = Decimal(str(raw_weight).strip())
+                    except (ValueError, TypeError):
+                        pass
+                if weight_val is not None:
+                    target_item = Item.objects.filter(name__iexact=product_name, weight=weight_val).first()
+                if not target_item:
+                    target_item = Item.objects.filter(name__iexact=product_name).first()
 
             if not target_item:
                 messages.error(request, "Please select or enter a valid product to remove stock from.")
@@ -426,7 +436,7 @@ class AddInventoryView(View):
                 if locked_item.current_stock < quantity:
                     messages.error(
                         request,
-                        f"Cannot remove {quantity} units from '{locked_item.name}'. "
+                        f"Cannot remove {quantity} units from '{locked_item.name}' ({locked_item.weight} kg/box). "
                         f"Only {locked_item.current_stock} {locked_item.unit_of_measure} available on hand."
                     )
                     return redirect('add-inventory')
@@ -447,7 +457,7 @@ class AddInventoryView(View):
 
                 messages.success(
                     request,
-                    f"Successfully removed -{quantity} units from '{locked_item.name}'. "
+                    f"Successfully removed -{quantity} units from '{locked_item.name}' ({locked_item.weight} kg/box). "
                     f"Remaining Stock: {locked_item.current_stock} {locked_item.unit_of_measure}."
                 )
 
@@ -460,7 +470,7 @@ class AddInventoryView(View):
         product_name = (request.POST.get('name') or request.POST.get('product_name') or '').strip()
         # 2. Quantity
         raw_quantity = request.POST.get('quantity')
-        # 3. Weight of the product (core box)
+        # 3. Weight of the product (core box) - unit weight of one core box
         raw_weight = request.POST.get('weight')
 
         # Optional auxiliary inputs (graceful fallback/backward compatibility)
@@ -517,22 +527,27 @@ class AddInventoryView(View):
         if vendor_id:
             vendor = Contact.objects.filter(pk=vendor_id, type=ContactType.VENDOR).first()
 
+        effective_weight = weight if weight is not None else Decimal('0.000')
+
         with transaction.atomic():
-            # Check if item exists either by target_item or case-insensitive name
+            # If item_id was given, check if user changed weight:
+            # If weight changed, treat as a different core box product
+            if item_id and target_item:
+                if weight is not None and target_item.weight != effective_weight:
+                    target_item = None
+
+            # Look up existing product with the SAME name AND the SAME weight of one core box
             if not target_item:
-                target_item = Item.objects.filter(name__iexact=product_name).first()
+                target_item = Item.objects.filter(name__iexact=product_name, weight=effective_weight).first()
 
             if target_item:
-                # Existing item: increment stock & update weight
+                # Same product with same unit weight: increment stock
                 locked_item = Item.objects.select_for_update().get(pk=target_item.pk)
                 old_stock = locked_item.current_stock
                 old_cost = locked_item.moving_average_cost
                 new_stock = old_stock + quantity
 
                 update_fields = ['current_stock', 'updated_at']
-                if weight is not None:
-                    locked_item.weight = weight
-                    update_fields.append('weight')
 
                 # Recompute WAC if positive cost supplied
                 if unit_cost > Decimal('0'):
@@ -545,8 +560,8 @@ class AddInventoryView(View):
                 locked_item.current_stock = new_stock
                 locked_item.save(update_fields=update_fields)
 
-                weight_info = f" | Unit Weight: {locked_item.weight} kg" if locked_item.weight else ""
-                default_narration = narration or f"Stock inward addition of {quantity} units for '{locked_item.name}'."
+                weight_info = f" | Weight (One Core Box): {locked_item.weight} kg" if locked_item.weight else ""
+                default_narration = narration or f"Stock addition of {quantity} units for '{locked_item.name}'."
                 effective_cost = unit_cost if unit_cost > 0 else locked_item.moving_average_cost
 
                 InventoryLedger.objects.create(
@@ -566,7 +581,8 @@ class AddInventoryView(View):
                     f"New On-Hand Stock: {locked_item.current_stock} {locked_item.unit_of_measure}{weight_info}"
                 )
             else:
-                # New Product (Core Box / Finished Good)
+                # Same core box with different weight, or new core box product:
+                # Stored separately as a distinct item!
                 clean_slug = re.sub(r'[^A-Za-z0-9]+', '-', product_name).strip('-').upper()
                 base_sku = f"CB-{clean_slug[:12]}" if clean_slug else "CB-PROD"
                 sku = base_sku
@@ -575,25 +591,23 @@ class AddInventoryView(View):
                     sku = f"{base_sku}-{counter:02d}"
                     counter += 1
 
-                item_weight = weight if weight is not None else Decimal('0.000')
-
                 new_item = Item.objects.create(
                     sku=sku,
                     name=product_name,
                     type=ItemType.FINISHED_GOOD,
                     unit_of_measure='pcs',
                     current_stock=quantity,
-                    weight=item_weight,
+                    weight=effective_weight,
                     moving_average_cost=unit_cost
                 )
 
-                default_narration = narration or f"Initial product creation and inward receipt of {quantity} units. Unit weight: {item_weight} kg."
+                default_narration = narration or f"Created distinct core box '{new_item.name}' (Weight: {effective_weight} kg/box) with {quantity} units."
                 InventoryLedger.objects.create(
                     item=new_item,
                     quantity_changed=quantity,
                     transaction_type=TransactionType.IN,
                     contact=vendor,
-                    generic_reference_id=reference_id or 'INIT-INWARD',
+                    generic_reference_id=reference_id or 'NEW-PROD-INWARD',
                     unit_cost=unit_cost,
                     total_cost=(quantity * unit_cost).quantize(Decimal('0.01')),
                     narration=default_narration
@@ -601,8 +615,7 @@ class AddInventoryView(View):
 
                 messages.success(
                     request,
-                    f"New product '{new_item.name}' (SKU: {new_item.sku}) added to inventory! "
-                    f"Stock: {quantity} pcs | Weight: {item_weight} kg"
+                    f"Created distinct product '{new_item.name}' (Weight: {effective_weight} kg/box, SKU: {new_item.sku}) with {quantity} units."
                 )
 
         return redirect('add-inventory')

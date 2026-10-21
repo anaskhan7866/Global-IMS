@@ -499,13 +499,15 @@ class EmployeeAndVendorOrderViewsTestCase(TestCase):
         self.assertEqual(ledger.transaction_type, TransactionType.IN)
         self.assertEqual(ledger.quantity_changed, Decimal('40.0000'))
 
-    def test_add_inventory_existing_product_increments_stock_and_updates_weight(self):
+    def test_add_same_product_same_weight_increments_stock(self):
         """
-        Validates submitting an existing product name increments current_stock and updates weight.
+        Validates submitting the same core box name with the same unit weight increments stock.
         """
         from django.urls import reverse
         from inventory.models import Item
 
+        self.item.weight = Decimal('4.800')
+        self.item.save(update_fields=['weight'])
         initial_stock = self.item.current_stock  # 20.0000
 
         response = self.client.post(reverse('add-inventory'), {
@@ -518,12 +520,40 @@ class EmployeeAndVendorOrderViewsTestCase(TestCase):
         self.item.refresh_from_db()
         self.assertEqual(self.item.current_stock, initial_stock + Decimal('15'))
         self.assertEqual(self.item.weight, Decimal('4.800'))
-        self.assertEqual(self.item.total_weight, Decimal('168.000'))  # 35 * 4.800
 
-    def test_inventory_table_displays_all_product_details(self):
+    def test_add_same_core_box_different_weight_creates_distinct_item(self):
         """
-        Validates the table renders all product details:
-        name, quantity, weight of product (core box), and total weight.
+        Validates adding the same core box name but with different weight creates
+        a separate distinct product, not merged into one.
+        """
+        from django.urls import reverse
+        from inventory.models import Item
+
+        self.item.weight = Decimal('3.500')
+        self.item.save(update_fields=['weight'])
+
+        # Add same name 'Test GI Core Box' with DIFFERENT weight '5.200'
+        response = self.client.post(reverse('add-inventory'), {
+            'name': 'Test GI Core Box',
+            'quantity': '25',
+            'weight': '5.200'
+        })
+        self.assertEqual(response.status_code, 302)
+
+        # Must have two distinct items for 'Test GI Core Box'
+        matching_items = Item.objects.filter(name='Test GI Core Box')
+        self.assertEqual(matching_items.count(), 2)
+
+        item1 = matching_items.get(weight=Decimal('3.500'))
+        self.assertEqual(item1.current_stock, Decimal('20.0000'))
+
+        item2 = matching_items.get(weight=Decimal('5.200'))
+        self.assertEqual(item2.current_stock, Decimal('25.0000'))
+        self.assertNotEqual(item1.sku, item2.sku)
+
+    def test_inventory_table_displays_weight_of_one_core_box_without_total_weight(self):
+        """
+        Validates the table renders weight of one core box, without total weight calculations.
         """
         from django.urls import reverse
 
@@ -534,9 +564,12 @@ class EmployeeAndVendorOrderViewsTestCase(TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, 'All Products Inventory Details')
         self.assertContains(response, 'Test GI Core Box')
-        self.assertContains(response, 'Weight (Core Box)')
-        self.assertContains(response, 'Total Weight on Hand')
+        self.assertContains(response, 'Weight (One Core Box)')
         self.assertContains(response, '3.500')
+        # Total weight calculations must NOT be in the response
+        self.assertNotContains(response, 'Total Weight on Hand')
+        self.assertNotContains(response, 'Total Stock Weight')
+        self.assertNotContains(response, 'Total Batch Weight')
 
     def test_remove_stock_success(self):
         """
