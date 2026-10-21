@@ -1,6 +1,6 @@
 {% extends 'base.html' %}
 
-{% block title %}{{ employee.full_name }} - Productivity Breakdown | Global-IMS{% endblock %}
+{% block title %}{{ employee.full_name }} - Daily Logs & Productivity | Global-IMS{% endblock %}
 
 {% block content %}
 <div class="space-y-8">
@@ -13,7 +13,7 @@
             <span>Back to Employees Directory</span>
         </a>
 
-        <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 p-6 rounded-2xl bg-slate-950 border border-slate-800 shadow-xl">
+        <div class="flex flex-col md:flex-row md:items-center md:justify-between gap-4 p-6 rounded-2xl bg-slate-950 border border-slate-800 shadow-xl">
             <div class="flex items-center space-x-4">
                 <div class="h-14 w-14 rounded-2xl bg-gradient-to-tr from-cyan-600 to-blue-700 flex items-center justify-center text-white font-extrabold text-xl shadow-lg shadow-cyan-900/50">
                     {{ employee.first_name|slice:":1" }}{{ employee.last_name|slice:":1" }}
@@ -33,13 +33,13 @@
                         {% endif %}
                     </div>
                     <p class="text-xs text-slate-400 mt-1">
-                        Employee ID: <span class="font-mono-code text-cyan-400">EMP-#{{ employee.pk|stringformat:"04d" }}</span> &bull; Production Operator &bull; Registered {{ employee.created_at|date:"M Y" }}
+                        Employee ID: <span class="font-mono-code text-cyan-400">EMP-#{{ employee.pk|stringformat:"04d" }}</span> &bull; Shop-Floor Assembler &bull; Registered {{ employee.created_at|date:"M Y" }}
                     </p>
                 </div>
             </div>
 
-            <!-- Month Filter / Period Indicator -->
-            <div class="flex items-center space-x-3">
+            <!-- Month Filter & Add Log Button -->
+            <div class="flex flex-wrap items-center gap-3">
                 <form method="get" class="flex items-center space-x-2">
                     <label for="month" class="text-xs text-slate-400 font-medium">Period:</label>
                     <select name="month" id="month" onchange="this.form.submit()" class="px-3 py-1.5 rounded-lg bg-slate-900 border border-slate-700 text-xs font-semibold text-slate-200 focus:border-cyan-500 focus:ring-1 focus:ring-cyan-500">
@@ -57,6 +57,15 @@
                         <option value="12" {% if selected_month == 12 %}selected{% endif %}>December</option>
                     </select>
                 </form>
+
+                <button
+                    type="button"
+                    onclick="openLogProductionModal()"
+                    class="inline-flex items-center space-x-1.5 px-3.5 py-1.5 rounded-lg bg-gradient-to-r from-cyan-600 to-blue-600 hover:from-cyan-500 hover:to-blue-500 text-white text-xs font-bold shadow-md shadow-cyan-900/40 transition"
+                >
+                    <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>
+                    <span>Log Box Output</span>
+                </button>
             </div>
         </div>
     </div>
@@ -65,15 +74,15 @@
     <section aria-label="Monthly Output Statistics" class="grid grid-cols-1 sm:grid-cols-3 gap-5">
         <div class="rounded-xl bg-slate-950 p-5 border border-slate-800 shadow-xl">
             <div class="flex items-center justify-between">
-                <p class="text-xs font-semibold uppercase tracking-wider text-slate-400">Total Units Built</p>
+                <p class="text-xs font-semibold uppercase tracking-wider text-slate-400">Total Boxes Built</p>
                 <span class="p-2 rounded-lg bg-cyan-950 text-cyan-400 border border-cyan-800">
                     <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" />
                     </svg>
                 </span>
             </div>
-            <h3 class="mt-4 text-3xl font-extrabold text-cyan-300 font-mono-code">{{ total_month_units }}</h3>
-            <p class="mt-1 text-xs text-slate-400">Completed assemblies during {{ selected_month_name }}</p>
+            <h3 class="mt-4 text-3xl font-extrabold text-cyan-300 font-mono-code">{{ total_month_units }} <span class="text-sm font-normal text-slate-400">Boxes</span></h3>
+            <p class="mt-1 text-xs text-slate-400">Manufactured during {{ selected_month_name }}</p>
         </div>
 
         <div class="rounded-xl bg-slate-950 p-5 border border-slate-800 shadow-xl">
@@ -85,31 +94,37 @@
                     </svg>
                 </span>
             </div>
-            <h3 class="mt-4 text-3xl font-extrabold text-white font-mono-code">{{ active_days }}</h3>
-            <p class="mt-1 text-xs text-slate-400">Days with verified shop-floor output</p>
+            <h3 class="mt-4 text-3xl font-extrabold text-white font-mono-code">{{ active_days }} <span class="text-sm font-normal text-slate-400">Days</span></h3>
+            <p class="mt-1 text-xs text-slate-400">Days with recorded assembly output</p>
         </div>
 
         <div class="rounded-xl bg-slate-950 p-5 border border-slate-800 shadow-xl">
             <div class="flex items-center justify-between">
-                <p class="text-xs font-semibold uppercase tracking-wider text-slate-400">Ledger Compliance</p>
+                <p class="text-xs font-semibold uppercase tracking-wider text-slate-400">Daily Average</p>
                 <span class="p-2 rounded-lg bg-purple-950 text-purple-400 border border-purple-800">
                     <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
                     </svg>
                 </span>
             </div>
-            <h3 class="mt-4 text-3xl font-extrabold text-white font-mono-code">100%</h3>
-            <p class="mt-1 text-xs text-slate-400">Synchronized with InventoryLedger</p>
+            <h3 class="mt-4 text-3xl font-extrabold text-purple-300 font-mono-code">
+                {% if active_days > 0 %}
+                    {{ total_month_units|floatformat:1 }}
+                {% else %}
+                    0
+                {% endif %}
+            </h3>
+            <p class="mt-1 text-xs text-slate-400">Average boxes produced per active day</p>
         </div>
     </section>
 
-    <!-- Daily Breakdown Table -->
-    <section aria-label="Daily Production Breakdown" class="rounded-xl bg-slate-950 border border-slate-800 shadow-xl overflow-hidden">
+    <!-- Daily Breakdown Table: Shows each date, total made, detail if one box type, or breakdown of multiple box types -->
+    <section aria-label="Daily Production Breakdown" class="rounded-2xl bg-slate-950 border border-slate-800 shadow-xl overflow-hidden">
         <div class="p-5 sm:p-6 border-b border-slate-800 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
             <div>
                 <h2 class="text-lg font-bold text-white tracking-tight">Daily Production Breakdown</h2>
                 <p class="text-xs text-slate-400 mt-0.5">
-                    Aggregated daily logs for <span class="text-cyan-400 font-semibold">{{ selected_month_name }}</span> showing Date, Item Name, and Quantity Produced.
+                    Daily output records for <span class="text-cyan-400 font-semibold">{{ selected_month_name }}</span> showing total boxes manufactured and breakdown of all box types.
                 </p>
             </div>
             <span class="inline-flex items-center px-3 py-1 rounded-md text-xs font-mono-code font-semibold bg-slate-900 text-slate-300 border border-slate-800">
@@ -122,32 +137,71 @@
                 <thead class="bg-slate-900/60 text-xs uppercase font-semibold text-slate-400">
                     <tr>
                         <th scope="col" class="py-3.5 pl-6 pr-3">Date</th>
-                        <th scope="col" class="px-3 py-3.5">Item Name</th>
-                        <th scope="col" class="py-3.5 pl-3 pr-6 text-right">Quantity Produced</th>
+                        <th scope="col" class="px-3 py-3.5 min-w-[160px]">Total Boxes</th>
+                        <th scope="col" class="py-3.5 pl-3 pr-6">Manufactured Box Types & Quantities</th>
                     </tr>
                 </thead>
                 <tbody class="divide-y divide-slate-800/60 bg-slate-950 text-slate-200">
-                    {% for row in production_breakdown %}
+                    {% for row in daily_groups %}
                     <tr class="hover:bg-slate-900/40 transition">
-                        <!-- Date -->
-                        <td class="whitespace-nowrap py-4 pl-6 pr-3 font-mono-code text-sm font-semibold text-slate-200">
+                        <!-- 1. Date -->
+                        <td class="whitespace-nowrap py-4 pl-6 pr-3 font-mono-code text-sm font-bold text-white align-top">
                             {{ row.production_date|date:"Y-m-d" }}
+                            <span class="text-xs text-slate-500 font-normal block">{{ row.production_date|date:"l" }}</span>
                         </td>
 
-                        <!-- Item Name & SKU -->
-                        <td class="whitespace-nowrap px-3 py-4">
-                            <span class="font-bold text-white block">{{ row.item__name }}</span>
-                            <span class="text-xs text-cyan-400 font-mono-code">{{ row.item__sku }}</span>
+                        <!-- 2. Total boxes made on this date -->
+                        <td class="whitespace-nowrap px-3 py-4 align-top">
+                            <div class="flex items-baseline space-x-1.5 font-mono-code">
+                                <span class="text-xl font-extrabold {% if row.is_single_type %}text-cyan-400{% else %}text-emerald-400{% endif %}">
+                                    {{ row.total_quantity }}
+                                </span>
+                                <span class="text-xs text-slate-400">Boxes</span>
+                            </div>
+                            {% if row.is_single_type %}
+                            <span class="text-[11px] text-slate-500 font-mono-code block mt-0.5">Single box type</span>
+                            {% else %}
+                            <span class="text-[11px] text-emerald-400/90 font-mono-code font-semibold block mt-0.5">
+                                {{ row.items|length }} different box types
+                            </span>
+                            {% endif %}
                         </td>
 
-                        <!-- Quantity Produced -->
-                        <td class="whitespace-nowrap py-4 pl-3 pr-6 text-right">
-                            <span class="text-lg font-extrabold font-mono-code text-cyan-400">
-                                {{ row.quantity_produced }}
-                            </span>
-                            <span class="text-xs text-slate-400 font-mono-code ml-1">
-                                {{ row.item__unit_of_measure|default:"Units" }}
-                            </span>
+                        <!-- 3. Details: If one type shows detail of it; if multiple types shows every type manufactured -->
+                        <td class="py-4 pl-3 pr-6 align-top">
+                            {% if row.is_single_type %}
+                            <!-- Single box type detail -->
+                            <div class="flex items-center space-x-3">
+                                <div class="inline-flex items-center space-x-2 px-3 py-1.5 rounded-xl bg-cyan-950/70 border border-cyan-800 text-xs">
+                                    <span class="font-mono-code font-extrabold text-cyan-300 text-sm">{{ row.single_item.quantity }}</span>
+                                    <span class="text-white font-bold">&times; {{ row.single_item.name }}</span>
+                                    {% if row.single_item.weight %}
+                                    <span class="text-[11px] text-cyan-400 font-mono-code">({{ row.single_item.weight }} kg/box)</span>
+                                    {% endif %}
+                                    {% if row.single_item.sku %}
+                                    <span class="text-[10px] text-slate-400 font-mono-code font-bold ml-1">[{{ row.single_item.sku }}]</span>
+                                    {% endif %}
+                                </div>
+                            </div>
+                            {% else %}
+                            <!-- Multiple different box types breakdown (e.g. 50 core box, 10 polish box, 10 plastic box) -->
+                            <div class="space-y-2">
+                                <div class="flex flex-wrap items-center gap-2">
+                                    {% for item in row.items %}
+                                    <div class="inline-flex items-center space-x-2 px-3 py-1.5 rounded-xl bg-slate-900 border border-slate-700/80 hover:border-slate-600 text-xs shadow-sm transition">
+                                        <span class="font-mono-code font-extrabold text-emerald-400 text-sm">{{ item.quantity }}</span>
+                                        <span class="text-white font-bold">&times; {{ item.name }}</span>
+                                        {% if item.weight %}
+                                        <span class="text-[11px] text-slate-400 font-mono-code">({{ item.weight }} kg/box)</span>
+                                        {% endif %}
+                                        {% if item.sku %}
+                                        <span class="text-[10px] text-slate-500 font-mono-code">[{{ item.sku }}]</span>
+                                        {% endif %}
+                                    </div>
+                                    {% endfor %}
+                                </div>
+                            </div>
+                            {% endif %}
                         </td>
                     </tr>
                     {% empty %}
@@ -159,6 +213,13 @@
                                 </svg>
                                 <p class="text-sm font-bold text-slate-200">No Production Logs Found</p>
                                 <p class="text-xs text-slate-500 mt-1 max-w-sm">No finished goods assembly was recorded for {{ employee.full_name }} in {{ selected_month_name }}.</p>
+                                <button
+                                    type="button"
+                                    onclick="openLogProductionModal()"
+                                    class="mt-4 px-4 py-2 rounded-xl bg-cyan-600 hover:bg-cyan-500 text-white text-xs font-semibold shadow-md transition"
+                                >
+                                    Log First Output
+                                </button>
                             </div>
                         </td>
                     </tr>
@@ -168,4 +229,124 @@
         </div>
     </section>
 </div>
+
+<!-- Modal: Log Box Production Output directly from Daily Logs -->
+<div id="logProductionModal" class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm hidden transition-opacity">
+    <div class="relative w-full max-w-md rounded-2xl bg-slate-950 border border-slate-800 shadow-2xl overflow-hidden p-6 space-y-5">
+        <div class="flex items-center justify-between border-b border-slate-800 pb-3.5">
+            <div class="flex items-center space-x-3">
+                <div class="w-9 h-9 rounded-xl bg-cyan-950 border border-cyan-800 text-cyan-400 flex items-center justify-center">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/>
+                    </svg>
+                </div>
+                <div>
+                    <h3 class="text-base font-bold text-white tracking-tight">Log Box Production</h3>
+                    <p class="text-xs text-slate-400">Record daily manufacturing output for {{ employee.full_name }}</p>
+                </div>
+            </div>
+            <button type="button" onclick="closeLogProductionModal()" class="text-slate-400 hover:text-white transition">
+                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+            </button>
+        </div>
+
+        <form method="post" action="{% url 'employee-detail' employee.pk selected_month %}" class="space-y-4">
+            {% csrf_token %}
+            <input type="hidden" name="action" value="log_production">
+
+            <!-- Date -->
+            <div class="space-y-1.5">
+                <label for="modal_prod_date" class="block text-xs font-bold uppercase tracking-wider text-slate-300">
+                    Production Date <span class="text-rose-400">*</span>
+                </label>
+                <input
+                    type="date"
+                    name="production_date"
+                    id="modal_prod_date"
+                    required
+                    value="{{ today|date:'Y-m-d' }}"
+                    class="w-full px-4 py-2.5 rounded-xl bg-slate-900 border border-slate-700 text-white text-sm font-mono-code focus:border-cyan-500 focus:ring-2 focus:ring-cyan-500/20 transition"
+                >
+            </div>
+
+            <!-- Box Type / Product Selection -->
+            <div class="space-y-1.5">
+                <label for="modal_item_id" class="block text-xs font-bold uppercase tracking-wider text-slate-300">
+                    Box Type / Product <span class="text-rose-400">*</span>
+                </label>
+                <select
+                    name="item_id"
+                    id="modal_item_id"
+                    required
+                    class="w-full px-4 py-2.5 rounded-xl bg-slate-900 border border-slate-700 text-white text-sm focus:border-cyan-500 focus:ring-2 focus:ring-cyan-500/20 transition font-medium"
+                >
+                    {% for fg in finished_goods %}
+                    <option value="{{ fg.pk }}" {% if fg == default_item %}selected{% endif %}>
+                        {{ fg.name }} {% if fg.weight %}({{ fg.weight }} kg/box){% endif %} [{{ fg.sku }}]
+                    </option>
+                    {% endfor %}
+                </select>
+            </div>
+
+            <!-- Quantity of Boxes -->
+            <div class="space-y-1.5">
+                <label for="modal_quantity" class="block text-xs font-bold uppercase tracking-wider text-slate-300">
+                    Quantity of Boxes Manufactured <span class="text-rose-400">*</span>
+                </label>
+                <div class="relative">
+                    <input
+                        type="number"
+                        name="quantity"
+                        id="modal_quantity"
+                        min="1"
+                        required
+                        placeholder="e.g. 50"
+                        class="w-full px-4 py-2.5 rounded-xl bg-slate-900 border border-slate-700 text-white font-mono-code text-sm focus:border-cyan-500 focus:ring-2 focus:ring-cyan-500/20 transition"
+                    >
+                    <span class="absolute right-3.5 top-2.5 text-xs text-slate-400 font-mono-code font-bold pointer-events-none">boxes</span>
+                </div>
+            </div>
+
+            <div class="pt-3 border-t border-slate-800 flex items-center justify-end space-x-3">
+                <button
+                    type="button"
+                    onclick="closeLogProductionModal()"
+                    class="px-4 py-2.5 rounded-xl bg-slate-900 hover:bg-slate-800 text-slate-300 text-xs font-semibold border border-slate-800 transition"
+                >
+                    Cancel
+                </button>
+                <button
+                    type="submit"
+                    class="inline-flex items-center space-x-2 px-6 py-2.5 rounded-xl bg-gradient-to-r from-cyan-600 to-blue-600 hover:from-cyan-500 hover:to-blue-500 text-white text-xs font-bold shadow-lg shadow-cyan-950/50 transition focus:outline-none focus:ring-2 focus:ring-cyan-400"
+                >
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>
+                    <span>Save Output</span>
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<script>
+    const logModal = document.getElementById('logProductionModal');
+    const modalQuantity = document.getElementById('modal_quantity');
+
+    function openLogProductionModal() {
+        logModal.classList.remove('hidden');
+        setTimeout(() => modalQuantity.focus(), 100);
+    }
+
+    function closeLogProductionModal() {
+        logModal.classList.add('hidden');
+    }
+
+    window.addEventListener('keydown', function (e) {
+        if (e.key === 'Escape' && !logModal.classList.contains('hidden')) {
+            closeLogProductionModal();
+        }
+    });
+    logModal.addEventListener('click', function (e) {
+        if (e.target === logModal) closeLogProductionModal();
+    });
+</script>
 {% endblock %}

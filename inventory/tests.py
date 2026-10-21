@@ -403,6 +403,77 @@ class EmployeeAndVendorOrderViewsTestCase(TestCase):
         self.assertContains(response, 'Daily Production Breakdown')
         self.assertContains(response, 'Test GI Core Box')
 
+    def test_daily_logs_single_and_multiple_box_types_breakdown(self):
+        """
+        Validates:
+        1. When multiple different box types are produced on the same day
+           (e.g. 50 core box, 10 polish box, 10 plastic box),
+           the daily log shows the day's total (70) and the breakdown of each box type.
+        2. When only one type of box is produced on a day (e.g. 40 core box),
+           it shows the total (40) and details of that single box type.
+        """
+        import datetime
+        from django.urls import reverse
+        from inventory.models import Item, ItemType, UnitOfMeasure, ProductionLog
+
+        # Create multiple distinct box types
+        core_box = self.item  # Test GI Core Box
+        polish_box = Item.objects.create(
+            sku='FG-POLISH-BOX',
+            name='Polish Box',
+            type=ItemType.FINISHED_GOOD,
+            unit_of_measure=UnitOfMeasure.PIECE,
+            weight=Decimal('2.100')
+        )
+        plastic_box = Item.objects.create(
+            sku='FG-PLASTIC-BOX',
+            name='Plastic Box',
+            type=ItemType.FINISHED_GOOD,
+            unit_of_measure=UnitOfMeasure.PIECE,
+            weight=Decimal('1.500')
+        )
+
+        target_date_single = self.today - datetime.timedelta(days=2)
+
+        # Clear existing logs for emp1 for clean isolated test assertions
+        self.emp1.production_logs.all().delete()
+
+        # Day 1: Multiple different types: 50 Core Box, 10 Polish Box, 10 Plastic Box (Total 70)
+        ProductionLog.objects.create(employee=self.emp1, item=core_box, quantity=50)
+        ProductionLog.objects.create(employee=self.emp1, item=polish_box, quantity=10)
+        ProductionLog.objects.create(employee=self.emp1, item=plastic_box, quantity=10)
+
+        # Day 2: Single type: 40 Core Box (Total 40)
+        log_single = ProductionLog.objects.create(employee=self.emp1, item=core_box, quantity=40)
+        log_single.production_date = target_date_single
+        log_single.save(update_fields=['production_date'])
+
+        # GET employee detail view for current month
+        response = self.client.get(reverse('employee-detail', kwargs={'pk': self.emp1.pk, 'month': self.current_month}))
+        self.assertEqual(response.status_code, 200)
+
+        # Day 1 (Multiple types): Total = 70, contains all 3 items and quantities
+        self.assertContains(response, '70')
+        self.assertContains(response, '3 different box types')
+        self.assertContains(response, 'Polish Box')
+        self.assertContains(response, 'Plastic Box')
+
+        # Day 2 (Single type): Total = 40, shows single box type detail
+        self.assertContains(response, '40')
+        self.assertContains(response, 'Single box type')
+
+        # Test POST directly to employee-detail to log output
+        post_res = self.client.post(reverse('employee-detail', kwargs={'pk': self.emp1.pk, 'month': self.current_month}), {
+            'action': 'log_production',
+            'quantity': '15',
+            'item_id': polish_box.pk,
+            'production_date': self.today.strftime('%Y-%m-%d')
+        })
+        self.assertEqual(post_res.status_code, 302)
+        total_polish = ProductionLog.objects.filter(employee=self.emp1, item=polish_box).count()
+        self.assertEqual(total_polish, 2)
+
+
     def test_vendor_orders_view_template_and_overdue_highlight(self):
         """
         Validates VendorOrderListView template rendering and overdue light red highlight.

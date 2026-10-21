@@ -91,7 +91,15 @@
                                 {% csrf_token %}
                                 <input type="hidden" name="action" value="log_production">
                                 <input type="hidden" name="employee_id" value="{{ emp.pk }}">
+                                {% if finished_goods|length > 1 %}
+                                <select name="item_id" class="px-2 py-1.5 rounded-lg bg-slate-900 border border-slate-700 text-xs text-slate-200 focus:border-cyan-500 font-medium max-w-[130px] truncate" title="Select manufactured box type">
+                                    {% for fg in finished_goods %}
+                                    <option value="{{ fg.pk }}" {% if fg == default_item %}selected{% endif %}>{{ fg.name }}</option>
+                                    {% endfor %}
+                                </select>
+                                {% else %}
                                 <input type="hidden" name="item_id" value="{{ default_item.pk }}">
+                                {% endif %}
                                 <div class="relative w-28">
                                     <input
                                         type="number"

@@ -296,20 +296,54 @@ class EmployeeDetailView(DetailView):
         # Daily breakdown using values('production_date').annotate(Sum('quantity'))
         daily_breakdown = self.get_daily_breakdown(employee, month, year)
 
-        # Detailed breakdown including item name and SKU
+        # Detailed breakdown including item name, SKU, and unit weight
         production_breakdown = (
             ProductionLog.objects.filter(
                 employee=employee,
                 production_date__year=year,
                 production_date__month=month
             )
-            .values('production_date', 'item__name', 'item__sku', 'item__unit_of_measure')
+            .values('production_date', 'item__id', 'item__name', 'item__sku', 'item__unit_of_measure', 'item__weight')
             .annotate(
                 quantity_produced=Sum('quantity'),
                 total_qty=Sum('quantity')
             )
             .order_by('-production_date', 'item__name')
         )
+
+        # Build daily_groups: for each date, total boxes and individual box type breakdown
+        daily_records = {}
+        for row in production_breakdown:
+            p_date = row['production_date']
+            if p_date not in daily_records:
+                daily_records[p_date] = {
+                    'production_date': p_date,
+                    'total_quantity': 0,
+                    'items': [],
+                }
+            qty = row['quantity_produced'] or 0
+            daily_records[p_date]['total_quantity'] += qty
+            daily_records[p_date]['items'].append({
+                'item_id': row.get('item__id'),
+                'name': row.get('item__name'),
+                'sku': row.get('item__sku'),
+                'weight': row.get('item__weight'),
+                'quantity': qty,
+                'unit_of_measure': row.get('item__unit_of_measure') or 'Units',
+            })
+
+        daily_groups = []
+        for p_date in sorted(daily_records.keys(), reverse=True):
+            rec = daily_records[p_date]
+            rec['is_single_type'] = (len(rec['items']) == 1)
+            rec['single_item'] = rec['items'][0] if rec['is_single_type'] else None
+            daily_groups.append(rec)
+
+        # Finished goods catalog for output logging
+        from inventory.models import ItemType
+        finished_goods = Item.objects.filter(type=ItemType.FINISHED_GOOD, is_active=True).order_by('name')
+        if not finished_goods.exists():
+            finished_goods = Item.objects.filter(is_active=True).order_by('name')
 
         # Summary calculations for KPI cards
         total_units = sum(entry['quantity__sum'] for entry in daily_breakdown) if daily_breakdown else 0
@@ -322,9 +356,56 @@ class EmployeeDetailView(DetailView):
         context['selected_month_name'] = month_date.strftime('%B %Y')
         context['daily_breakdown'] = daily_breakdown
         context['production_breakdown'] = production_breakdown
+        context['daily_groups'] = daily_groups
         context['total_month_units'] = total_units
         context['active_days'] = active_days
+        context['finished_goods'] = finished_goods
+        context['default_item'] = finished_goods.first() if finished_goods.exists() else None
+        context['today'] = timezone.now().date()
         return context
+
+    def post(self, request, *args, **kwargs):
+        self.object = self.get_object()
+        action = request.POST.get('action', 'log_production')
+
+        if action == 'log_production':
+            raw_quantity = request.POST.get('quantity')
+            item_id = request.POST.get('item_id')
+            raw_date = request.POST.get('production_date')
+
+            try:
+                quantity = int(raw_quantity)
+                if quantity <= 0:
+                    raise ValueError
+            except (ValueError, TypeError):
+                messages.error(request, f"Please enter a valid positive number of boxes for {self.object.full_name}.")
+                return redirect('employee-detail', pk=self.object.pk, month=self.kwargs.get('month', timezone.now().month))
+
+            item = get_or_resolve_production_item(item_id)
+            log = ProductionLog.objects.create(
+                employee=self.object,
+                item=item,
+                quantity=quantity
+            )
+
+            # If user specified a particular date (different from today)
+            if raw_date:
+                try:
+                    custom_date = datetime.date.fromisoformat(raw_date.strip())
+                    if custom_date != log.production_date:
+                        log.production_date = custom_date
+                        log.save(update_fields=['production_date'])
+                except (ValueError, TypeError):
+                    pass
+
+            messages.success(
+                request,
+                f"Logged {quantity} boxes of '{item.name}' for {self.object.full_name} ({log.production_date})."
+            )
+            return redirect('employee-detail', pk=self.object.pk, month=log.production_date.month)
+
+        messages.warning(request, "Unrecognized action.")
+        return redirect('employee-detail', pk=self.object.pk, month=self.kwargs.get('month', timezone.now().month))
 
 
 class VendorOrderListView(ListView):
