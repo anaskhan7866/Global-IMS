@@ -4,31 +4,40 @@
 
 {% block content %}
 <div class="space-y-8">
-    <!-- Header & Quick KPIs -->
+    <!-- Header -->
     <div class="flex flex-col md:flex-row md:items-center md:justify-between gap-4 pb-2 border-b border-slate-800">
-        <div>
-            <div class="flex items-center space-x-3">
-                <div class="w-10 h-10 rounded-xl bg-gradient-to-br from-cyan-500 to-blue-600 flex items-center justify-center text-white shadow-lg shadow-cyan-900/40">
-                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" />
-                    </svg>
-                </div>
-                <div>
-                    <h1 class="text-2xl sm:text-3xl font-extrabold tracking-tight text-white">Inventory Management</h1>
-                    <p class="text-xs sm:text-sm text-slate-400 mt-0.5">Manage Core Box products, record inbound stock quantities, and track item weights.</p>
-                </div>
+        <div class="flex items-center space-x-3">
+            <div class="w-10 h-10 rounded-xl bg-gradient-to-br from-cyan-500 to-blue-600 flex items-center justify-center text-white shadow-lg shadow-cyan-900/40">
+                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" />
+                </svg>
+            </div>
+            <div>
+                <h1 class="text-2xl sm:text-3xl font-extrabold tracking-tight text-white">Inventory Management</h1>
+                <p class="text-xs sm:text-sm text-slate-400 mt-0.5">Manage Core Box products, add or remove stock, and track weights.</p>
             </div>
         </div>
 
-        <div class="flex items-center space-x-3">
-            <a href="{% url 'employee-list' %}" class="inline-flex items-center space-x-2 px-3 py-2 rounded-lg bg-slate-900 hover:bg-slate-800 text-slate-300 text-xs font-semibold border border-slate-800 transition">
-                <svg class="w-4 h-4 text-cyan-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z"/></svg>
-                <span>Employees</span>
-            </a>
-            <a href="{% url 'vendor-order-list' %}" class="inline-flex items-center space-x-2 px-3 py-2 rounded-lg bg-slate-900 hover:bg-slate-800 text-slate-300 text-xs font-semibold border border-slate-800 transition">
-                <svg class="w-4 h-4 text-cyan-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01"/></svg>
-                <span>Vendor Orders</span>
-            </a>
+        <!-- Mode Toggle (Add vs Remove) -->
+        <div class="inline-flex rounded-xl p-1 bg-slate-900 border border-slate-800 self-start md:self-auto">
+            <button
+                type="button"
+                id="tabBtnAdd"
+                onclick="switchFormMode('add')"
+                class="px-4 py-2 rounded-lg text-xs font-bold transition flex items-center space-x-1.5 bg-cyan-600 text-white shadow"
+            >
+                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"/></svg>
+                <span>Add Stock</span>
+            </button>
+            <button
+                type="button"
+                id="tabBtnRemove"
+                onclick="switchFormMode('remove')"
+                class="px-4 py-2 rounded-lg text-xs font-bold transition flex items-center space-x-1.5 text-slate-400 hover:text-slate-200"
+            >
+                <svg class="w-3.5 h-3.5 text-rose-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 12H4"/></svg>
+                <span>Remove Stock</span>
+            </button>
         </div>
     </div>
 
@@ -74,26 +83,29 @@
         </div>
     </div>
 
-    <!-- Add Inventory Form Section -->
-    <div id="addInventoryCard" class="rounded-2xl bg-slate-950 border border-slate-800 shadow-2xl overflow-hidden">
+    <!-- Inventory Form Card (Supports both Add Stock and Remove Stock) -->
+    <div id="addInventoryCard" class="rounded-2xl bg-slate-950 border border-slate-800 shadow-2xl overflow-hidden transition-all duration-300">
+        <!-- Form Header -->
         <div class="p-6 border-b border-slate-800 bg-gradient-to-r from-slate-900 to-slate-950 flex items-center justify-between">
             <div class="flex items-center space-x-3">
-                <div class="w-8 h-8 rounded-lg bg-cyan-500/20 text-cyan-400 flex items-center justify-center">
-                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"/></svg>
+                <div id="formIconWrap" class="w-8 h-8 rounded-lg bg-cyan-500/20 text-cyan-400 flex items-center justify-center transition">
+                    <svg id="formIcon" class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"/></svg>
                 </div>
                 <div>
-                    <h2 class="text-lg font-bold text-white tracking-tight">Add Inventory Stock</h2>
-                    <p class="text-xs text-slate-400">Fill in the product details to add new inventory stock or create a new core box product.</p>
+                    <h2 id="formTitle" class="text-lg font-bold text-white tracking-tight">Add Inventory Stock</h2>
+                    <p id="formSubtitle" class="text-xs text-slate-400">Fill in the product details to add new inventory stock or create a new core box product.</p>
                 </div>
             </div>
-            <span class="inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold bg-cyan-950 text-cyan-300 border border-cyan-800">
+            <span id="formBadge" class="inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold bg-cyan-950 text-cyan-300 border border-cyan-800 transition">
                 Simple Entry Form
             </span>
         </div>
 
         <form method="post" action="{% url 'add-inventory' %}" id="inventoryForm" class="p-6 sm:p-8 space-y-6">
             {% csrf_token %}
+            <input type="hidden" name="action" id="formActionInput" value="add_stock">
 
+            <!-- Three Form Questions Grid -->
             <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
                 <!-- Question 1: Name of the product -->
                 <div class="space-y-2">
@@ -114,20 +126,20 @@
                         >
                         <datalist id="product_datalist">
                             {% for item in items %}
-                            <option value="{{ item.name }}" data-weight="{{ item.weight }}" data-stock="{{ item.current_stock }}" data-sku="{{ item.sku }}">
+                            <option value="{{ item.name }}" data-id="{{ item.id }}" data-weight="{{ item.weight }}" data-stock="{{ item.current_stock|floatformat:0 }}" data-sku="{{ item.sku }}">
                                 [{{ item.sku }}] Stock: {{ item.current_stock|floatformat:0 }} | Weight: {{ item.weight }} kg
                             </option>
                             {% endfor %}
                         </datalist>
                     </div>
-                    <p class="text-[11px] text-slate-400">Type a new product name or pick an existing product from the catalog.</p>
+                    <p id="productNameHint" class="text-[11px] text-slate-400">Type a new product name or pick an existing product from the catalog.</p>
                 </div>
 
                 <!-- Question 2: Quantity -->
                 <div class="space-y-2">
                     <label for="quantity" class="block text-xs font-bold uppercase tracking-wider text-cyan-400 flex items-center space-x-1.5">
                         <span class="w-5 h-5 rounded-full bg-cyan-900/60 text-cyan-300 flex items-center justify-center text-[11px] font-bold">2</span>
-                        <span>Quantity <span class="text-rose-400">*</span></span>
+                        <span id="qtyLabelText">Quantity <span class="text-rose-400">*</span></span>
                     </label>
                     <div class="relative">
                         <input
@@ -142,11 +154,11 @@
                         >
                         <span class="absolute right-3.5 top-3 text-xs text-slate-400 font-mono-code font-bold pointer-events-none">units</span>
                     </div>
-                    <p class="text-[11px] text-slate-400">Number of core boxes / units to add into inventory.</p>
+                    <p id="quantityHint" class="text-[11px] text-slate-400">Number of core boxes / units to add into inventory.</p>
                 </div>
 
-                <!-- Question 3: Weight of the product (core box) -->
-                <div class="space-y-2">
+                <!-- Question 3: Weight of the product (core box) / Reason for removal -->
+                <div class="space-y-2" id="weightFieldGroup">
                     <label for="weight" class="block text-xs font-bold uppercase tracking-wider text-cyan-400 flex items-center space-x-1.5">
                         <span class="w-5 h-5 rounded-full bg-cyan-900/60 text-cyan-300 flex items-center justify-center text-[11px] font-bold">3</span>
                         <span>Weight of the Product (Core Box) <span class="text-rose-400">*</span></span>
@@ -166,16 +178,34 @@
                     </div>
                     <p class="text-[11px] text-slate-400">Unit weight per individual core box in kilograms (kg).</p>
                 </div>
+
+                <!-- Removal Reason (shown only in Remove Stock mode) -->
+                <div class="space-y-2 hidden" id="removeReasonGroup">
+                    <label for="removal_reason" class="block text-xs font-bold uppercase tracking-wider text-rose-400 flex items-center space-x-1.5">
+                        <span class="w-5 h-5 rounded-full bg-rose-900/60 text-rose-300 flex items-center justify-center text-[11px] font-bold">3</span>
+                        <span>Reason for Stock Removal</span>
+                    </label>
+                    <div class="relative">
+                        <select name="reason" id="removal_reason" class="w-full px-4 py-3 rounded-xl bg-slate-900 border border-slate-700 text-white text-sm focus:border-rose-500 focus:ring-2 focus:ring-rose-500/20 transition">
+                            <option value="Customer Dispatch / Sale">Customer Dispatch / Order Fulfillment</option>
+                            <option value="Damaged / Scrap">Damaged / Machining Scrap</option>
+                            <option value="Internal Transfer">Internal Shop Floor Transfer</option>
+                            <option value="Inventory Count Correction">Inventory Count Correction</option>
+                            <option value="Sample / Quality Testing">Sample / Quality Testing</option>
+                        </select>
+                    </div>
+                    <p class="text-[11px] text-slate-400">Specifies the operational purpose for this stock deduction.</p>
+                </div>
             </div>
 
             <!-- Dynamic Batch Calculation Preview Banner -->
             <div id="previewBanner" class="p-4 rounded-xl bg-slate-900/80 border border-slate-800 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 text-xs transition">
                 <div class="flex items-center space-x-3">
-                    <div class="w-8 h-8 rounded-lg bg-cyan-950 text-cyan-400 flex items-center justify-center font-bold">
+                    <div id="calcIconWrap" class="w-8 h-8 rounded-lg bg-cyan-950 text-cyan-400 flex items-center justify-center font-bold">
                         &sum;
                     </div>
                     <div>
-                        <span class="font-bold text-white block">Batch Summary Projection</span>
+                        <span id="calcTitle" class="font-bold text-white block">Batch Summary Projection</span>
                         <span id="previewStatusText" class="text-slate-400">Enter product name, quantity, and weight above to compute batch stats.</span>
                     </div>
                 </div>
@@ -185,11 +215,11 @@
                         <span class="text-slate-400 block text-[10px] uppercase">Batch Quantity</span>
                         <span id="calcQuantity" class="text-white font-bold text-sm">0 units</span>
                     </div>
-                    <div>
+                    <div id="unitWeightCalcCol">
                         <span class="text-slate-400 block text-[10px] uppercase">Unit Weight</span>
                         <span id="calcUnitWeight" class="text-cyan-400 font-bold text-sm">0.000 kg</span>
                     </div>
-                    <div>
+                    <div id="totalWeightCalcCol">
                         <span class="text-slate-400 block text-[10px] uppercase">Total Batch Weight</span>
                         <span id="calcTotalWeight" class="text-emerald-400 font-bold text-base">0.000 kg</span>
                     </div>
@@ -210,8 +240,8 @@
                     id="submitBtn"
                     class="inline-flex items-center space-x-2 px-8 py-3 rounded-xl bg-gradient-to-r from-cyan-600 to-blue-600 hover:from-cyan-500 hover:to-blue-500 text-white text-sm font-bold shadow-lg shadow-cyan-900/40 hover:shadow-cyan-900/60 transition focus:outline-none focus:ring-2 focus:ring-cyan-400"
                 >
-                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"/></svg>
-                    <span>Add Inventory</span>
+                    <svg id="submitIcon" class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"/></svg>
+                    <span id="submitBtnText">Add Inventory</span>
                 </button>
             </div>
         </form>
@@ -256,7 +286,7 @@
                         <th class="px-3 py-3.5">Weight (Core Box)</th>
                         <th class="px-3 py-3.5">Total Weight on Hand</th>
                         <th class="px-3 py-3.5">Status</th>
-                        <th class="py-3.5 pl-3 pr-6 text-right">Action</th>
+                        <th class="py-3.5 pl-3 pr-6 text-right">Actions</th>
                     </tr>
                 </thead>
                 <tbody class="divide-y divide-slate-800/60 bg-slate-950 text-slate-200" id="tableBody">
@@ -316,17 +346,28 @@
                             {% endif %}
                         </td>
 
-                        <!-- Quick Action -->
+                        <!-- Quick Actions: Add Stock & Remove Stock -->
                         <td class="whitespace-nowrap py-4 pl-3 pr-6 text-right">
-                            <button
-                                type="button"
-                                onclick="fillQuickAdd('{{ item.name|escapejs }}', '{{ item.weight }}')"
-                                class="inline-flex items-center space-x-1 px-3 py-1.5 rounded-lg bg-slate-900 hover:bg-cyan-950 text-slate-300 hover:text-cyan-300 border border-slate-800 hover:border-cyan-700 text-xs font-medium transition"
-                                title="Quick fill this product in the form above"
-                            >
-                                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>
-                                <span>Add Stock</span>
-                            </button>
+                            <div class="flex items-center justify-end space-x-2">
+                                <button
+                                    type="button"
+                                    onclick="fillQuickAdd('{{ item.name|escapejs }}', '{{ item.weight }}')"
+                                    class="inline-flex items-center space-x-1 px-2.5 py-1.5 rounded-lg bg-slate-900 hover:bg-cyan-950 text-slate-300 hover:text-cyan-300 border border-slate-800 hover:border-cyan-700 text-xs font-medium transition"
+                                    title="Add more stock for this product"
+                                >
+                                    <svg class="w-3.5 h-3.5 text-cyan-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>
+                                    <span>Add</span>
+                                </button>
+                                <button
+                                    type="button"
+                                    onclick="openRemoveStockModal('{{ item.id }}', '{{ item.name|escapejs }}', '{{ item.current_stock|floatformat:0 }}', '{{ item.unit_of_measure }}')"
+                                    class="inline-flex items-center space-x-1 px-2.5 py-1.5 rounded-lg bg-slate-900 hover:bg-rose-950 text-slate-300 hover:text-rose-300 border border-slate-800 hover:border-rose-700 text-xs font-medium transition"
+                                    title="Remove / deduct stock from this product"
+                                >
+                                    <svg class="w-3.5 h-3.5 text-rose-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 12H4"/></svg>
+                                    <span>Remove</span>
+                                </button>
+                            </div>
                         </td>
                     </tr>
                     {% empty %}
@@ -342,58 +383,96 @@
             </table>
         </div>
     </div>
+</div>
 
-    <!-- Recent Inward Stock Movements (Audit Trail) -->
-    <div class="rounded-xl bg-slate-950 border border-slate-800/80 shadow-lg overflow-hidden">
-        <div class="p-5 border-b border-slate-800/80 flex items-center justify-between">
-            <div>
-                <h3 class="text-sm font-bold text-white tracking-tight">Recent Inward Stock Movements</h3>
-                <p class="text-xs text-slate-400 mt-0.5">Audit log of direct additions and stock inward entries committed to InventoryLedger.</p>
+<!-- Modal: Remove Stock -->
+<div id="removeStockModal" class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm hidden transition-opacity">
+    <div class="relative w-full max-w-lg rounded-2xl bg-slate-950 border border-slate-800 shadow-2xl overflow-hidden p-6 sm:p-7 space-y-6">
+        <div class="flex items-center justify-between border-b border-slate-800/80 pb-4">
+            <div class="flex items-center space-x-3">
+                <div class="w-9 h-9 rounded-xl bg-rose-950/80 border border-rose-800/60 text-rose-400 flex items-center justify-center">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 12H4"/></svg>
+                </div>
+                <div>
+                    <h3 class="text-base font-bold text-white tracking-tight">Remove Stock</h3>
+                    <p class="text-xs text-slate-400 mt-0.5">Deduct physical units from product inventory balance.</p>
+                </div>
             </div>
-            <span class="text-xs text-slate-400 font-mono-code">Audit Trail</span>
+            <button type="button" onclick="closeRemoveStockModal()" class="text-slate-400 hover:text-white transition">
+                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+            </button>
         </div>
 
-        <div class="overflow-x-auto">
-            <table class="min-w-full divide-y divide-slate-800 text-left text-xs">
-                <thead class="bg-slate-900/60 uppercase font-semibold text-slate-400">
-                    <tr>
-                        <th class="py-3 pl-6 pr-3">Timestamp</th>
-                        <th class="px-3 py-3">Product Name</th>
-                        <th class="px-3 py-3">Quantity Added</th>
-                        <th class="px-3 py-3">Unit Valuation</th>
-                        <th class="py-3 pl-3 pr-6 text-right">Reference</th>
-                    </tr>
-                </thead>
-                <tbody class="divide-y divide-slate-800/60 bg-slate-950 text-slate-200">
-                    {% for entry in recent_ledgers %}
-                    <tr class="hover:bg-slate-900/40 transition">
-                        <td class="whitespace-nowrap py-3 pl-6 pr-3 font-mono-code text-slate-400">
-                            {{ entry.timestamp|date:"Y-m-d H:i" }}
-                        </td>
-                        <td class="whitespace-nowrap px-3 py-3 font-medium text-white">
-                            {{ entry.item.name }}
-                            <span class="text-[10px] text-cyan-400 font-mono-code block">{{ entry.item.sku }}</span>
-                        </td>
-                        <td class="whitespace-nowrap px-3 py-3 font-mono-code font-bold text-emerald-400">
-                            +{{ entry.quantity_changed|floatformat:0 }} {{ entry.item.unit_of_measure }}
-                        </td>
-                        <td class="whitespace-nowrap px-3 py-3 font-mono-code text-slate-300">
-                            ${{ entry.unit_cost|floatformat:2 }}
-                        </td>
-                        <td class="whitespace-nowrap py-3 pl-3 pr-6 text-right font-mono-code text-slate-400">
-                            {{ entry.generic_reference_id|default:"DIRECT-INWARD" }}
-                        </td>
-                    </tr>
-                    {% empty %}
-                    <tr>
-                        <td colspan="5" class="py-6 text-center text-slate-500">
-                            No recent stock transactions recorded yet.
-                        </td>
-                    </tr>
-                    {% endfor %}
-                </tbody>
-            </table>
-        </div>
+        <form method="post" action="{% url 'add-inventory' %}" class="space-y-5">
+            {% csrf_token %}
+            <input type="hidden" name="action" value="remove_stock">
+            <input type="hidden" name="item_id" id="modalItemId">
+
+            <!-- Selected Product Info Banner -->
+            <div class="p-3.5 rounded-xl bg-slate-900 border border-slate-800 flex items-center justify-between">
+                <div>
+                    <span class="text-[10px] uppercase font-semibold text-slate-400 block">Selected Product</span>
+                    <span id="modalProductName" class="text-sm font-bold text-white mt-0.5 block">Product Name</span>
+                </div>
+                <div class="text-right">
+                    <span class="text-[10px] uppercase font-semibold text-slate-400 block">Current Stock</span>
+                    <span id="modalCurrentStock" class="text-sm font-mono-code font-bold text-emerald-400">0 pcs</span>
+                </div>
+            </div>
+
+            <!-- Quantity to Remove -->
+            <div class="space-y-1.5">
+                <label for="modalQuantity" class="block text-xs font-bold uppercase tracking-wider text-slate-300">
+                    Quantity to Remove <span class="text-rose-400">*</span>
+                </label>
+                <div class="relative">
+                    <input
+                        type="number"
+                        name="quantity"
+                        id="modalQuantity"
+                        min="1"
+                        step="1"
+                        required
+                        placeholder="e.g. 10"
+                        class="w-full px-4 py-2.5 rounded-xl bg-slate-900 border border-slate-700 text-white font-mono-code text-sm focus:border-rose-500 focus:ring-2 focus:ring-rose-500/20 transition"
+                    >
+                    <span id="modalUomBadge" class="absolute right-3.5 top-2.5 text-xs text-slate-400 font-mono-code font-bold pointer-events-none">units</span>
+                </div>
+                <p id="modalMaxHelp" class="text-[11px] text-slate-400">Enter a quantity up to the available on-hand balance.</p>
+            </div>
+
+            <!-- Reason / Narration -->
+            <div class="space-y-1.5">
+                <label for="modalReason" class="block text-xs font-bold uppercase tracking-wider text-slate-300">
+                    Reason for Removal
+                </label>
+                <select name="reason" id="modalReason" class="w-full px-4 py-2.5 rounded-xl bg-slate-900 border border-slate-700 text-white text-sm focus:border-rose-500 focus:ring-2 focus:ring-rose-500/20 transition">
+                    <option value="Customer Dispatch / Sale">Customer Dispatch / Order Fulfillment</option>
+                    <option value="Damaged / Scrap">Damaged / Machining Scrap</option>
+                    <option value="Internal Transfer">Internal Shop Floor Transfer</option>
+                    <option value="Inventory Count Correction">Inventory Count Correction</option>
+                    <option value="Sample / Quality Testing">Sample / Quality Testing</option>
+                </select>
+            </div>
+
+            <!-- Modal Actions -->
+            <div class="pt-3 border-t border-slate-800 flex items-center justify-end space-x-3">
+                <button
+                    type="button"
+                    onclick="closeRemoveStockModal()"
+                    class="px-4 py-2.5 rounded-xl bg-slate-900 hover:bg-slate-800 text-slate-300 text-xs font-semibold border border-slate-800 transition"
+                >
+                    Cancel
+                </button>
+                <button
+                    type="submit"
+                    class="inline-flex items-center space-x-2 px-6 py-2.5 rounded-xl bg-gradient-to-r from-rose-600 to-red-600 hover:from-rose-500 hover:to-red-500 text-white text-xs font-bold shadow-lg shadow-rose-950/50 transition focus:outline-none focus:ring-2 focus:ring-rose-400"
+                >
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 12H4"/></svg>
+                    <span>Confirm Remove Stock</span>
+                </button>
+            </div>
+        </form>
     </div>
 </div>
 
@@ -410,6 +489,8 @@
     const calcUnitWeight = document.getElementById('calcUnitWeight');
     const calcTotalWeight = document.getElementById('calcTotalWeight');
 
+    let currentMode = 'add'; // 'add' or 'remove'
+
     function updateCalculations() {
         const valName = productNameInput.value.trim();
         const qty = parseFloat(quantityInput.value) || 0;
@@ -421,16 +502,83 @@
         const totalBatchWeight = qty * wt;
         calcTotalWeight.textContent = `${totalBatchWeight.toFixed(3)} kg`;
 
-        if (valName && qty > 0 && wt > 0) {
-            previewStatusText.innerHTML = `<span class="text-emerald-400 font-medium">Ready:</span> Adding ${qty} units of "${valName}" (~${totalBatchWeight.toFixed(2)} kg batch weight).`;
-        } else if (valName) {
-            previewStatusText.innerHTML = `Configuring stock inward for <span class="text-white font-medium">"${valName}"</span>.`;
+        if (currentMode === 'add') {
+            if (valName && qty > 0 && wt > 0) {
+                previewStatusText.innerHTML = `<span class="text-emerald-400 font-medium">Ready:</span> Adding ${qty} units of "${valName}" (~${totalBatchWeight.toFixed(2)} kg batch weight).`;
+            } else if (valName) {
+                previewStatusText.innerHTML = `Configuring stock inward for <span class="text-white font-medium">"${valName}"</span>.`;
+            } else {
+                previewStatusText.textContent = 'Enter product name, quantity, and weight above to compute batch stats.';
+            }
         } else {
-            previewStatusText.textContent = 'Enter product name, quantity, and weight above to compute batch stats.';
+            if (valName && qty > 0) {
+                previewStatusText.innerHTML = `<span class="text-rose-400 font-medium">Removal Ready:</span> Deducting ${qty} units from "${valName}".`;
+            } else if (valName) {
+                previewStatusText.innerHTML = `Preparing stock removal for <span class="text-white font-medium">"${valName}"</span>.`;
+            } else {
+                previewStatusText.textContent = 'Select product and specify quantity to deduct.';
+            }
         }
     }
 
-    // When product name is typed or selected from datalist, auto-fill weight if known
+    // Switch Form Mode between Add and Remove
+    function switchFormMode(mode) {
+        currentMode = mode;
+        const formActionInput = document.getElementById('formActionInput');
+        const formTitle = document.getElementById('formTitle');
+        const formSubtitle = document.getElementById('formSubtitle');
+        const formBadge = document.getElementById('formBadge');
+        const submitBtnText = document.getElementById('submitBtnText');
+        const submitBtn = document.getElementById('submitBtn');
+        const tabBtnAdd = document.getElementById('tabBtnAdd');
+        const tabBtnRemove = document.getElementById('tabBtnRemove');
+        const weightFieldGroup = document.getElementById('weightFieldGroup');
+        const removeReasonGroup = document.getElementById('removeReasonGroup');
+        const unitWeightCalcCol = document.getElementById('unitWeightCalcCol');
+        const totalWeightCalcCol = document.getElementById('totalWeightCalcCol');
+        const formIconWrap = document.getElementById('formIconWrap');
+
+        if (mode === 'remove') {
+            formActionInput.value = 'remove_stock';
+            formTitle.textContent = 'Remove Inventory Stock';
+            formSubtitle.textContent = 'Deduct units from existing product inventory for customer dispatch, scrap, or adjustments.';
+            formBadge.textContent = 'Stock Deduction Mode';
+            formBadge.className = 'inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold bg-rose-950 text-rose-300 border border-rose-800 transition';
+            submitBtnText.textContent = 'Confirm Remove Stock';
+            submitBtn.className = 'inline-flex items-center space-x-2 px-8 py-3 rounded-xl bg-gradient-to-r from-rose-600 to-red-600 hover:from-rose-500 hover:to-red-500 text-white text-sm font-bold shadow-lg shadow-rose-950/40 transition focus:outline-none focus:ring-2 focus:ring-rose-400';
+            formIconWrap.className = 'w-8 h-8 rounded-lg bg-rose-500/20 text-rose-400 flex items-center justify-center transition';
+
+            tabBtnAdd.className = 'px-4 py-2 rounded-lg text-xs font-bold transition flex items-center space-x-1.5 text-slate-400 hover:text-slate-200';
+            tabBtnRemove.className = 'px-4 py-2 rounded-lg text-xs font-bold transition flex items-center space-x-1.5 bg-rose-600 text-white shadow';
+
+            weightFieldGroup.classList.add('hidden');
+            weightInput.removeAttribute('required');
+            removeReasonGroup.classList.remove('hidden');
+            unitWeightCalcCol.classList.add('hidden');
+            totalWeightCalcCol.classList.add('hidden');
+        } else {
+            formActionInput.value = 'add_stock';
+            formTitle.textContent = 'Add Inventory Stock';
+            formSubtitle.textContent = 'Fill in the product details to add new inventory stock or create a new core box product.';
+            formBadge.textContent = 'Simple Entry Form';
+            formBadge.className = 'inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold bg-cyan-950 text-cyan-300 border border-cyan-800 transition';
+            submitBtnText.textContent = 'Add Inventory';
+            submitBtn.className = 'inline-flex items-center space-x-2 px-8 py-3 rounded-xl bg-gradient-to-r from-cyan-600 to-blue-600 hover:from-cyan-500 hover:to-blue-500 text-white text-sm font-bold shadow-lg shadow-cyan-900/40 hover:shadow-cyan-900/60 transition focus:outline-none focus:ring-2 focus:ring-cyan-400';
+            formIconWrap.className = 'w-8 h-8 rounded-lg bg-cyan-500/20 text-cyan-400 flex items-center justify-center transition';
+
+            tabBtnAdd.className = 'px-4 py-2 rounded-lg text-xs font-bold transition flex items-center space-x-1.5 bg-cyan-600 text-white shadow';
+            tabBtnRemove.className = 'px-4 py-2 rounded-lg text-xs font-bold transition flex items-center space-x-1.5 text-slate-400 hover:text-slate-200';
+
+            weightFieldGroup.classList.remove('hidden');
+            weightInput.setAttribute('required', 'required');
+            removeReasonGroup.classList.add('hidden');
+            unitWeightCalcCol.classList.remove('hidden');
+            totalWeightCalcCol.classList.remove('hidden');
+        }
+        updateCalculations();
+    }
+
+    // Auto-fill product weight when product is typed/selected
     productNameInput.addEventListener('input', function () {
         const enteredName = this.value.trim().toLowerCase();
         if (datalist && datalist.options) {
@@ -453,6 +601,7 @@
 
     // Quick Add button from table row
     function fillQuickAdd(name, weight) {
+        switchFormMode('add');
         productNameInput.value = name;
         if (weight && parseFloat(weight) > 0) {
             weightInput.value = parseFloat(weight).toFixed(3);
@@ -460,7 +609,6 @@
         quantityInput.focus();
         updateCalculations();
 
-        // Smooth scroll to form
         const formCard = document.getElementById('addInventoryCard');
         if (formCard) {
             formCard.scrollIntoView({ behavior: 'smooth', block: 'center' });
@@ -471,6 +619,44 @@
         }
     }
 
+    // Modal: Open & Close Remove Stock Dialog
+    const removeModal = document.getElementById('removeStockModal');
+    const modalItemId = document.getElementById('modalItemId');
+    const modalProductName = document.getElementById('modalProductName');
+    const modalCurrentStock = document.getElementById('modalCurrentStock');
+    const modalQuantity = document.getElementById('modalQuantity');
+    const modalUomBadge = document.getElementById('modalUomBadge');
+    const modalMaxHelp = document.getElementById('modalMaxHelp');
+
+    function openRemoveStockModal(id, name, stock, uom) {
+        modalItemId.value = id;
+        modalProductName.textContent = name;
+        modalCurrentStock.textContent = `${stock} ${uom}`;
+        modalUomBadge.textContent = uom || 'units';
+        modalQuantity.value = '';
+        modalQuantity.max = stock;
+        modalMaxHelp.textContent = `Available on-hand: ${stock} ${uom}. Maximum deduction: ${stock}.`;
+
+        removeModal.classList.remove('hidden');
+        setTimeout(() => modalQuantity.focus(), 100);
+    }
+
+    function closeRemoveStockModal() {
+        removeModal.classList.add('hidden');
+    }
+
+    // Close modal on Escape or Outside click
+    window.addEventListener('keydown', function (e) {
+        if (e.key === 'Escape' && !removeModal.classList.contains('hidden')) {
+            closeRemoveStockModal();
+        }
+    });
+    removeModal.addEventListener('click', function (e) {
+        if (e.target === removeModal) {
+            closeRemoveStockModal();
+        }
+    });
+
     // Live Table Search Filter
     const searchInput = document.getElementById('tableSearch');
     const tableRows = document.querySelectorAll('.product-row');
@@ -478,15 +664,11 @@
     if (searchInput) {
         searchInput.addEventListener('input', function () {
             const query = this.value.toLowerCase().trim();
-            let matches = 0;
-
             tableRows.forEach(row => {
                 const nameText = row.querySelector('.product-name')?.textContent.toLowerCase() || '';
                 const skuText = row.querySelector('.product-sku')?.textContent.toLowerCase() || '';
-
                 if (nameText.includes(query) || skuText.includes(query)) {
                     row.style.display = '';
-                    matches++;
                 } else {
                     row.style.display = 'none';
                 }

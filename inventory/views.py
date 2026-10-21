@@ -378,21 +378,84 @@ class AddInventoryView(View):
         total_units = sum(item.current_stock for item in items)
         total_weight = sum(item.total_weight for item in items)
 
-        recent_ledgers = (
-            InventoryLedger.objects.filter(transaction_type=TransactionType.IN)
-            .select_related('item', 'contact')
-            .order_by('-id')[:10]
-        )
         return render(request, self.template_name, {
             'items': items,
             'total_items_count': total_items_count,
             'total_units': total_units,
             'total_weight': total_weight,
             'vendors': vendors,
-            'recent_ledgers': recent_ledgers,
         })
 
     def post(self, request, *args, **kwargs):
+        action = request.POST.get('action', 'add_stock')
+
+        # -------------------------------------------------------------
+        # Action: Remove / Deduct Stock from Product
+        # -------------------------------------------------------------
+        if action == 'remove_stock':
+            product_name = (request.POST.get('name') or request.POST.get('product_name') or '').strip()
+            item_id = request.POST.get('item_id')
+            raw_quantity = request.POST.get('quantity')
+            reason = request.POST.get('reason', '').strip() or request.POST.get('narration', '').strip()
+
+            target_item = None
+            if item_id:
+                target_item = Item.objects.filter(pk=item_id).first()
+            if not target_item and product_name:
+                target_item = Item.objects.filter(name__iexact=product_name).first()
+
+            if not target_item:
+                messages.error(request, "Please select or enter a valid product to remove stock from.")
+                return redirect('add-inventory')
+
+            if not raw_quantity:
+                messages.error(request, "Please specify the quantity to remove.")
+                return redirect('add-inventory')
+
+            try:
+                quantity = Decimal(str(raw_quantity).strip())
+                if quantity <= Decimal('0'):
+                    raise ValueError
+            except (ValueError, TypeError):
+                messages.error(request, "Quantity to remove must be a valid positive number.")
+                return redirect('add-inventory')
+
+            with transaction.atomic():
+                locked_item = Item.objects.select_for_update().get(pk=target_item.pk)
+
+                if locked_item.current_stock < quantity:
+                    messages.error(
+                        request,
+                        f"Cannot remove {quantity} units from '{locked_item.name}'. "
+                        f"Only {locked_item.current_stock} {locked_item.unit_of_measure} available on hand."
+                    )
+                    return redirect('add-inventory')
+
+                locked_item.current_stock -= quantity
+                locked_item.save(update_fields=['current_stock', 'updated_at'])
+
+                narration_text = reason or f"Stock deduction of {quantity} {locked_item.unit_of_measure}."
+                InventoryLedger.objects.create(
+                    item=locked_item,
+                    quantity_changed=-quantity,
+                    transaction_type=TransactionType.OUT,
+                    generic_reference_id='STOCK-REMOVAL',
+                    unit_cost=locked_item.moving_average_cost,
+                    total_cost=(quantity * locked_item.moving_average_cost).quantize(Decimal('0.01')),
+                    narration=narration_text
+                )
+
+                messages.success(
+                    request,
+                    f"Successfully removed -{quantity} units from '{locked_item.name}'. "
+                    f"Remaining Stock: {locked_item.current_stock} {locked_item.unit_of_measure}."
+                )
+
+            return redirect('add-inventory')
+
+        # -------------------------------------------------------------
+        # Action: Add Inventory Stock (Default)
+        # -------------------------------------------------------------
         # 1. Name of the product
         product_name = (request.POST.get('name') or request.POST.get('product_name') or '').strip()
         # 2. Quantity

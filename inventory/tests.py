@@ -538,3 +538,65 @@ class EmployeeAndVendorOrderViewsTestCase(TestCase):
         self.assertContains(response, 'Total Weight on Hand')
         self.assertContains(response, '3.500')
 
+    def test_remove_stock_success(self):
+        """
+        Validates deducting stock from an existing product.
+        """
+        from django.urls import reverse
+        from transactions.models import InventoryLedger, TransactionType
+
+        initial_stock = self.item.current_stock  # 20.0000
+
+        response = self.client.post(reverse('add-inventory'), {
+            'action': 'remove_stock',
+            'item_id': self.item.pk,
+            'quantity': '5',
+            'reason': 'Customer Dispatch / Sale'
+        })
+        self.assertEqual(response.status_code, 302)
+
+        self.item.refresh_from_db()
+        self.assertEqual(self.item.current_stock, initial_stock - Decimal('5'))
+
+        ledger = InventoryLedger.objects.filter(item=self.item, transaction_type=TransactionType.OUT).first()
+        self.assertIsNotNone(ledger)
+        self.assertEqual(ledger.quantity_changed, Decimal('-5.0000'))
+        self.assertEqual(ledger.generic_reference_id, 'STOCK-REMOVAL')
+
+    def test_remove_stock_insufficient_stock_fails(self):
+        """
+        Validates that attempting to remove more stock than available fails gracefully.
+        """
+        from django.urls import reverse
+
+        initial_stock = self.item.current_stock  # 20.0000
+
+        response = self.client.post(reverse('add-inventory'), {
+            'action': 'remove_stock',
+            'item_id': self.item.pk,
+            'quantity': '50',  # Exceeds 20
+        })
+        self.assertEqual(response.status_code, 302)
+
+        self.item.refresh_from_db()
+        self.assertEqual(self.item.current_stock, initial_stock)  # Stock untouched
+
+    def test_remove_stock_by_product_name(self):
+        """
+        Validates removing stock by matching product name.
+        """
+        from django.urls import reverse
+
+        initial_stock = self.item.current_stock  # 20.0000
+
+        response = self.client.post(reverse('add-inventory'), {
+            'action': 'remove_stock',
+            'name': 'Test GI Core Box',
+            'quantity': '8'
+        })
+        self.assertEqual(response.status_code, 302)
+
+        self.item.refresh_from_db()
+        self.assertEqual(self.item.current_stock, initial_stock - Decimal('8'))
+
+
