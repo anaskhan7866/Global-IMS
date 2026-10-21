@@ -277,24 +277,22 @@ All physical inventory mutations pass through `InventoryLedger`:
 Receipt of purchased goods executes within `@transaction.atomic` using pessimistic locking:
 $$\text{WAC}_{\text{new}} = \frac{(\text{Stock}_{\text{old}} \times \text{Cost}_{\text{old}}) + (\text{Qty}_{\text{new}} \times \text{Price}_{\text{new}})}{\text{Stock}_{\text{old}} + \text{Qty}_{\text{new}}}$$
 
-#### Vendor Orders & Procurement Fulfillment Lifecycle
-`PurchaseOrder` manages company/vendor demand and procurement fulfillment (`VendorOrderListView`):
+#### Vendor Orders Workflow
+`PurchaseOrder` manages company/vendor demand (`VendorOrderListView`):
 - **Order Intake**: Add incoming orders from companies with:
-  - Company / Vendor Name (selectable from existing contacts or typed on-the-fly)
+  - Company / Vendor Name (typed directly or selected from existing suggestions; auto-creates contact profile if new)
   - Core Box Type (resolved against catalog via `get_or_resolve_production_item`)
   - Required Quantity
   - Target Delivery Date
-- **Vendor Registration**: Direct creation of company/vendor profiles (`Contact` model with company name, contact person, phone, email, GST, and address).
-- **Delivery Execution (`deliver_order`)**:
-  - Atomically marks the order as `Delivered`.
-  - Optional **Stock Deduction**: Deducts dispatched units from `Item.current_stock` using `select_for_update()` row-level locking, ensuring stock never goes negative.
-  - Automatically writes an immutable audit record to `InventoryLedger` with transaction type `OUT` and reference `DELIVERY-PO-<id>`.
-  - Supports immediate clearance upon delivery.
-- **Order Clearing (`clear_order`)**: Removes completed or cancelled order records from the active schedule.
-- **Status Lifecycle & Visual Signals**:
-  - `Pending`: Active order awaiting delivery. Highlights in light red (`bg-red-950/40 border-l-4 border-red-500`) when `expected_delivery_date < today` (Overdue).
-  - `Delivered`: Completed order with green badge confirmation.
-  - Filter tabs: `All Orders`, `Pending`, and `Delivered`.
+- **Lean Presentation Table**:
+  - `Company / Vendor`
+  - `Core Box Type`
+  - `Quantity`
+  - `Delivery Date`
+  - `Action`: Single **`[Remove]`** button on each row.
+- **Fulfillment & Line Removal**:
+  - When the user delivers the stock to the company, clicking the **`Remove`** button immediately removes that line from vendor orders.
+  - No complex delivery status toggles or separate vendor registration steps.
 
 ---
 
@@ -349,7 +347,7 @@ Calculates key industrial accounting metrics for the current calendar period:
 | `/add-inventory/` | `AddInventoryView` | `inventory/add_inventory.html` | Explicit route for inventory stock operations. |
 | `/employees/` | `EmployeeListView` | `inventory/employee_list.html` | **Workforce Operations**: 5-feature operator table, manual box typing, today's output logging. |
 | `/employees/<pk>/<month>/` | `EmployeeDetailView` | `inventory/employee_detail.html` | **Daily Productivity Breakdown**: Date-grouped breakdown showing single vs. multi-box type outputs. |
-| `/vendor-orders/` | `VendorOrderListView` | `inventory/vendor_orders.html` | **Vendor Orders & Procurement**: Order intake (Company, Core Box, Qty, Delivery Date), vendor registration, stock delivery deduction, and order clearing. |
+| `/vendor-orders/` | `VendorOrderListView` | `inventory/vendor_orders.html` | **Vendor Orders**: Order intake (Company, Core Box, Quantity, Delivery Date) and direct line removal on delivery. |
 | `/dashboard/` | `DashboardHomeView` | `dashboard/home.html` | **Executive Analytics**: Top-line revenue, COGS, inventory valuation, and sales charts. |
 | `/admin/` | Django Admin | Admin Default | Administrative data management with custom badges and audit locks. |
 
@@ -371,11 +369,10 @@ The system includes automated tests covering all critical operational pathways:
    - Tests manufacturing order atomic rollbacks under stock shortages (verifying raw material balances remain intact).
    - Tests sales dispatch with accurate COGS and revenue computations.
 6. **Immutable Ledger Preservations**: Asserts that update and delete attempts on `InventoryLedger` raise `ValidationError`.
-7. **Vendor Orders & Fulfillment Lifecycle**:
+7. **Vendor Orders Streamlined Workflow**:
    - Tests company order creation with auto-resolution of core box items.
-   - Tests vendor/company profile creation (`Contact`).
-   - Tests delivery fulfillment with atomic stock deduction and ledger `OUT` verification.
-   - Tests clearing/deleting orders from the database.
+   - Tests automatic on-the-fly registration of company contacts without separate modals.
+   - Tests direct line removal upon fulfillment via the Remove button.
 
 ---
 
@@ -393,4 +390,5 @@ The system includes automated tests covering all critical operational pathways:
 | **v1.7** | Manual Typing for Box Types | Removed `<select>` dropdowns; implemented manual text input with `<datalist>` and automatic catalog creation. |
 | **v1.8** | Date-Grouped Multi-Box Daily Logs Engine | Grouped logs by date showing day's total boxes with adaptive single-type detail or multi-box type breakdown. |
 | **v1.9** | Architectural Document & Codebase Synchronization | Fully audited codebase and aligned `ARCHITECTURE.md` with operational reality. |
-| **v2.0** | Vendor Orders Full Lifecycle & Delivery Engine | Added company order intake, vendor registration, atomic stock delivery deduction with double-entry ledger logging, and clear order actions. |
+| **v2.0** | Vendor Orders Lifecycle Foundation | Added company order intake and order management. |
+| **v2.1** | Streamlined Vendor Orders | Removed separate Add Vendor feature and delivery status; replaced delivery modal with single direct line removal button upon fulfillment. |

@@ -511,13 +511,13 @@ class EmployeeAndVendorOrderViewsTestCase(TestCase):
 
     def test_vendor_orders_view_template_and_overdue_highlight(self):
         """
-        Validates VendorOrderListView template rendering and overdue light red highlight.
+        Validates VendorOrderListView template rendering and overdue highlight.
         """
         import datetime
         from django.urls import reverse
         from transactions.models import PurchaseOrder
 
-        # Create an overdue pending order
+        # Create an overdue order
         overdue_po = PurchaseOrder.objects.create(
             vendor=self.vendor,
             item=self.item,
@@ -530,24 +530,20 @@ class EmployeeAndVendorOrderViewsTestCase(TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertTemplateUsed(response, 'inventory/vendor_orders.html')
         self.assertContains(response, 'Apex Metals Ltd')
-        self.assertContains(response, 'Overdue (Pending)')
-        # Row highlight class
-        self.assertContains(response, 'bg-red-950/40 border-l-4 border-red-500')
+        self.assertContains(response, 'Due')
+        self.assertContains(response, 'bg-rose-950/20')
 
     def test_vendor_orders_add_order_deliver_and_clear_workflow(self):
         """
-        Validates the complete Company/Vendor Order lifecycle:
+        Validates the streamlined Company/Vendor Order workflow:
         1. Add order from a company specifying quantity, core box type, and delivery date.
-        2. Deliver the stock to them with atomic stock deduction and ledger logging.
-        3. Clear the order from the list.
+        2. Verify table renders clean columns (Company, Box, Quantity, Delivery Date, Remove button).
+        3. Click button to remove that line from the vendor order.
         """
         import datetime
         from django.urls import reverse
-        from transactions.models import PurchaseOrder, PurchaseOrderStatus, InventoryLedger, TransactionType
+        from transactions.models import PurchaseOrder, PurchaseOrderStatus
         from inventory.models import Item
-
-        # Initial inventory stock for self.item is 20 units
-        initial_stock = self.item.current_stock  # 20
 
         # 1. POST add_order: Company 'Steel Corp' needs 8 boxes of 'Test GI Core Box'
         future_date = (self.today + datetime.timedelta(days=5)).isoformat()
@@ -564,71 +560,61 @@ class EmployeeAndVendorOrderViewsTestCase(TestCase):
         self.assertIsNotNone(order)
         self.assertEqual(order.quantity, 8)
         self.assertEqual(order.item, self.item)
-        self.assertEqual(order.status, PurchaseOrderStatus.PENDING)
         self.assertEqual(order.expected_delivery_date.isoformat(), future_date)
 
-        # GET /vendor-orders/ renders the order and action buttons
+        # 2. GET /vendor-orders/ renders the order and remove action button
         get_res = self.client.get(reverse('vendor-order-list'))
         self.assertEqual(get_res.status_code, 200)
         self.assertContains(get_res, 'Steel Corp')
         self.assertContains(get_res, 'Test GI Core Box')
-        self.assertContains(get_res, 'openDeliverModal')
-        self.assertContains(get_res, 'openClearOrderModal')
+        self.assertContains(get_res, 'openRemoveOrderModal')
+        # Confirm separate Add Vendor and Deliver status buttons are removed
+        self.assertNotContains(get_res, 'openAddVendorModal')
+        self.assertNotContains(get_res, 'openDeliverModal')
 
-        # 2. POST deliver_order: Deliver the 8 boxes to Steel Corp with stock deduction
-        deliver_res = self.client.post(reverse('vendor-order-list'), {
-            'action': 'deliver_order',
-            'order_id': order.pk,
-            'deduct_stock': 'on'
-        })
-        self.assertEqual(deliver_res.status_code, 302)
-
-        order.refresh_from_db()
-        self.assertEqual(order.status, PurchaseOrderStatus.DELIVERED)
-
-        # Stock deducted from 20 to 12
-        self.item.refresh_from_db()
-        self.assertEqual(self.item.current_stock, initial_stock - Decimal('8'))
-
-        # Ledger OUT entry created
-        ledger = InventoryLedger.objects.filter(
-            generic_reference_id=f"DELIVERY-PO-{order.id}",
-            transaction_type=TransactionType.OUT
-        ).first()
-        self.assertIsNotNone(ledger)
-        self.assertEqual(ledger.quantity_changed, Decimal('-8'))
-
-        # 3. POST clear_order: Clear order from the list
-        clear_res = self.client.post(reverse('vendor-order-list'), {
-            'action': 'clear_order',
+        # 3. POST remove_order: Clicking the remove button clears the line from vendor orders
+        remove_res = self.client.post(reverse('vendor-order-list'), {
+            'action': 'remove_order',
             'order_id': order.pk
         })
-        self.assertEqual(clear_res.status_code, 302)
+        self.assertEqual(remove_res.status_code, 302)
         self.assertFalse(PurchaseOrder.objects.filter(pk=order.pk).exists())
 
-    def test_vendor_orders_add_vendor_profile(self):
+    def test_vendor_orders_auto_create_company_on_the_fly(self):
         """
-        Validates registering a new vendor/company profile directly.
+        Validates that adding an order for a new company automatically creates
+        the company contact record without needing a separate Add Vendor feature.
         """
+        import datetime
         from django.urls import reverse
-        from transactions.models import Contact, ContactType
+        from transactions.models import Contact, ContactType, PurchaseOrder
 
+        future_date = (self.today + datetime.timedelta(days=10)).isoformat()
         response = self.client.post(reverse('vendor-order-list'), {
-            'action': 'add_vendor',
+            'action': 'add_order',
             'company_name': 'Precision Engineering Works',
-            'contact_person': 'Ramesh Kumar',
-            'phone': '+91 9988776655',
-            'email': 'orders@precisioneng.com',
-            'GST_number': '07AABCP1122D1Z4',
-            'address': 'Plot 44, Okhla Phase 3, New Delhi'
+            'box_name': 'New Cast Box',
+            'quantity': '25',
+            'expected_delivery_date': future_date
         })
         self.assertEqual(response.status_code, 302)
 
         vendor = Contact.objects.filter(company_name='Precision Engineering Works').first()
         self.assertIsNotNone(vendor)
-        self.assertEqual(vendor.contact_person, 'Ramesh Kumar')
-        self.assertEqual(vendor.GST_number, '07AABCP1122D1Z4')
         self.assertEqual(vendor.type, ContactType.VENDOR)
+
+        order = PurchaseOrder.objects.filter(vendor=vendor).first()
+        self.assertIsNotNone(order)
+        self.assertEqual(order.quantity, 25)
+        self.assertEqual(order.item.name, 'New Cast Box')
+
+        # Remove line
+        del_res = self.client.post(reverse('vendor-order-list'), {
+            'action': 'remove_order',
+            'order_id': order.pk
+        })
+        self.assertEqual(del_res.status_code, 302)
+        self.assertFalse(PurchaseOrder.objects.filter(pk=order.pk).exists())
 
     def test_add_inventory_view_get_and_post(self):
         """

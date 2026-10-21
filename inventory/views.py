@@ -451,44 +451,28 @@ class EmployeeDetailView(DetailView):
 
 class VendorOrderListView(ListView):
     """
-    Vendor & Company Orders Management Controller:
-    1. Tracks orders received from companies (Vendor / Client entity, Core Box item, Quantity, Delivery Date).
-    2. Add Orders: Manual typing or selection for both company and box type, auto-resolving new entities.
-    3. Add Vendors: Register new business partners (company name, GST, contact info).
-    4. Deliver Orders: Marks order as Delivered, optionally deducts stock from inventory with ledger entry.
-    5. Clear Orders: Allows clearing/removing completed or cancelled orders from the list.
-    6. Filter Tabs: Filter between All Orders, Pending Orders, and Delivered Orders.
+    Vendor & Company Orders Controller:
+    - Add incoming order: Company Name, Core Box Type, Quantity, Delivery Date.
+    - View active company orders (Company, Core Box, Quantity, Delivery Date, Action).
+    - Remove line button: Directly removes that line from vendor orders upon delivery or clearance.
     """
     model = PurchaseOrder
     context_object_name = 'purchase_orders'
     template_name = 'inventory/vendor_orders.html'
 
     def get_queryset(self):
-        status_filter = ''
-        if hasattr(self, 'request') and self.request:
-            status_filter = self.request.GET.get('status', '').strip().lower()
-        from transactions.models import PurchaseOrderStatus
-        qs = PurchaseOrder.objects.select_related('vendor', 'item').all()
-        if status_filter == 'pending':
-            qs = qs.filter(status=PurchaseOrderStatus.PENDING)
-        elif status_filter == 'delivered':
-            qs = qs.filter(status=PurchaseOrderStatus.DELIVERED)
-        return qs.order_by('-order_date', '-id')
+        return PurchaseOrder.objects.select_related('vendor', 'item').all().order_by('expected_delivery_date', '-id')
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
         today = timezone.localdate()
-        all_orders = list(PurchaseOrder.objects.select_related('vendor', 'item').all())
-        from transactions.models import PurchaseOrderStatus
+        orders = list(self.get_queryset())
 
         context['today'] = today
-        context['total_count'] = len(all_orders)
-        context['pending_count'] = sum(1 for o in all_orders if o.status == PurchaseOrderStatus.PENDING)
-        context['overdue_count'] = sum(1 for o in all_orders if o.is_overdue)
-        context['delivered_count'] = sum(1 for o in all_orders if o.status == PurchaseOrderStatus.DELIVERED)
-        context['current_status'] = self.request.GET.get('status', 'all').strip().lower() or 'all'
+        context['total_orders_count'] = len(orders)
+        context['total_boxes_ordered'] = sum(o.quantity for o in orders)
 
-        # Suppliers / Companies for auto-completion
+        # Suppliers / Companies for auto-completion datalist
         context['vendors'] = Contact.objects.filter(is_active=True).order_by('company_name')
 
         # Items catalog for core box suggestions
@@ -566,134 +550,39 @@ class VendorOrderListView(ListView):
 
             messages.success(
                 request,
-                f"Order #{order.id} registered: '{vendor.company_name}' requested {quantity} boxes of '{item.name}' "
+                f"Order registered: '{vendor.company_name}' requested {quantity} boxes of '{item.name}' "
                 f"(Delivery Date: {order.expected_delivery_date.strftime('%b %d, %Y')})."
             )
             return redirect('vendor-order-list')
 
         # -------------------------------------------------------------
-        # Action 2: Add New Vendor / Company Profile
+        # Action 2: Remove Line from Vendor Orders (Delivered or Cleared)
         # -------------------------------------------------------------
-        elif action == 'add_vendor':
-            company_name = request.POST.get('company_name', '').strip()
-            contact_person = request.POST.get('contact_person', '').strip()
-            phone = request.POST.get('phone', '').strip()
-            email = request.POST.get('email', '').strip()
-            gst_number = request.POST.get('GST_number', '').strip().upper()
-            address = request.POST.get('address', '').strip()
-
-            if not company_name:
-                messages.error(request, "Company name is required.")
-                return redirect('vendor-order-list')
-
-            existing = Contact.objects.filter(company_name__iexact=company_name).first()
-            if existing:
-                messages.info(request, f"Company '{existing.company_name}' is already registered.")
-                return redirect('vendor-order-list')
-
-            vendor = Contact.objects.create(
-                type=ContactType.VENDOR,
-                company_name=company_name,
-                contact_person=contact_person,
-                phone=phone,
-                email=email,
-                GST_number=gst_number,
-                address=address,
-                is_active=True
-            )
-
-            messages.success(request, f"Company / Vendor '{vendor.company_name}' registered successfully.")
-            return redirect('vendor-order-list')
-
-        # -------------------------------------------------------------
-        # Action 3: Deliver Stock to Company
-        # -------------------------------------------------------------
-        elif action == 'deliver_order':
-            order_id = request.POST.get('order_id')
-            order = get_object_or_404(PurchaseOrder, pk=order_id)
-            should_deduct = request.POST.get('deduct_stock') in ['on', 'true', '1', True]
-            clear_immediately = request.POST.get('clear_immediately') in ['on', 'true', '1']
-
-            with transaction.atomic():
-                locked_order = PurchaseOrder.objects.select_for_update().get(pk=order.pk)
-                stock_deducted = Decimal('0')
-
-                if should_deduct and locked_order.status != PurchaseOrderStatus.DELIVERED:
-                    locked_item = Item.objects.select_for_update().get(pk=locked_order.item_id)
-                    order_qty_dec = Decimal(str(locked_order.quantity))
-
-                    if locked_item.current_stock >= order_qty_dec:
-                        locked_item.current_stock -= order_qty_dec
-                        locked_item.save(update_fields=['current_stock', 'updated_at'])
-                        stock_deducted = order_qty_dec
-
-                        InventoryLedger.objects.create(
-                            item=locked_item,
-                            quantity_changed=-order_qty_dec,
-                            transaction_type=TransactionType.OUT,
-                            contact=locked_order.vendor,
-                            generic_reference_id=f"DELIVERY-PO-{locked_order.id}",
-                            unit_cost=locked_item.moving_average_cost,
-                            total_cost=(order_qty_dec * locked_item.moving_average_cost).quantize(Decimal('0.01')),
-                            narration=f"Dispatched & delivered {locked_order.quantity} units to {locked_order.vendor.company_name} (Order #{locked_order.id})."
-                        )
-                    else:
-                        # Partial deduction if some stock available
-                        avail = locked_item.current_stock
-                        if avail > Decimal('0'):
-                            locked_item.current_stock = Decimal('0')
-                            locked_item.save(update_fields=['current_stock', 'updated_at'])
-                            stock_deducted = avail
-
-                            InventoryLedger.objects.create(
-                                item=locked_item,
-                                quantity_changed=-avail,
-                                transaction_type=TransactionType.OUT,
-                                contact=locked_order.vendor,
-                                generic_reference_id=f"DELIVERY-PO-{locked_order.id}",
-                                unit_cost=locked_item.moving_average_cost,
-                                total_cost=(avail * locked_item.moving_average_cost).quantize(Decimal('0.01')),
-                                narration=(
-                                    f"Dispatched available {avail} units (order requested {locked_order.quantity}) "
-                                    f"to {locked_order.vendor.company_name} (Order #{locked_order.id})."
-                                )
-                            )
-
-                locked_order.status = PurchaseOrderStatus.DELIVERED
-                locked_order.save(update_fields=['status'])
-
-                if clear_immediately:
-                    order_num = locked_order.id
-                    company_title = locked_order.vendor.company_name
-                    locked_order.delete()
-                    messages.success(
-                        request,
-                        f"Order #{order_num} delivered to '{company_title}' and cleared from the list!"
-                    )
-                    return redirect('vendor-order-list')
-
-                deduct_msg = f" (Deducted {stock_deducted:,.0f} units from stock)" if stock_deducted > Decimal('0') else ""
-                messages.success(
-                    request,
-                    f"Order #{locked_order.id} for '{locked_order.vendor.company_name}' has been delivered!{deduct_msg}"
-                )
-
-            return redirect('vendor-order-list')
-
-        # -------------------------------------------------------------
-        # Action 4: Clear / Remove Order from List
-        # -------------------------------------------------------------
-        elif action == 'clear_order' or action == 'delete_order':
+        elif action in ['remove_order', 'clear_order', 'delete_order', 'deliver_order']:
             order_id = request.POST.get('order_id')
             order = get_object_or_404(PurchaseOrder, pk=order_id)
             order_num = order.id
             company_title = order.vendor.company_name
+            box_title = order.item.name
+            qty = order.quantity
             order.delete()
 
             messages.success(
                 request,
-                f"Order #{order_num} for '{company_title}' has been cleared from the orders list."
+                f"Order #{order_num} for '{company_title}' ({qty} boxes of '{box_title}') has been removed from vendor orders."
             )
+            return redirect('vendor-order-list')
+
+        # Graceful fallback for add_vendor if invoked programmatically
+        elif action == 'add_vendor':
+            company_name = request.POST.get('company_name', '').strip()
+            if company_name:
+                Contact.objects.get_or_create(
+                    type=ContactType.VENDOR,
+                    company_name=company_name,
+                    defaults={'is_active': True}
+                )
+                messages.success(request, f"Company '{company_name}' registered successfully.")
             return redirect('vendor-order-list')
 
         messages.warning(request, "Unrecognized action.")
