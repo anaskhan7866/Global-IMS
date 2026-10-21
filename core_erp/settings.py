@@ -8,7 +8,6 @@ the primary database, and WhiteNoise for production static asset delivery.
 
 from pathlib import Path
 import environ
-import os
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -80,7 +79,6 @@ TEMPLATES = [
         'BACKEND': 'django.template.backends.django.DjangoTemplates',
         'DIRS': [
             BASE_DIR / 'templates',
-            BASE_DIR / 'core_erp' / 'templates',
         ],
         'APP_DIRS': True,
         'OPTIONS': {

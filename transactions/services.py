@@ -4,8 +4,8 @@ from typing import Dict, Any, Optional
 from django.db import transaction
 from django.core.exceptions import ValidationError
 
-from inventory.models import Item, BillOfMaterials, BOMComponent, ItemType, Employee, ProductionLog
-from transactions.models import Contact, ContactType, InventoryLedger, TransactionType
+from inventory.models import Item, BillOfMaterials, ItemType, Employee, ProductionLog
+from transactions.models import Contact, InventoryLedger, TransactionType
 from transactions.exceptions import InsufficientStockError, BOMNotFoundError
 
 

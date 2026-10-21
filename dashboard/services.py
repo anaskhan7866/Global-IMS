@@ -1,12 +1,11 @@
 from decimal import Decimal
 from typing import Dict, Any, Optional
-from datetime import date, datetime
 
 from django.db import models
 from django.db.models import Sum, F, DecimalField
 from django.db.models.functions import Abs
 
-from inventory.models import Item, ItemType
+from inventory.models import Item
 from transactions.models import InventoryLedger, TransactionType
 
 

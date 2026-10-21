@@ -11,7 +11,7 @@ from django.views import View
 from django.views.generic import ListView, DetailView
 
 from inventory.models import Employee, ProductionLog, Item, ItemType
-from transactions.models import PurchaseOrder, Contact, ContactType, InventoryLedger, TransactionType
+from transactions.models import PurchaseOrder, Contact, ContactType, InventoryLedger, TransactionType, PurchaseOrderStatus
 
 
 def get_or_resolve_production_item(item_id=None, item_name=None):
@@ -19,7 +19,6 @@ def get_or_resolve_production_item(item_id=None, item_name=None):
     Resolves target manufactured item (Finished Good) by item_id or manual box/item name.
     If a manual name is entered that doesn't exist, it automatically creates it in the catalog.
     """
-    from inventory.models import ItemType
     if item_id:
         found = Item.objects.filter(pk=item_id).first()
         if found:
@@ -130,7 +129,6 @@ class EmployeeListView(ListView):
         context['current_month_name'] = today.strftime('%B %Y')
 
         # Catalog finished goods for box logging
-        from inventory.models import ItemType
         finished_goods = Item.objects.filter(type=ItemType.FINISHED_GOOD, is_active=True).order_by('name')
         if not finished_goods.exists():
             finished_goods = Item.objects.filter(is_active=True).order_by('name')
@@ -382,7 +380,6 @@ class EmployeeDetailView(DetailView):
             daily_groups.append(rec)
 
         # Finished goods catalog for output logging
-        from inventory.models import ItemType
         finished_goods = Item.objects.filter(type=ItemType.FINISHED_GOOD, is_active=True).order_by('name')
         if not finished_goods.exists():
             finished_goods = Item.objects.filter(is_active=True).order_by('name')
@@ -484,7 +481,6 @@ class VendorOrderListView(ListView):
 
     def post(self, request, *args, **kwargs):
         action = request.POST.get('action')
-        from transactions.models import PurchaseOrderStatus
 
         # -------------------------------------------------------------
         # Action 1: Add New Company / Vendor Order
@@ -675,9 +671,7 @@ class AddInventoryView(View):
 
             with transaction.atomic():
                 locked_item = Item.objects.select_for_update().get(pk=target_item.pk)
-                old_name = locked_item.name
                 old_stock = locked_item.current_stock
-                old_weight = locked_item.weight
 
                 stock_diff = new_quantity - old_stock
 

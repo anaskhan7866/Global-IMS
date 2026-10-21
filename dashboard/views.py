@@ -1,5 +1,4 @@
 from decimal import Decimal
-from datetime import date
 from typing import Any, Dict
 
 from django.views.generic import TemplateView
