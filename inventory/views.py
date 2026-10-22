@@ -5,6 +5,7 @@ from django.db import transaction, IntegrityError
 from django.db.models import Count, Sum, Q, Value, ProtectedError
 from django.db.models.functions import Coalesce
 from django.shortcuts import render, redirect, get_object_or_404
+from django.urls import reverse
 from django.contrib import messages
 from django.contrib.auth.mixins import LoginRequiredMixin
 from django.utils import timezone
@@ -257,6 +258,32 @@ class EmployeeListView(LoginRequiredMixin, ListView):
             messages.success(request, f"Employee '{emp_name}' has been deleted.")
             return redirect('employee-list')
 
+        elif action == 'delete_date':
+            employee_id = request.POST.get('employee_id')
+            emp = get_object_or_404(Employee, pk=employee_id)
+            raw_date = request.POST.get('production_date') or request.POST.get('date')
+            if not raw_date:
+                messages.error(request, "Date is required to delete production logs.")
+                return redirect('employee-list')
+
+            try:
+                target_date = datetime.date.fromisoformat(raw_date.strip())
+            except (ValueError, TypeError):
+                messages.error(request, "Invalid date format specified.")
+                return redirect('employee-list')
+
+            deleted_count, _ = ProductionLog.objects.filter(
+                employee=emp,
+                production_date=target_date
+            ).delete()
+
+            messages.success(
+                request,
+                f"Deleted daily log for {emp.full_name} on {target_date.strftime('%b %d, %Y')} "
+                f"({deleted_count} record{'s' if deleted_count > 1 else ''} removed)."
+            )
+            return redirect('employee-list')
+
         messages.warning(request, "Unrecognized action.")
         return redirect('employee-list')
 
@@ -421,6 +448,42 @@ class EmployeeDetailView(LoginRequiredMixin, DetailView):
                 f"Logged {quantity} boxes of '{item.name}' for {self.object.full_name} ({log.production_date})."
             )
             return redirect('employee-detail', pk=self.object.pk, month=log.production_date.month)
+
+        elif action == 'delete_date':
+            raw_date = request.POST.get('production_date') or request.POST.get('date')
+            redirect_month = self.kwargs.get('month') or timezone.localdate().month
+
+            if not raw_date:
+                messages.error(request, "Date is required to delete daily production logs.")
+                return redirect('employee-detail', pk=self.object.pk, month=redirect_month)
+
+            try:
+                target_date = datetime.date.fromisoformat(raw_date.strip())
+            except (ValueError, TypeError):
+                messages.error(request, "Invalid date format specified.")
+                return redirect('employee-detail', pk=self.object.pk, month=redirect_month)
+
+            logs_to_delete = ProductionLog.objects.filter(
+                employee=self.object,
+                production_date=target_date
+            )
+            deleted_count, _ = logs_to_delete.delete()
+
+            if deleted_count > 0:
+                messages.success(
+                    request,
+                    f"Successfully deleted daily log for {target_date.strftime('%A, %b %d, %Y')} "
+                    f"({deleted_count} log entr{'ies' if deleted_count > 1 else 'y'} removed)."
+                )
+            else:
+                messages.info(request, f"No daily production logs found for {target_date.strftime('%b %d, %Y')}.")
+
+            redirect_month = self.kwargs.get('month') or target_date.month
+            year = request.POST.get('year') or request.GET.get('year')
+            url = reverse('employee-detail', kwargs={'pk': self.object.pk, 'month': redirect_month})
+            if year:
+                url = f"{url}?year={year}"
+            return redirect(url)
 
         messages.warning(request, "Unrecognized action.")
         return redirect('employee-detail', pk=self.object.pk, month=self.kwargs.get('month', timezone.now().month))

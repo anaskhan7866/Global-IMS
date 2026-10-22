@@ -511,6 +511,92 @@ class EmployeeAndVendorOrderViewsTestCase(TestCase):
         self.assertIsNotNone(log_entry)
         self.assertEqual(log_entry.quantity, 28)
 
+    def test_delete_specific_date_from_daily_logs(self):
+        """
+        Validates deleting a specific date from employee daily logs:
+        - Renders Delete Date button on daily logs table.
+        - Deletes all logs for that employee on that specific date.
+        - Preserves logs on other dates.
+        """
+        import datetime
+        from django.urls import reverse
+        from inventory.models import ProductionLog, Item
+
+        # Create two distinct items
+        item_a = Item.objects.create(
+            name="Alpha Box",
+            sku="FG-ALPHA",
+            unit_of_measure="pcs"
+        )
+        item_b = Item.objects.create(
+            name="Beta Box",
+            sku="FG-BETA",
+            unit_of_measure="pcs"
+        )
+
+        date_target = self.today - datetime.timedelta(days=2)
+        date_other = self.today - datetime.timedelta(days=5)
+
+        # Logs on target date to delete
+        log_target_1 = ProductionLog.objects.create(
+            employee=self.emp1,
+            item=item_a,
+            quantity=30,
+            production_date=date_target
+        )
+        log_target_2 = ProductionLog.objects.create(
+            employee=self.emp1,
+            item=item_b,
+            quantity=15,
+            production_date=date_target
+        )
+
+        # Log on other date to preserve
+        log_preserved = ProductionLog.objects.create(
+            employee=self.emp1,
+            item=item_a,
+            quantity=50,
+            production_date=date_other
+        )
+
+        # 1. GET employee detail page displays the Delete Date button
+        url_detail = reverse('employee-detail', kwargs={'pk': self.emp1.pk, 'month': self.current_month})
+        get_res = self.client.get(url_detail)
+        self.assertEqual(get_res.status_code, 200)
+        self.assertContains(get_res, 'Delete Date')
+        self.assertContains(get_res, 'name="action" value="delete_date"')
+        self.assertContains(get_res, f'value="{date_target.strftime("%Y-%m-%d")}"')
+
+        # 2. POST delete_date for date_target
+        post_res = self.client.post(url_detail, {
+            'action': 'delete_date',
+            'production_date': date_target.strftime('%Y-%m-%d'),
+            'year': str(self.today.year)
+        })
+        self.assertEqual(post_res.status_code, 302)
+
+        # Assert target date logs were deleted
+        self.assertFalse(ProductionLog.objects.filter(pk=log_target_1.pk).exists())
+        self.assertFalse(ProductionLog.objects.filter(pk=log_target_2.pk).exists())
+
+        # Assert other date log is strictly preserved
+        self.assertTrue(ProductionLog.objects.filter(pk=log_preserved.pk).exists())
+
+        # 3. Test deleting via EmployeeListView
+        log_for_list = ProductionLog.objects.create(
+            employee=self.emp1,
+            item=item_a,
+            quantity=10,
+            production_date=self.today
+        )
+        list_post_res = self.client.post(reverse('employee-list'), {
+            'action': 'delete_date',
+            'employee_id': self.emp1.pk,
+            'production_date': self.today.strftime('%Y-%m-%d')
+        })
+        self.assertEqual(list_post_res.status_code, 302)
+        self.assertFalse(ProductionLog.objects.filter(pk=log_for_list.pk).exists())
+
 
 
     def test_vendor_orders_view_template_and_overdue_highlight(self):

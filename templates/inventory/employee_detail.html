@@ -137,8 +137,9 @@
                 <thead class="bg-slate-900/60 text-xs uppercase font-semibold text-slate-400">
                     <tr>
                         <th scope="col" class="py-3.5 pl-6 pr-3">Date</th>
-                        <th scope="col" class="px-3 py-3.5 min-w-[160px]">Total Boxes</th>
-                        <th scope="col" class="py-3.5 pl-3 pr-6">Manufactured Box Types & Quantities</th>
+                        <th scope="col" class="px-3 py-3.5 min-w-[150px]">Total Boxes</th>
+                        <th scope="col" class="py-3.5 pl-3 pr-4">Manufactured Box Types & Quantities</th>
+                        <th scope="col" class="py-3.5 pl-3 pr-6 text-right min-w-[130px]">Action</th>
                     </tr>
                 </thead>
                 <tbody class="divide-y divide-slate-800/60 bg-slate-950 text-slate-200">
@@ -168,7 +169,7 @@
                         </td>
 
                         <!-- 3. Details: If one type shows detail of it; if multiple types shows every type manufactured -->
-                        <td class="py-4 pl-3 pr-6 align-top">
+                        <td class="py-4 pl-3 pr-4 align-top">
                             {% if row.is_single_type %}
                             <!-- Single box type detail -->
                             <div class="flex items-center space-x-3">
@@ -203,10 +204,30 @@
                             </div>
                             {% endif %}
                         </td>
+
+                        <!-- 4. Action: Delete specific date from daily logs -->
+                        <td class="whitespace-nowrap py-4 pl-3 pr-6 text-right align-top">
+                            <form method="post" action="{% url 'employee-detail' employee.pk selected_month %}" onsubmit="return confirm('Are you sure you want to delete all daily logs for {{ row.production_date|date:"Y-m-d" }} ({{ row.total_quantity }} boxes)?');" class="inline-block">
+                                {% csrf_token %}
+                                <input type="hidden" name="action" value="delete_date">
+                                <input type="hidden" name="production_date" value="{{ row.production_date|date:'Y-m-d' }}">
+                                <input type="hidden" name="year" value="{{ selected_year }}">
+                                <button
+                                    type="submit"
+                                    class="inline-flex items-center space-x-1.5 px-3 py-1.5 rounded-lg bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 hover:text-rose-300 border border-rose-500/30 hover:border-rose-500/50 text-xs font-semibold shadow-sm transition group"
+                                    title="Delete all production logs for {{ row.production_date|date:'Y-m-d' }}"
+                                >
+                                    <svg class="w-3.5 h-3.5 group-hover:scale-110 transition-transform text-rose-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                                    </svg>
+                                    <span>Delete Date</span>
+                                </button>
+                            </form>
+                        </td>
                     </tr>
                     {% empty %}
                     <tr>
-                        <td colspan="3" class="py-12 text-center text-slate-400">
+                        <td colspan="4" class="py-12 text-center text-slate-400">
                             <div class="flex flex-col items-center justify-center">
                                 <svg class="h-10 w-10 text-slate-600 mb-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
