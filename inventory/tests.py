@@ -683,7 +683,10 @@ class EmployeeAndVendorOrderViewsTestCase(TestCase):
         self.assertContains(get_res, '7.500')
         self.assertContains(get_res, 'kg/box')
         self.assertContains(get_res, 'openRemoveOrderModal')
-        # Confirm separate Add Vendor and Deliver status buttons are removed
+        self.assertContains(get_res, 'openEditOrderModal')
+        self.assertContains(get_res, 'editOrderModal')
+        # Confirm Total Boxes Demanded is removed and obsolete buttons are absent
+        self.assertNotContains(get_res, 'Total Boxes Demanded')
         self.assertNotContains(get_res, 'openAddVendorModal')
         self.assertNotContains(get_res, 'openDeliverModal')
 
@@ -694,6 +697,63 @@ class EmployeeAndVendorOrderViewsTestCase(TestCase):
         })
         self.assertEqual(remove_res.status_code, 302)
         self.assertFalse(PurchaseOrder.objects.filter(pk=order.pk).exists())
+
+    def test_vendor_orders_edit_order(self):
+        """
+        Validates editing an existing company/vendor order:
+        modifying company name, box type, weight, quantity, and delivery date.
+        """
+        import datetime
+        from django.urls import reverse
+        from transactions.models import PurchaseOrder
+
+        # 1. Create an initial order
+        init_date = (self.today + datetime.timedelta(days=3)).isoformat()
+        create_res = self.client.post(reverse('vendor-order-list'), {
+            'action': 'add_order',
+            'company_name': 'Original Corp',
+            'box_name': 'Original Box',
+            'weight': '6.000',
+            'quantity': '10',
+            'expected_delivery_date': init_date
+        })
+        self.assertEqual(create_res.status_code, 302)
+
+        order = PurchaseOrder.objects.filter(vendor__company_name='Original Corp').first()
+        self.assertIsNotNone(order)
+        self.assertEqual(order.quantity, 10)
+        self.assertEqual(order.item.weight, Decimal('6.000'))
+
+        # 2. POST edit_order: update company, box name, weight, quantity, delivery date
+        new_date = (self.today + datetime.timedelta(days=14)).isoformat()
+        edit_res = self.client.post(reverse('vendor-order-list'), {
+            'action': 'edit_order',
+            'order_id': order.pk,
+            'company_name': 'Apex Electricals Updated',
+            'box_name': 'Super Core Box',
+            'weight': '8.250',
+            'quantity': '45',
+            'expected_delivery_date': new_date
+        })
+        self.assertEqual(edit_res.status_code, 302)
+
+        order.refresh_from_db()
+        self.assertEqual(order.vendor.company_name, 'Apex Electricals Updated')
+        self.assertEqual(order.item.name, 'Super Core Box')
+        self.assertEqual(order.item.weight, Decimal('8.250'))
+        self.assertEqual(order.quantity, 45)
+        self.assertEqual(order.expected_delivery_date.isoformat(), new_date)
+
+        # 3. GET /vendor-orders/ renders updated details, edit modal, and no Total Boxes Demanded
+        get_res = self.client.get(reverse('vendor-order-list'))
+        self.assertEqual(get_res.status_code, 200)
+        self.assertContains(get_res, 'Apex Electricals Updated')
+        self.assertContains(get_res, 'Super Core Box')
+        self.assertContains(get_res, '8.250')
+        self.assertContains(get_res, '45')
+        self.assertContains(get_res, 'openEditOrderModal')
+        self.assertContains(get_res, 'editOrderModal')
+        self.assertNotContains(get_res, 'Total Boxes Demanded')
 
     def test_vendor_orders_auto_create_company_on_the_fly(self):
         """

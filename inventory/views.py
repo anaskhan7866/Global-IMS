@@ -540,7 +540,6 @@ class VendorOrderListView(LoginRequiredMixin, ListView):
 
         context['today'] = today
         context['total_orders_count'] = len(orders)
-        context['total_boxes_ordered'] = sum(o.quantity for o in orders)
 
         # Suppliers / Companies for auto-completion datalist
         context['vendors'] = Contact.objects.filter(is_active=True).order_by('company_name')
@@ -635,7 +634,82 @@ class VendorOrderListView(LoginRequiredMixin, ListView):
             return redirect('vendor-order-list')
 
         # -------------------------------------------------------------
-        # Action 2: Remove Line from Vendor Orders (Delivered or Cleared)
+        # Action 2: Edit Existing Vendor Order
+        # -------------------------------------------------------------
+        elif action == 'edit_order':
+            order_id = request.POST.get('order_id')
+            company_name = (request.POST.get('company_name') or request.POST.get('vendor_name') or '').strip()
+            box_name = (request.POST.get('box_name') or request.POST.get('item_name') or request.POST.get('name') or '').strip()
+            raw_quantity = request.POST.get('quantity')
+            raw_weight = request.POST.get('weight')
+            raw_delivery_date = request.POST.get('expected_delivery_date') or request.POST.get('delivery_date')
+
+            order = PurchaseOrder.objects.filter(pk=order_id).select_related('vendor', 'item').first()
+            if not order:
+                messages.error(request, "Order not found or already removed.")
+                return redirect('vendor-order-list')
+
+            # 1. Resolve or Create Vendor / Company
+            if company_name:
+                vendor = Contact.objects.filter(company_name__iexact=company_name).first()
+                if not vendor:
+                    vendor = Contact.objects.create(
+                        type=ContactType.VENDOR,
+                        company_name=company_name,
+                        is_active=True
+                    )
+                order.vendor = vendor
+
+            # 2. Resolve Quantity
+            if raw_quantity:
+                try:
+                    quantity = int(raw_quantity)
+                    if quantity <= 0:
+                        raise ValueError
+                    order.quantity = quantity
+                except (ValueError, TypeError):
+                    messages.error(request, "Quantity must be a valid positive number.")
+                    return redirect('vendor-order-list')
+
+            # 3. Resolve Box Item & Weight
+            if box_name:
+                item = get_or_resolve_production_item(item_name=box_name, weight=raw_weight)
+                if raw_weight and item.weight == Decimal('0.000'):
+                    try:
+                        w_val = Decimal(str(raw_weight).strip())
+                        if w_val > Decimal('0'):
+                            item.weight = w_val
+                            item.save(update_fields=['weight', 'updated_at'])
+                    except (ValueError, TypeError):
+                        pass
+                order.item = item
+            elif raw_weight:
+                try:
+                    w_val = Decimal(str(raw_weight).strip())
+                    if w_val > Decimal('0') and order.item.weight != w_val:
+                        order.item.weight = w_val
+                        order.item.save(update_fields=['weight', 'updated_at'])
+                except (ValueError, TypeError):
+                    pass
+
+            # 4. Resolve Delivery Date
+            if raw_delivery_date:
+                try:
+                    order.expected_delivery_date = datetime.date.fromisoformat(raw_delivery_date.strip())
+                except (ValueError, TypeError):
+                    pass
+
+            order.save()
+            weight_info = f" ({order.item.weight} kg/box)" if order.item.weight else ""
+            messages.success(
+                request,
+                f"Order updated: '{order.vendor.company_name}' &bull; {order.quantity} boxes of "
+                f"'{order.item.name}'{weight_info}."
+            )
+            return redirect('vendor-order-list')
+
+        # -------------------------------------------------------------
+        # Action 3: Remove Line from Vendor Orders (Delivered or Cleared)
         # -------------------------------------------------------------
         elif action in ['remove_order', 'clear_order', 'delete_order', 'deliver_order']:
             order_id = request.POST.get('order_id')
