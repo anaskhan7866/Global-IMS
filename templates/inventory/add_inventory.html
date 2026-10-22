@@ -211,24 +211,6 @@
                     </div>
                     <p class="text-[11px] text-slate-400">Weight of one individual core box in kg. Different weight = different product.</p>
                 </div>
-
-                <!-- Removal Reason (shown only in Remove Stock mode) -->
-                <div class="space-y-2 hidden" id="removeReasonGroup">
-                    <label for="removal_reason" class="block text-xs font-bold uppercase tracking-wider text-rose-400 flex items-center space-x-1.5">
-                        <span class="w-5 h-5 rounded-full bg-rose-900/60 text-rose-300 flex items-center justify-center text-[11px] font-bold">3</span>
-                        <span>Reason for Stock Removal</span>
-                    </label>
-                    <div class="relative">
-                        <select name="reason" id="removal_reason" class="w-full px-4 py-3 rounded-xl bg-slate-900 border border-slate-700 text-white text-sm focus:border-rose-500 focus:ring-2 focus:ring-rose-500/20 transition">
-                            <option value="Customer Dispatch / Sale">Customer Dispatch / Order Fulfillment</option>
-                            <option value="Damaged / Scrap">Damaged / Machining Scrap</option>
-                            <option value="Internal Transfer">Internal Shop Floor Transfer</option>
-                            <option value="Inventory Count Correction">Inventory Count Correction</option>
-                            <option value="Sample / Quality Testing">Sample / Quality Testing</option>
-                        </select>
-                    </div>
-                    <p class="text-[11px] text-slate-400">Specifies the operational purpose for this stock deduction.</p>
-                </div>
             </div>
 
             <!-- Dynamic Batch Summary Preview (Quantity & Weight of One Box, NO Total Weight) -->
@@ -454,20 +436,6 @@
                 <p id="modalMaxHelp" class="text-[11px] text-slate-400">Enter a quantity up to the available on-hand balance.</p>
             </div>
 
-            <!-- Reason / Narration -->
-            <div class="space-y-1.5">
-                <label for="modalReason" class="block text-xs font-bold uppercase tracking-wider text-slate-300">
-                    Reason for Removal
-                </label>
-                <select name="reason" id="modalReason" class="w-full px-4 py-2.5 rounded-xl bg-slate-900 border border-slate-700 text-white text-sm focus:border-rose-500 focus:ring-2 focus:ring-rose-500/20 transition">
-                    <option value="Customer Dispatch / Sale">Customer Dispatch / Order Fulfillment</option>
-                    <option value="Damaged / Scrap">Damaged / Machining Scrap</option>
-                    <option value="Internal Transfer">Internal Shop Floor Transfer</option>
-                    <option value="Inventory Count Correction">Inventory Count Correction</option>
-                    <option value="Sample / Quality Testing">Sample / Quality Testing</option>
-                </select>
-            </div>
-
             <!-- Modal Actions -->
             <div class="pt-3 border-t border-slate-800 flex items-center justify-end space-x-3">
                 <button
@@ -687,12 +655,12 @@
                 previewStatusText.textContent = 'Enter product name, quantity, and weight of one box above.';
             }
         } else {
-            if (valName && qty > 0) {
-                previewStatusText.innerHTML = `<span class="text-rose-400 font-medium">Removal Ready:</span> Deducting ${qty} units from "${valName}".`;
+            if (valName && qty > 0 && wt > 0) {
+                previewStatusText.innerHTML = `<span class="text-rose-400 font-medium">Removal Ready:</span> Deducting ${qty} units from "${valName}" (${wt.toFixed(3)} kg/box).`;
             } else if (valName) {
                 previewStatusText.innerHTML = `Preparing stock removal for <span class="text-white font-medium">"${valName}"</span>.`;
             } else {
-                previewStatusText.textContent = 'Select product and specify quantity to deduct.';
+                previewStatusText.textContent = 'Enter product name, quantity, and unit weight to deduct.';
             }
         }
     }
@@ -708,15 +676,13 @@
         const submitBtn = document.getElementById('submitBtn');
         const tabBtnAdd = document.getElementById('tabBtnAdd');
         const tabBtnRemove = document.getElementById('tabBtnRemove');
-        const weightFieldGroup = document.getElementById('weightFieldGroup');
-        const removeReasonGroup = document.getElementById('removeReasonGroup');
-        const unitWeightCalcCol = document.getElementById('unitWeightCalcCol');
         const formIconWrap = document.getElementById('formIconWrap');
+        const qtyHint = document.getElementById('quantityHint');
 
         if (mode === 'remove') {
             formActionInput.value = 'remove_stock';
             formTitle.textContent = 'Remove Inventory Stock';
-            formSubtitle.textContent = 'Deduct units from existing product inventory for customer dispatch, scrap, or adjustments.';
+            formSubtitle.textContent = 'Specify product name, quantity, and unit weight of core box to remove.';
             formBadge.textContent = 'Stock Deduction Mode';
             formBadge.className = 'inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold bg-rose-950 text-rose-300 border border-rose-800 transition';
             submitBtnText.textContent = 'Confirm Remove Stock';
@@ -726,10 +692,7 @@
             tabBtnAdd.className = 'px-4 py-2 rounded-lg text-xs font-bold transition flex items-center space-x-1.5 text-slate-400 hover:text-slate-200';
             tabBtnRemove.className = 'px-4 py-2 rounded-lg text-xs font-bold transition flex items-center space-x-1.5 bg-rose-600 text-white shadow';
 
-            weightFieldGroup.classList.add('hidden');
-            weightInput.removeAttribute('required');
-            removeReasonGroup.classList.remove('hidden');
-            unitWeightCalcCol.classList.add('hidden');
+            if (qtyHint) qtyHint.textContent = 'Number of core boxes / units to deduct from inventory.';
         } else {
             formActionInput.value = 'add_stock';
             formTitle.textContent = 'Add Inventory Stock';
@@ -743,10 +706,7 @@
             tabBtnAdd.className = 'px-4 py-2 rounded-lg text-xs font-bold transition flex items-center space-x-1.5 bg-cyan-600 text-white shadow';
             tabBtnRemove.className = 'px-4 py-2 rounded-lg text-xs font-bold transition flex items-center space-x-1.5 text-slate-400 hover:text-slate-200';
 
-            weightFieldGroup.classList.remove('hidden');
-            weightInput.setAttribute('required', 'required');
-            removeReasonGroup.classList.add('hidden');
-            unitWeightCalcCol.classList.remove('hidden');
+            if (qtyHint) qtyHint.textContent = 'Number of core boxes / units to add into inventory.';
         }
         updateCalculations();
     }

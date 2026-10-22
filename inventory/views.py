@@ -919,7 +919,13 @@ class AddInventoryView(LoginRequiredMixin, View):
                         pass
                 if weight_val is not None:
                     target_item = Item.objects.filter(name__iexact=product_name, weight=weight_val).first()
-                if not target_item:
+                    if not target_item:
+                        messages.error(
+                            request,
+                            f"No core box found for '{product_name}' with weight {weight_val} kg/box."
+                        )
+                        return redirect('add-inventory')
+                else:
                     target_item = Item.objects.filter(name__iexact=product_name).first()
 
             if not target_item:

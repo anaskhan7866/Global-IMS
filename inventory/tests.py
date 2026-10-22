@@ -1117,6 +1117,50 @@ class EmployeeAndVendorOrderViewsTestCase(TestCase):
         self.item.refresh_from_db()
         self.assertEqual(self.item.current_stock, initial_stock - Decimal('8'))
 
+    def test_remove_stock_with_name_weight_and_quantity_only(self):
+        """
+        Validates removing stock using specifically Name of Product, Weight of Core Box,
+        and Quantity only, correctly distinguishing between different weights.
+        """
+        from django.urls import reverse
+        from inventory.models import Item, ItemType
+
+        box1 = Item.objects.create(
+            name='Precision Casting Box',
+            sku='FG-BOX-PC-01',
+            type=ItemType.FINISHED_GOOD,
+            unit_of_measure='pcs',
+            current_stock=Decimal('20.0000'),
+            weight=Decimal('3.500')
+        )
+        box2 = Item.objects.create(
+            name='Precision Casting Box',
+            sku='FG-BOX-PC-02',
+            type=ItemType.FINISHED_GOOD,
+            unit_of_measure='pcs',
+            current_stock=Decimal('30.0000'),
+            weight=Decimal('5.200')
+        )
+
+        response = self.client.post(reverse('add-inventory'), {
+            'action': 'remove_stock',
+            'name': 'Precision Casting Box',
+            'weight': '3.500',
+            'quantity': '6'
+        })
+        self.assertEqual(response.status_code, 302)
+
+        box1.refresh_from_db()
+        box2.refresh_from_db()
+        self.assertEqual(box1.current_stock, Decimal('14.0000'))
+        self.assertEqual(box2.current_stock, Decimal('30.0000'))
+
+        # Verify page does not contain obsolete removal reason fields
+        get_res = self.client.get(reverse('add-inventory'))
+        self.assertEqual(get_res.status_code, 200)
+        self.assertNotContains(get_res, 'Reason for Stock Removal')
+        self.assertNotContains(get_res, 'Reason for Removal')
+
     def test_delete_product_when_stock_is_zero_succeeds(self):
         """
         Validates that a product with zero stock can be completely removed from inventory.
