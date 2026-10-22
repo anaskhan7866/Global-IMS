@@ -14,3 +14,7 @@ urlpatterns = [
     path('', include('inventory.urls')),
     path('dashboard/', include('dashboard.urls', namespace='dashboard')),
 ]
+
+admin.site.site_header = "Global-IMS Administration"
+admin.site.site_title = "Global-IMS Admin Portal"
+admin.site.index_title = "MRP & Production Control Center"

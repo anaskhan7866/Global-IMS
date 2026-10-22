@@ -112,33 +112,13 @@ class BillOfMaterialsAdmin(admin.ModelAdmin):
         return obj.components.count()
 
 
-@admin.register(BOMComponent)
-class BOMComponentAdmin(admin.ModelAdmin):
-    list_display = (
-        'bom',
-        'raw_material',
-        'quantity',
-        'scrap_percentage',
-    )
-    list_filter = (
-        'bom__is_active',
-    )
-    search_fields = (
-        'bom__finished_good__name',
-        'bom__finished_good__sku',
-        'raw_material__name',
-        'raw_material__sku',
-    )
-    autocomplete_fields = ['bom', 'raw_material']
-
-
 @admin.register(Employee)
 class EmployeeAdmin(admin.ModelAdmin):
     list_display = (
         'full_name',
         'first_name',
         'last_name',
-        'is_active',
+        'status_badge',
         'created_at',
     )
     list_filter = (
@@ -150,6 +130,14 @@ class EmployeeAdmin(admin.ModelAdmin):
         'last_name',
     )
     readonly_fields = ('created_at',)
+
+    @admin.display(description=_('Status'), ordering='is_active')
+    def status_badge(self, obj: Employee) -> str:
+        if obj.is_active:
+            style = "background-color: #D1FAE5; color: #065F46; font-weight: 600; padding: 2px 8px; border-radius: 9999px;"
+            return format_html('<span style="{}">{}</span>', style, _('Active'))
+        style = "background-color: #FEE2E2; color: #991B1B; font-weight: 600; padding: 2px 8px; border-radius: 9999px;"
+        return format_html('<span style="{}">{}</span>', style, _('Inactive'))
 
 
 @admin.register(ProductionLog)
