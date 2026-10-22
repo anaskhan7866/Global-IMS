@@ -1,28 +1,31 @@
-# Python
+# Environment Variables & Secrets
+.env
+*.local
+
+# Database
+db.sqlite3
+db.sqlite3-journal
+
+# Bytecode & Caches
 __pycache__/
+*.pyc
 *.py[cod]
 *$py.class
-*.so
-.Python
+
+# Static & Media Assets
+staticfiles/
+media/
 
 # Virtual Environment
 .venv/
 venv/
 ENV/
 
-# Environment Variables & Secrets
-.env
-*.local
-
-# Django
+# Logs & Temporary Files
 *.log
 local_settings.py
-db.sqlite3
-db.sqlite3-journal
-media/
-staticfiles/
 
-# IDE
+# IDE & Editor Metadata
 .idea/
 .vscode/
 *.swp

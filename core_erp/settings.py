@@ -1,13 +1,14 @@
 """
 Django settings for core_erp project.
 
-Production-grade configuration adhering to 12-factor application design,
-using django-environ for environment variable extraction, PostgreSQL as
-the primary database, and WhiteNoise for production static asset delivery.
+Production-grade configuration for Render (Free Tier) deployment
+with Neon.tech external PostgreSQL instance and WhiteNoise static asset delivery.
 """
 
+import os
 from pathlib import Path
 import environ
+import dj_database_url
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -16,8 +17,7 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 env = environ.Env(
     DEBUG=(bool, False),
     SECRET_KEY=(str, ""),
-    ALLOWED_HOSTS=(list, ["127.0.0.1", "localhost"]),
-    DATABASE_URL=(str, "postgres://postgres:postgres@localhost:5432/global_ims_db"),
+    ALLOWED_HOSTS=(list, ["*"]),
     CONN_MAX_AGE=(int, 600),
 )
 
@@ -33,7 +33,11 @@ if not SECRET_KEY:
 
 DEBUG = env('DEBUG')
 
-ALLOWED_HOSTS = env('ALLOWED_HOSTS')
+ALLOWED_HOSTS = ['*']
+
+CSRF_TRUSTED_ORIGINS = [
+    'https://*.onrender.com',
+]
 
 
 # Application Definition
@@ -97,13 +101,14 @@ ASGI_APPLICATION = 'core_erp.asgi.application'
 
 
 # Database Configuration
-# Parses DATABASE_URL using django-environ (PostgreSQL in production, SQLite in local dev)
+# Parses the Neon connection string and enforces SSL for Render production deployment
 DATABASES = {
-    'default': env.db('DATABASE_URL', default=f'sqlite:///{BASE_DIR / "db.sqlite3"}')
+    'default': dj_database_url.config(
+        default=os.environ.get('DATABASE_URL'),
+        conn_max_age=600,
+    )
 }
-if DATABASES['default']['ENGINE'] == 'django.db.backends.postgresql':
-    DATABASES['default']['CONN_MAX_AGE'] = env('CONN_MAX_AGE')
-    DATABASES['default']['CONN_HEALTH_CHECKS'] = True
+DATABASES['default']['OPTIONS'] = {'sslmode': 'require'}
 
 
 # Password Validation
@@ -140,23 +145,21 @@ STATICFILES_DIRS = [
     BASE_DIR / 'static',
 ]
 
-# Media Files (User-uploaded documents, attachments)
-MEDIA_URL = '/media/'
-MEDIA_ROOT = BASE_DIR / 'media'
+# Static Files Storage Configuration (WhiteNoise Compressed Manifest)
+STATICFILES_STORAGE = 'whitenoise.storage.CompressedManifestStaticFilesStorage'
 
-# Modern Django 5+ Storage Configuration
 STORAGES = {
     'default': {
         'BACKEND': 'django.core.files.storage.FileSystemStorage',
     },
     'staticfiles': {
-        'BACKEND': (
-            'django.contrib.staticfiles.storage.StaticFilesStorage'
-            if DEBUG
-            else 'whitenoise.storage.CompressedManifestStaticFilesStorage'
-        ),
+        'BACKEND': 'whitenoise.storage.CompressedManifestStaticFilesStorage',
     },
 }
+
+# Media Files (User-uploaded documents, attachments)
+MEDIA_URL = '/media/'
+MEDIA_ROOT = BASE_DIR / 'media'
 
 
 # Default Primary Key Field Type
