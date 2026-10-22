@@ -295,7 +295,7 @@
             <!-- Box Type (Manual Entry) -->
             <div class="space-y-1.5">
                 <label for="modal_box_name" class="block text-xs font-bold uppercase tracking-wider text-slate-300">
-                    Box Type <span class="text-rose-400">*</span>
+                    Type of Box <span class="text-rose-400">*</span>
                 </label>
                 <input
                     type="text"
@@ -305,32 +305,55 @@
                     required
                     autocomplete="off"
                     placeholder="e.g. Core Box, Polish Box, Plastic Box"
+                    oninput="onModalBoxNameChange(this.value)"
                     class="w-full px-4 py-2.5 rounded-xl bg-slate-900 border border-slate-700 text-white placeholder-slate-500 text-sm focus:border-cyan-500 focus:ring-2 focus:ring-cyan-500/20 transition font-medium"
                 >
                 <datalist id="modal_boxes_datalist">
                     {% for fg in finished_goods %}
-                    <option value="{{ fg.name }}">
+                    <option value="{{ fg.name }}" data-weight="{{ fg.weight|default:'' }}">
                     {% endfor %}
                 </datalist>
                 <p class="text-[11px] text-slate-400">Type any box type name manually (e.g. Core Box, Polish Box, Plastic Box).</p>
             </div>
 
-            <!-- Quantity of Boxes -->
-            <div class="space-y-1.5">
-                <label for="modal_quantity" class="block text-xs font-bold uppercase tracking-wider text-slate-300">
-                    Quantity of Boxes Manufactured <span class="text-rose-400">*</span>
-                </label>
-                <div class="relative">
-                    <input
-                        type="number"
-                        name="quantity"
-                        id="modal_quantity"
-                        min="1"
-                        required
-                        placeholder="e.g. 50"
-                        class="w-full px-4 py-2.5 rounded-xl bg-slate-900 border border-slate-700 text-white font-mono-code text-sm focus:border-cyan-500 focus:ring-2 focus:ring-cyan-500/20 transition"
-                    >
-                    <span class="absolute right-3.5 top-2.5 text-xs text-slate-400 font-mono-code font-bold pointer-events-none">boxes</span>
+            <!-- Weight (kg/box) & Number of Boxes Grid -->
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div class="space-y-1.5">
+                    <label for="modal_weight" class="block text-xs font-bold uppercase tracking-wider text-slate-300">
+                        Weight (kg/box)
+                    </label>
+                    <div class="relative">
+                        <input
+                            type="number"
+                            name="weight"
+                            id="modal_weight"
+                            step="0.001"
+                            min="0"
+                            placeholder="e.g. 7.000"
+                            class="w-full px-4 py-2.5 rounded-xl bg-slate-900 border border-slate-700 text-white placeholder-slate-500 font-mono-code text-sm focus:border-cyan-500 focus:ring-2 focus:ring-cyan-500/20 transition"
+                        >
+                        <span class="absolute right-3.5 top-2.5 text-xs text-slate-400 font-mono-code font-bold pointer-events-none">kg/box</span>
+                    </div>
+                    <p class="text-[11px] text-slate-400">Weight of one box in kg.</p>
+                </div>
+
+                <div class="space-y-1.5">
+                    <label for="modal_quantity" class="block text-xs font-bold uppercase tracking-wider text-slate-300">
+                        Number of Boxes <span class="text-rose-400">*</span>
+                    </label>
+                    <div class="relative">
+                        <input
+                            type="number"
+                            name="quantity"
+                            id="modal_quantity"
+                            min="1"
+                            required
+                            placeholder="e.g. 50"
+                            class="w-full px-4 py-2.5 rounded-xl bg-slate-900 border border-slate-700 text-white font-mono-code text-sm focus:border-cyan-500 focus:ring-2 focus:ring-cyan-500/20 transition"
+                        >
+                        <span class="absolute right-3.5 top-2.5 text-xs text-slate-400 font-mono-code font-bold pointer-events-none">boxes</span>
+                    </div>
+                    <p class="text-[11px] text-slate-400">Total units manufactured.</p>
                 </div>
             </div>
 
@@ -375,5 +398,22 @@
     logModal.addEventListener('click', function (e) {
         if (e.target === logModal) closeLogProductionModal();
     });
+
+    // Auto-fill weight from catalog when box type name is entered
+    const boxesCatalog = {
+        {% for fg in finished_goods %}
+        "{{ fg.name|escapejs }}": "{{ fg.weight|default:'' }}",
+        {% endfor %}
+    };
+
+    function onModalBoxNameChange(val) {
+        const trimmed = (val || '').trim();
+        if (boxesCatalog[trimmed]) {
+            const weightInput = document.getElementById('modal_weight');
+            if (weightInput && (!weightInput.value || weightInput.value === '0' || weightInput.value === '0.000')) {
+                weightInput.value = boxesCatalog[trimmed];
+            }
+        }
+    }
 </script>
 {% endblock %}

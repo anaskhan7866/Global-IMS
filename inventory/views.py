@@ -208,6 +208,7 @@ class EmployeeListView(LoginRequiredMixin, ListView):
         elif action == 'log_production':
             employee_id = request.POST.get('employee_id')
             raw_quantity = request.POST.get('quantity')
+            raw_weight = request.POST.get('weight')
             item_id = request.POST.get('item_id')
             box_name = (request.POST.get('box_name') or request.POST.get('name') or request.POST.get('item_name') or '').strip()
 
@@ -221,7 +222,16 @@ class EmployeeListView(LoginRequiredMixin, ListView):
                 messages.error(request, f"Please enter a valid positive number of boxes for {emp.full_name}.")
                 return redirect('employee-list')
 
-            item = get_or_resolve_production_item(item_id=item_id, item_name=box_name)
+            item = get_or_resolve_production_item(item_id=item_id, item_name=box_name, weight=raw_weight)
+            if raw_weight and item.weight == Decimal('0.000'):
+                try:
+                    w_val = Decimal(str(raw_weight).strip())
+                    if w_val > Decimal('0'):
+                        item.weight = w_val
+                        item.save(update_fields=['weight', 'updated_at'])
+                except (ValueError, TypeError):
+                    pass
+
             target_date = timezone.localdate()
             raw_date = request.POST.get('production_date') or request.POST.get('date')
             if raw_date:
@@ -237,9 +247,10 @@ class EmployeeListView(LoginRequiredMixin, ListView):
                 production_date=target_date
             )
 
+            weight_info = f" ({item.weight} kg/box)" if item.weight else ""
             messages.success(
                 request,
-                f"Saved {quantity} boxes for {emp.full_name} today! ({item.name})"
+                f"Saved {quantity} boxes of '{item.name}'{weight_info} for {emp.full_name} today!"
             )
             return redirect('employee-list')
 
@@ -451,6 +462,7 @@ class EmployeeDetailView(LoginRequiredMixin, DetailView):
 
         if action == 'log_production':
             raw_quantity = request.POST.get('quantity')
+            raw_weight = request.POST.get('weight')
             item_id = request.POST.get('item_id')
             box_name = (request.POST.get('box_name') or request.POST.get('name') or request.POST.get('item_name') or '').strip()
             raw_date = request.POST.get('production_date')
@@ -463,7 +475,16 @@ class EmployeeDetailView(LoginRequiredMixin, DetailView):
                 messages.error(request, f"Please enter a valid positive number of boxes for {self.object.full_name}.")
                 return redirect('employee-detail', pk=self.object.pk, month=self.kwargs.get('month', timezone.localdate().month))
 
-            item = get_or_resolve_production_item(item_id=item_id, item_name=box_name)
+            item = get_or_resolve_production_item(item_id=item_id, item_name=box_name, weight=raw_weight)
+            if raw_weight and item.weight == Decimal('0.000'):
+                try:
+                    w_val = Decimal(str(raw_weight).strip())
+                    if w_val > Decimal('0'):
+                        item.weight = w_val
+                        item.save(update_fields=['weight', 'updated_at'])
+                except (ValueError, TypeError):
+                    pass
+
             target_date = timezone.localdate()
             if raw_date:
                 try:
@@ -478,9 +499,10 @@ class EmployeeDetailView(LoginRequiredMixin, DetailView):
                 production_date=target_date
             )
 
+            weight_info = f" ({item.weight} kg/box)" if item.weight else ""
             messages.success(
                 request,
-                f"Logged {quantity} boxes of '{item.name}' for {self.object.full_name} ({log.production_date})."
+                f"Logged {quantity} boxes of '{item.name}'{weight_info} for {self.object.full_name} ({log.production_date})."
             )
             return redirect('employee-detail', pk=self.object.pk, month=log.production_date.month)
 

@@ -617,7 +617,72 @@ class EmployeeAndVendorOrderViewsTestCase(TestCase):
         self.assertEqual(list_post_res.status_code, 302)
         self.assertFalse(ProductionLog.objects.filter(pk=log_for_list.pk).exists())
 
+    def test_employee_production_logging_with_weight_feature(self):
+        """
+        Validates the weight feature in employee production logging:
+        - Employee list table renders type of box, weight, and number of boxes inputs.
+        - Logging output with box_name, weight, and quantity records the item with weight.
+        - Employee detail modal provides box type, weight, and quantity fields.
+        - Employee detail breakdown renders the weight in kg/box for the produced item.
+        """
+        from decimal import Decimal
+        from django.urls import reverse
+        from inventory.models import Item, ProductionLog
 
+        # 1. GET /employees/ renders weight input
+        list_res = self.client.get(reverse('employee-list'))
+        self.assertEqual(list_res.status_code, 200)
+        self.assertContains(list_res, 'placeholder="Weight (kg)"')
+        self.assertContains(list_res, 'name="weight"')
+
+        # 2. POST log_production with box_name, weight, and quantity
+        log_res = self.client.post(reverse('employee-list'), {
+            'action': 'log_production',
+            'employee_id': self.emp1.pk,
+            'box_name': 'Reinforced Heavy Box',
+            'weight': '6.850',
+            'quantity': '24'
+        })
+        self.assertEqual(log_res.status_code, 302)
+
+        heavy_box = Item.objects.filter(name='Reinforced Heavy Box').first()
+        self.assertIsNotNone(heavy_box)
+        self.assertEqual(heavy_box.weight, Decimal('6.850'))
+
+        log_entry = ProductionLog.objects.filter(employee=self.emp1, item=heavy_box).first()
+        self.assertIsNotNone(log_entry)
+        self.assertEqual(log_entry.quantity, 24)
+
+        # 3. GET employee detail page renders weight input in modal
+        detail_url = reverse('employee-detail', kwargs={'pk': self.emp1.pk, 'month': self.current_month})
+        detail_res = self.client.get(detail_url)
+        self.assertEqual(detail_res.status_code, 200)
+        self.assertContains(detail_res, 'id="modal_weight"')
+        self.assertContains(detail_res, 'Weight (kg/box)')
+        # Breakdown should display the weight in the log breakdown
+        self.assertContains(detail_res, '(6.850 kg/box)')
+
+        # 4. POST log_production via employee detail modal with weight
+        detail_post_res = self.client.post(detail_url, {
+            'action': 'log_production',
+            'box_name': 'Precision Die Box',
+            'weight': '3.250',
+            'quantity': '15',
+            'production_date': self.today.strftime('%Y-%m-%d')
+        })
+        self.assertEqual(detail_post_res.status_code, 302)
+
+        die_box = Item.objects.filter(name='Precision Die Box').first()
+        self.assertIsNotNone(die_box)
+        self.assertEqual(die_box.weight, Decimal('3.250'))
+
+        die_log = ProductionLog.objects.filter(employee=self.emp1, item=die_box).first()
+        self.assertIsNotNone(die_log)
+        self.assertEqual(die_log.quantity, 15)
+
+        # 5. Subsequent GET on detail view renders the new weight
+        detail_check = self.client.get(detail_url)
+        self.assertContains(detail_check, '(3.250 kg/box)')
 
     def test_vendor_orders_view_template_and_overdue_highlight(self):
         """
