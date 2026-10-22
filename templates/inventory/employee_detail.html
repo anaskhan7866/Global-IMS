@@ -108,13 +108,15 @@
                 </span>
             </div>
             <h3 class="mt-4 text-3xl font-extrabold text-purple-300 font-mono-code">
-                {% if active_days > 0 %}
-                    {{ total_month_units|floatformat:1 }}
-                {% else %}
-                    0
-                {% endif %}
+                {{ daily_average|floatformat:1 }} <span class="text-sm font-normal text-slate-400">Boxes/day</span>
             </h3>
-            <p class="mt-1 text-xs text-slate-400">Average boxes produced per active day</p>
+            <p class="mt-1 text-xs text-slate-400">
+                {% if active_days > 0 %}
+                Average across {{ active_days }} active day{{ active_days|pluralize }}
+                {% else %}
+                Average boxes produced per active day
+                {% endif %}
+            </p>
         </div>
     </section>
 

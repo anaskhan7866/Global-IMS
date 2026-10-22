@@ -394,6 +394,7 @@ class EmployeeDetailView(LoginRequiredMixin, DetailView):
         # Summary calculations for KPI cards
         total_units = sum(entry['quantity__sum'] for entry in daily_breakdown) if daily_breakdown else 0
         active_days = len(daily_breakdown)
+        daily_average = round(total_units / active_days, 1) if active_days > 0 else 0.0
 
         month_date = datetime.date(year, month, 1)
 
@@ -405,6 +406,7 @@ class EmployeeDetailView(LoginRequiredMixin, DetailView):
         context['daily_groups'] = daily_groups
         context['total_month_units'] = total_units
         context['active_days'] = active_days
+        context['daily_average'] = daily_average
         context['finished_goods'] = finished_goods
         context['default_item'] = finished_goods.first() if finished_goods.exists() else None
         context['today'] = today

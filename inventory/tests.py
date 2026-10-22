@@ -1,9 +1,13 @@
+import datetime
 from decimal import Decimal
 from django.test import TestCase
 from django.core.exceptions import ValidationError
 from django.db import IntegrityError
 
-from inventory.models import Item, ItemType, UnitOfMeasure, BillOfMaterials, BOMComponent
+from inventory.models import (
+    Item, ItemType, UnitOfMeasure, BillOfMaterials, BOMComponent,
+    Employee, ProductionLog
+)
 from transactions.models import Contact, ContactType
 
 
@@ -264,6 +268,22 @@ class EmployeeAndVendorOrderViewsTestCase(TestCase):
         self.assertEqual(len(breakdown), 1)
         self.assertEqual(breakdown[0]['production_date'], self.today)
         self.assertEqual(breakdown[0]['quantity__sum'], 25)
+        self.assertEqual(context['total_month_units'], 25)
+        self.assertEqual(context['active_days'], 1)
+        self.assertEqual(context['daily_average'], 25.0)
+
+        # Add a second active day for emp1 to verify multi-day average division
+        yesterday = self.today - datetime.timedelta(days=1)
+        ProductionLog.objects.create(
+            employee=self.emp1,
+            item=self.item,
+            quantity=15,
+            production_date=yesterday
+        )
+        context_multi = view.get_context_data()
+        self.assertEqual(context_multi['total_month_units'], 40)
+        self.assertEqual(context_multi['active_days'], 2)
+        self.assertEqual(context_multi['daily_average'], 20.0)
 
     def test_vendor_order_list_view_queryset(self):
         """
