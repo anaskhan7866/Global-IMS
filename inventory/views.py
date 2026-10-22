@@ -16,7 +16,7 @@ from inventory.models import Employee, ProductionLog, Item, ItemType
 from transactions.models import PurchaseOrder, Contact, ContactType, InventoryLedger, TransactionType, PurchaseOrderStatus
 
 
-def get_or_resolve_production_item(item_id=None, item_name=None):
+def get_or_resolve_production_item(item_id=None, item_name=None, weight=None):
     """Resolve an item from the catalog or auto-create a finished good if newly named."""
     if item_id:
         found = Item.objects.filter(pk=item_id).first()
@@ -25,9 +25,40 @@ def get_or_resolve_production_item(item_id=None, item_name=None):
 
     if item_name and str(item_name).strip():
         clean_name = str(item_name).strip()
-        found = Item.objects.filter(name__iexact=clean_name).first()
-        if found:
-            return found
+        parsed_weight = None
+        if weight is not None and str(weight).strip() != '':
+            try:
+                parsed_weight = Decimal(str(weight).strip())
+            except (ValueError, TypeError):
+                pass
+
+        if parsed_weight is not None:
+            found = Item.objects.filter(name__iexact=clean_name, weight=parsed_weight, is_active=True).first()
+            if not found:
+                found = Item.objects.filter(name__iexact=clean_name, weight=parsed_weight).first()
+            if found:
+                if not found.is_active:
+                    found.is_active = True
+                    found.save(update_fields=['is_active'])
+                return found
+
+            # If no box with that exact weight exists, check if one exists with 0 weight (unassigned weight)
+            unweighted = Item.objects.filter(name__iexact=clean_name, weight=Decimal('0.000'), is_active=True).first()
+            if not unweighted:
+                unweighted = Item.objects.filter(name__iexact=clean_name, weight=Decimal('0.000')).first()
+            if unweighted:
+                unweighted.weight = parsed_weight
+                if not unweighted.is_active:
+                    unweighted.is_active = True
+                unweighted.save(update_fields=['weight', 'is_active', 'updated_at'])
+                return unweighted
+        else:
+            found = Item.objects.filter(name__iexact=clean_name, is_active=True).first()
+            if not found:
+                found = Item.objects.filter(name__iexact=clean_name).first()
+            if found:
+                return found
+
         # Auto-create finished good with generated unique SKU
         clean_slug = re.sub(r'[^A-Za-z0-9]+', '-', clean_name).strip('-').upper()
         base_sku = f"FG-{clean_slug[:12]}" if clean_slug else "FG-BOX"
@@ -42,6 +73,7 @@ def get_or_resolve_production_item(item_id=None, item_name=None):
             type=ItemType.FINISHED_GOOD,
             unit_of_measure='pcs',
             current_stock=Decimal('0.0000'),
+            weight=parsed_weight if parsed_weight is not None else Decimal('0.000'),
             moving_average_cost=Decimal('0.0000')
         )
 
@@ -60,6 +92,7 @@ def get_or_resolve_production_item(item_id=None, item_name=None):
         type=ItemType.FINISHED_GOOD,
         unit_of_measure='pcs',
         current_stock=Decimal('0.0000'),
+        weight=Decimal('0.000'),
         moving_average_cost=Decimal('0.0000')
     )
 
@@ -531,6 +564,7 @@ class VendorOrderListView(LoginRequiredMixin, ListView):
             item_id = request.POST.get('item_id')
             box_name = (request.POST.get('box_name') or request.POST.get('item_name') or request.POST.get('name') or '').strip()
             raw_quantity = request.POST.get('quantity')
+            raw_weight = request.POST.get('weight')
             raw_delivery_date = request.POST.get('expected_delivery_date') or request.POST.get('delivery_date')
 
             # 1. Resolve or Create Vendor / Company
@@ -563,8 +597,16 @@ class VendorOrderListView(LoginRequiredMixin, ListView):
                 messages.error(request, "Quantity must be a valid positive number.")
                 return redirect('vendor-order-list')
 
-            # 3. Resolve Core Box Item
-            item = get_or_resolve_production_item(item_id=item_id, item_name=box_name)
+            # 3. Resolve Core Box Item (with optional weight spec)
+            item = get_or_resolve_production_item(item_id=item_id, item_name=box_name, weight=raw_weight)
+            if raw_weight and item.weight == Decimal('0.000'):
+                try:
+                    w_val = Decimal(str(raw_weight).strip())
+                    if w_val > Decimal('0'):
+                        item.weight = w_val
+                        item.save(update_fields=['weight', 'updated_at'])
+                except (ValueError, TypeError):
+                    pass
 
             # 4. Resolve Delivery Date
             today = timezone.localdate()
@@ -584,9 +626,10 @@ class VendorOrderListView(LoginRequiredMixin, ListView):
                 status=PurchaseOrderStatus.PENDING
             )
 
+            weight_info = f" ({item.weight} kg/box)" if item.weight else ""
             messages.success(
                 request,
-                f"Order registered: '{vendor.company_name}' requested {quantity} boxes of '{item.name}' "
+                f"Order registered: '{vendor.company_name}' requested {quantity} boxes of '{item.name}'{weight_info} "
                 f"(Delivery Date: {order.expected_delivery_date.strftime('%b %d, %Y')})."
             )
             return redirect('vendor-order-list')

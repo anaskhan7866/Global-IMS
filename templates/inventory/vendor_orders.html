@@ -94,6 +94,7 @@
                     <tr>
                         <th scope="col" class="py-3.5 pl-6 pr-3">Company / Vendor</th>
                         <th scope="col" class="px-3 py-3.5">Core Box Type</th>
+                        <th scope="col" class="px-3 py-3.5">Weight</th>
                         <th scope="col" class="px-3 py-3.5">Quantity</th>
                         <th scope="col" class="px-3 py-3.5">Delivery Date</th>
                         <th scope="col" class="py-3.5 pl-3 pr-6 text-right">Action</th>
@@ -121,20 +122,24 @@
                         <!-- 2. Core Box Type / Product -->
                         <td class="whitespace-nowrap px-3 py-4">
                             <span class="font-semibold text-white block order-product">{{ order.item.name }}</span>
-                            <div class="flex items-center space-x-2 mt-0.5">
-                                <span class="text-xs text-cyan-400 font-mono-code order-sku">{{ order.item.sku }}</span>
-                                {% if order.item.weight %}
-                                <span class="text-[11px] text-slate-400 font-mono-code">({{ order.item.weight }} kg/box)</span>
-                                {% endif %}
-                            </div>
+                            <span class="text-xs text-cyan-400 font-mono-code order-sku">{{ order.item.sku }}</span>
                         </td>
 
-                        <!-- 3. Quantity -->
+                        <!-- 3. Weight -->
+                        <td class="whitespace-nowrap px-3 py-4 font-mono-code text-sm">
+                            {% if order.item.weight %}
+                            <span class="font-bold text-cyan-300">{{ order.item.weight }}</span> <span class="text-xs text-slate-400">kg/box</span>
+                            {% else %}
+                            <span class="text-slate-500">&mdash;</span>
+                            {% endif %}
+                        </td>
+
+                        <!-- 4. Quantity -->
                         <td class="whitespace-nowrap px-3 py-4 font-mono-code font-bold text-base text-cyan-300">
                             {{ order.quantity }} <span class="text-xs text-slate-400 font-normal">boxes</span>
                         </td>
 
-                        <!-- 4. Delivery Date -->
+                        <!-- 5. Delivery Date -->
                         <td class="whitespace-nowrap px-3 py-4 font-mono-code text-xs">
                             {% if order.expected_delivery_date < today %}
                             <div class="flex items-center space-x-1.5 text-rose-300 font-bold">
@@ -149,7 +154,7 @@
                             {% endif %}
                         </td>
 
-                        <!-- 5. Action: Button to remove line from vendor orders -->
+                        <!-- 6. Action: Button to remove line from vendor orders -->
                         <td class="whitespace-nowrap py-4 pl-3 pr-6 text-right">
                             <button
                                 type="button"
@@ -166,7 +171,7 @@
                     </tr>
                     {% empty %}
                     <tr>
-                        <td colspan="5" class="py-12 text-center text-slate-400">
+                        <td colspan="6" class="py-12 text-center text-slate-400">
                             <div class="flex flex-col items-center justify-center">
                                 <svg class="h-10 w-10 text-slate-600 mb-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
@@ -245,6 +250,7 @@
                     required
                     autocomplete="off"
                     placeholder="e.g. GI Core Box 100mm, Polish Box"
+                    oninput="onBoxNameChange(this.value)"
                     class="w-full px-4 py-2.5 rounded-xl bg-slate-900 border border-slate-700 text-white placeholder-slate-500 text-sm focus:border-cyan-500 focus:ring-1 focus:ring-cyan-500 transition font-medium"
                 >
                 <datalist id="items_datalist">
@@ -254,8 +260,24 @@
                 </datalist>
             </div>
 
-            <!-- 3. Quantity & 4. Delivery Date Grid -->
+            <!-- 3. Weight & Quantity Grid -->
             <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div class="space-y-1.5">
+                    <label for="order_weight" class="block text-xs font-bold uppercase tracking-wider text-cyan-400">
+                        Weight (kg/box)
+                    </label>
+                    <input
+                        type="number"
+                        name="weight"
+                        id="order_weight"
+                        step="0.001"
+                        min="0"
+                        placeholder="e.g. 7.000"
+                        class="w-full px-4 py-2.5 rounded-xl bg-slate-900 border border-slate-700 text-white placeholder-slate-500 text-sm font-mono-code focus:border-cyan-500 focus:ring-1 focus:ring-cyan-500 transition"
+                    >
+                    <p class="text-[11px] text-slate-500">Weight of each box in kg.</p>
+                </div>
+
                 <div class="space-y-1.5">
                     <label for="order_quantity" class="block text-xs font-bold uppercase tracking-wider text-cyan-400">
                         Quantity Needed <span class="text-rose-400">*</span>
@@ -269,21 +291,23 @@
                         placeholder="e.g. 100"
                         class="w-full px-4 py-2.5 rounded-xl bg-slate-900 border border-slate-700 text-white placeholder-slate-500 text-sm font-mono-code focus:border-cyan-500 focus:ring-1 focus:ring-cyan-500 transition"
                     >
+                    <p class="text-[11px] text-slate-500">Total core boxes needed.</p>
                 </div>
+            </div>
 
-                <div class="space-y-1.5">
-                    <label for="expected_delivery_date" class="block text-xs font-bold uppercase tracking-wider text-cyan-400">
-                        Delivery Date <span class="text-rose-400">*</span>
-                    </label>
-                    <input
-                        type="date"
-                        name="expected_delivery_date"
-                        id="expected_delivery_date"
-                        value="{{ default_delivery_date }}"
-                        required
-                        class="w-full px-4 py-2.5 rounded-xl bg-slate-900 border border-slate-700 text-white text-sm font-mono-code focus:border-cyan-500 focus:ring-1 focus:ring-cyan-500 transition"
-                    >
-                </div>
+            <!-- 4. Delivery Date -->
+            <div class="space-y-1.5">
+                <label for="expected_delivery_date" class="block text-xs font-bold uppercase tracking-wider text-cyan-400">
+                    Delivery Date <span class="text-rose-400">*</span>
+                </label>
+                <input
+                    type="date"
+                    name="expected_delivery_date"
+                    id="expected_delivery_date"
+                    value="{{ default_delivery_date }}"
+                    required
+                    class="w-full px-4 py-2.5 rounded-xl bg-slate-900 border border-slate-700 text-white text-sm font-mono-code focus:border-cyan-500 focus:ring-1 focus:ring-cyan-500 transition"
+                >
             </div>
 
             <div class="flex items-center justify-end space-x-3 pt-3 border-t border-slate-800">
@@ -374,6 +398,23 @@
             }
         });
     });
+
+    // Catalog weight lookup for auto-population
+    const itemsCatalog = {
+        {% for item in items %}
+        "{{ item.name|escapejs }}": "{{ item.weight|default:'' }}",
+        {% endfor %}
+    };
+
+    function onBoxNameChange(val) {
+        const trimmed = (val || '').trim();
+        if (itemsCatalog[trimmed]) {
+            const weightInput = document.getElementById('order_weight');
+            if (weightInput && (!weightInput.value || weightInput.value === '0' || weightInput.value === '0.000')) {
+                weightInput.value = itemsCatalog[trimmed];
+            }
+        }
+    }
 
     // Modal Control: Add Order
     function openAddOrderModal() {

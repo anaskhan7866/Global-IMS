@@ -655,13 +655,14 @@ class EmployeeAndVendorOrderViewsTestCase(TestCase):
         from transactions.models import PurchaseOrder, PurchaseOrderStatus
         from inventory.models import Item
 
-        # 1. POST add_order: Company 'Steel Corp' needs 8 boxes of 'Test GI Core Box'
+        # 1. POST add_order: Company 'Steel Corp' needs 8 boxes of 'Test GI Core Box' with weight 7.500 kg
         future_date = (self.today + datetime.timedelta(days=5)).isoformat()
         add_res = self.client.post(reverse('vendor-order-list'), {
             'action': 'add_order',
             'company_name': 'Steel Corp',
             'box_name': 'Test GI Core Box',
             'quantity': '8',
+            'weight': '7.500',
             'expected_delivery_date': future_date
         })
         self.assertEqual(add_res.status_code, 302)
@@ -670,13 +671,17 @@ class EmployeeAndVendorOrderViewsTestCase(TestCase):
         self.assertIsNotNone(order)
         self.assertEqual(order.quantity, 8)
         self.assertEqual(order.item, self.item)
+        self.assertEqual(order.item.weight, Decimal('7.500'))
         self.assertEqual(order.expected_delivery_date.isoformat(), future_date)
 
-        # 2. GET /vendor-orders/ renders the order and remove action button
+        # 2. GET /vendor-orders/ renders the order with weight and remove action button
         get_res = self.client.get(reverse('vendor-order-list'))
         self.assertEqual(get_res.status_code, 200)
         self.assertContains(get_res, 'Steel Corp')
         self.assertContains(get_res, 'Test GI Core Box')
+        self.assertContains(get_res, 'Weight')
+        self.assertContains(get_res, '7.500')
+        self.assertContains(get_res, 'kg/box')
         self.assertContains(get_res, 'openRemoveOrderModal')
         # Confirm separate Add Vendor and Deliver status buttons are removed
         self.assertNotContains(get_res, 'openAddVendorModal')
@@ -1198,6 +1203,50 @@ class EmployeeAndVendorOrderViewsTestCase(TestCase):
             self.assertEqual(res.status_code, 302)
             self.assertIn('/admin/login/', res.url)
 
+    def test_inventory_cards_show_individual_box_totals(self):
+        """
+        Validates that add-inventory displays dynamic individual total stock cards
+        for each type of box (e.g. 1 card for 1 box, 2 for 2, 3 for 3) instead
+        of a single generic Total Units in Stock card.
+        """
+        from django.urls import reverse
+        from inventory.models import Item, ItemType
 
+        # 1. Case: 1 Box in Inventory
+        res1 = self.client.get(reverse('add-inventory'))
+        self.assertEqual(res1.status_code, 200)
+        self.assertContains(res1, 'Test GI Core Box')
+        self.assertContains(res1, '20')
+        self.assertContains(res1, 'Total Stock')
+        self.assertNotContains(res1, 'Total Units in Stock')
 
+        # 2. Case: 2 Boxes in Inventory
+        Item.objects.create(
+            name='Precision Cast Box',
+            sku='FG-BOX-PREC',
+            type=ItemType.FINISHED_GOOD,
+            unit_of_measure='pcs',
+            current_stock=Decimal('35.0000'),
+            weight=Decimal('5.200')
+        )
+        res2 = self.client.get(reverse('add-inventory'))
+        self.assertEqual(res2.status_code, 200)
+        self.assertContains(res2, 'Test GI Core Box')
+        self.assertContains(res2, 'Precision Cast Box')
+        self.assertContains(res2, '35')
 
+        # 3. Case: 3 Boxes in Inventory
+        Item.objects.create(
+            name='Heavy Duty Core Box',
+            sku='FG-BOX-HEAVY',
+            type=ItemType.FINISHED_GOOD,
+            unit_of_measure='pcs',
+            current_stock=Decimal('12.0000'),
+            weight=Decimal('9.800')
+        )
+        res3 = self.client.get(reverse('add-inventory'))
+        self.assertEqual(res3.status_code, 200)
+        self.assertContains(res3, 'Test GI Core Box')
+        self.assertContains(res3, 'Precision Cast Box')
+        self.assertContains(res3, 'Heavy Duty Core Box')
+        self.assertContains(res3, '12')
