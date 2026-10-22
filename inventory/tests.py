@@ -1281,7 +1281,8 @@ class EmployeeAndVendorOrderViewsTestCase(TestCase):
 
     def test_table_shows_delete_button_for_zero_stock_product(self):
         """
-        Validates that the table renders the Delete button when product stock is 0.
+        Validates that the table renders the Remove from Inventory action when product stock is 0,
+        and does not show Add or Edit buttons in that row.
         """
         from django.urls import reverse
         from inventory.models import Item, ItemType, UnitOfMeasure
@@ -1300,6 +1301,67 @@ class EmployeeAndVendorOrderViewsTestCase(TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, 'Empty Core Box')
         self.assertContains(response, 'openDeleteProductModal')
+        self.assertContains(response, 'Remove from Inventory')
+
+    def test_remove_stock_reaching_zero_removes_product_completely(self):
+        """
+        Validates that removing stock to 0 completely removes the product from inventory.
+        """
+        from django.urls import reverse
+        from inventory.models import Item, ItemType
+
+        active_box = Item.objects.create(
+            name='Depletable Box',
+            sku='FG-DEPLETE-01',
+            type=ItemType.FINISHED_GOOD,
+            unit_of_measure='pcs',
+            current_stock=Decimal('10.0000'),
+            weight=Decimal('2.500'),
+            is_active=True
+        )
+
+        response = self.client.post(reverse('add-inventory'), {
+            'action': 'remove_stock',
+            'item_id': active_box.pk,
+            'quantity': '10'
+        })
+        self.assertEqual(response.status_code, 302)
+
+        # Product is completely removed from active inventory
+        self.assertFalse(Item.objects.filter(pk=active_box.pk, is_active=True).exists())
+
+        # Page confirms zero stock removal
+        get_res = self.client.get(reverse('add-inventory'))
+        self.assertContains(get_res, 'Stock reached zero and product has been completely removed from inventory')
+        self.assertNotContains(get_res, 'FG-DEPLETE-01')
+
+    def test_edit_product_quantity_to_zero_removes_product_completely(self):
+        """
+        Validates that editing product quantity to 0 completely removes the product from inventory.
+        """
+        from django.urls import reverse
+        from inventory.models import Item, ItemType
+
+        edit_box = Item.objects.create(
+            name='Zero Out Box',
+            sku='FG-ZERO-OUT-01',
+            type=ItemType.FINISHED_GOOD,
+            unit_of_measure='pcs',
+            current_stock=Decimal('5.0000'),
+            weight=Decimal('3.000'),
+            is_active=True
+        )
+
+        response = self.client.post(reverse('add-inventory'), {
+            'action': 'edit_product',
+            'item_id': edit_box.pk,
+            'name': 'Zero Out Box',
+            'quantity': '0',
+            'weight': '3.000'
+        })
+        self.assertEqual(response.status_code, 302)
+
+        self.assertFalse(Item.objects.filter(pk=edit_box.pk, is_active=True).exists())
 
     def test_edit_product_success(self):
         """

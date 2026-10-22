@@ -322,6 +322,7 @@
                         <!-- 4. Action -->
                         <td class="whitespace-nowrap py-4 pl-3 pr-6 text-right">
                             <div class="flex items-center justify-end space-x-2">
+                                {% if item.current_stock > 0 %}
                                 <button
                                     type="button"
                                     onclick="fillQuickAdd('{{ item.name|escapejs }}', '{{ item.weight }}')"
@@ -340,7 +341,6 @@
                                     <svg class="w-3.5 h-3.5 text-amber-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/></svg>
                                     <span>Edit</span>
                                 </button>
-                                {% if item.current_stock > 0 %}
                                 <button
                                     type="button"
                                     onclick="openRemoveStockModal('{{ item.id }}', '{{ item.name|escapejs }}', '{{ item.weight }}', '{{ item.current_stock|floatformat:0 }}', '{{ item.unit_of_measure }}')"
@@ -351,14 +351,15 @@
                                     <span>Remove</span>
                                 </button>
                                 {% else %}
+                                <!-- Stock is zero: action to remove that stock from inventory completely -->
                                 <button
                                     type="button"
                                     onclick="openDeleteProductModal('{{ item.id }}', '{{ item.name|escapejs }}', '{{ item.weight }}', '{{ item.sku }}')"
-                                    class="inline-flex items-center space-x-1 px-2.5 py-1.5 rounded-lg bg-rose-950/70 hover:bg-rose-900 text-rose-300 border border-rose-800 text-xs font-semibold transition shadow-sm"
-                                    title="Remove complete product from inventory (stock is zero)"
+                                    class="inline-flex items-center space-x-1.5 px-3 py-1.5 rounded-lg bg-rose-950/80 hover:bg-rose-900 text-rose-300 hover:text-white border border-rose-800 hover:border-rose-700 text-xs font-bold transition shadow-sm hover:shadow-rose-950/50"
+                                    title="Stock is zero: Remove this stock from inventory completely"
                                 >
                                     <svg class="w-3.5 h-3.5 text-rose-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg>
-                                    <span>Delete</span>
+                                    <span>Remove from Inventory</span>
                                 </button>
                                 {% endif %}
                             </div>
@@ -457,7 +458,7 @@
     </div>
 </div>
 
-<!-- Modal: Delete Product (when stock is zero) -->
+<!-- Modal: Remove Stock from Inventory Completely (when stock is zero) -->
 <div id="deleteProductModal" class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm hidden transition-opacity">
     <div class="relative w-full max-w-md rounded-2xl bg-slate-950 border border-rose-900/60 shadow-2xl overflow-hidden p-6 space-y-5">
         <div class="flex items-center justify-between border-b border-slate-800/80 pb-3.5">
@@ -466,8 +467,8 @@
                     <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg>
                 </div>
                 <div>
-                    <h3 class="text-base font-bold text-white tracking-tight">Delete Complete Product</h3>
-                    <p class="text-xs text-rose-400 font-medium">Stock is zero &bull; Ready for permanent removal</p>
+                    <h3 class="text-base font-bold text-white tracking-tight">Remove Stock from Inventory</h3>
+                    <p class="text-xs text-rose-400 font-medium">Stock is zero (0) &bull; Remove completely from inventory</p>
                 </div>
             </div>
             <button type="button" onclick="closeDeleteProductModal()" class="text-slate-400 hover:text-white transition">
@@ -476,7 +477,7 @@
         </div>
 
         <p class="text-xs text-slate-300">
-            Are you sure you want to completely remove this product from the inventory catalog? This action will remove the product record since current stock is zero.
+            The stock for this product is zero (0). Are you sure you want to completely remove this stock from the inventory catalog?
         </p>
 
         <div class="p-3.5 rounded-xl bg-slate-900 border border-slate-800 space-y-1.5 text-xs">
@@ -510,7 +511,7 @@
                 class="inline-flex items-center space-x-2 px-5 py-2 rounded-xl bg-rose-600 hover:bg-rose-500 text-white text-xs font-bold shadow-lg shadow-rose-950/60 transition"
             >
                 <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg>
-                <span>Yes, Delete Product</span>
+                <span>Yes, Remove from Inventory Completely</span>
             </button>
         </form>
     </div>

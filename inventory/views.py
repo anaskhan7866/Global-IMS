@@ -837,6 +837,33 @@ class AddInventoryView(LoginRequiredMixin, View):
 
                 stock_diff = new_quantity - old_stock
 
+                if new_quantity == Decimal('0'):
+                    if stock_diff != Decimal('0'):
+                        InventoryLedger.objects.create(
+                            item=locked_item,
+                            quantity_changed=stock_diff,
+                            transaction_type=TransactionType.OUT,
+                            generic_reference_id='EDIT-CORRECTION',
+                            unit_cost=locked_item.moving_average_cost,
+                            total_cost=(abs(stock_diff) * locked_item.moving_average_cost).quantize(Decimal('0.01')),
+                            narration="Quantity updated to 0. Stock completely removed from inventory."
+                        )
+
+                    locked_item.current_stock = Decimal('0')
+                    locked_item.name = new_name
+                    locked_item.weight = new_weight
+                    try:
+                        locked_item.delete()
+                    except (ProtectedError, IntegrityError):
+                        locked_item.is_active = False
+                        locked_item.save(update_fields=['is_active', 'current_stock', 'name', 'weight', 'updated_at'])
+
+                    messages.success(
+                        request,
+                        f"Product '{locked_item.name}' stock was set to zero and has been completely removed from inventory."
+                    )
+                    return redirect('add-inventory')
+
                 update_fields = ['name', 'weight', 'current_stock', 'updated_at']
                 locked_item.name = new_name
                 locked_item.weight = new_weight
@@ -874,7 +901,7 @@ class AddInventoryView(LoginRequiredMixin, View):
         # -------------------------------------------------------------
         # Action: Remove / Delete Complete Product (if stock is zero)
         # -------------------------------------------------------------
-        if action == 'delete_product':
+        if action in ['delete_product', 'remove_zero_stock']:
             item_id = request.POST.get('item_id')
             product_name = (request.POST.get('name') or request.POST.get('product_name') or '').strip()
 
@@ -904,12 +931,13 @@ class AddInventoryView(LoginRequiredMixin, View):
                 item_sku = locked_item.sku
                 item_weight = locked_item.weight
 
-                # Preserve referential integrity if historical ledger movements reference this item
+                # Remove completely from inventory: delete or deactivate
                 try:
                     locked_item.delete()
                 except (ProtectedError, IntegrityError):
                     locked_item.is_active = False
-                    locked_item.save(update_fields=['is_active', 'updated_at'])
+                    locked_item.current_stock = Decimal('0')
+                    locked_item.save(update_fields=['is_active', 'current_stock', 'updated_at'])
 
                 messages.success(
                     request,
@@ -978,7 +1006,6 @@ class AddInventoryView(LoginRequiredMixin, View):
                     return redirect('add-inventory')
 
                 locked_item.current_stock -= quantity
-                locked_item.save(update_fields=['current_stock', 'updated_at'])
 
                 narration_text = reason or f"Stock deduction of {quantity} {locked_item.unit_of_measure}."
                 InventoryLedger.objects.create(
@@ -991,11 +1018,26 @@ class AddInventoryView(LoginRequiredMixin, View):
                     narration=narration_text
                 )
 
-                messages.success(
-                    request,
-                    f"Successfully removed -{quantity} units from '{locked_item.name}' ({locked_item.weight} kg/box). "
-                    f"Remaining Stock: {locked_item.current_stock} {locked_item.unit_of_measure}."
-                )
+                if locked_item.current_stock <= Decimal('0'):
+                    locked_item.current_stock = Decimal('0')
+                    try:
+                        locked_item.delete()
+                    except (ProtectedError, IntegrityError):
+                        locked_item.is_active = False
+                        locked_item.save(update_fields=['is_active', 'current_stock', 'updated_at'])
+
+                    messages.success(
+                        request,
+                        f"Successfully removed -{quantity} units from '{locked_item.name}' ({locked_item.weight} kg/box). "
+                        f"Stock reached zero and product has been completely removed from inventory."
+                    )
+                else:
+                    locked_item.save(update_fields=['current_stock', 'updated_at'])
+                    messages.success(
+                        request,
+                        f"Successfully removed -{quantity} units from '{locked_item.name}' ({locked_item.weight} kg/box). "
+                        f"Remaining Stock: {locked_item.current_stock} {locked_item.unit_of_measure}."
+                    )
 
             return redirect('add-inventory')
 
