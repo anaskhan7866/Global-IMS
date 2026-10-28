@@ -1,0 +1,543 @@
+{% extends 'base.html' %}
+
+{% block title %}{{ company.name }} - Daily Core Box Details | Global-IMS{% endblock %}
+
+{% block content %}
+<div class="space-y-6">
+    <!-- Top Navigation & Company Banner -->
+    <div>
+        <a href="{% url 'daily-core-box-list' %}"
+            class="inline-flex items-center space-x-2 text-xs font-semibold text-slate-400 hover:text-cyan-400 transition mb-3">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18" />
+            </svg>
+            <span>Back to Daily Core Box Dispatches</span>
+        </a>
+
+        <div
+            class="flex flex-col md:flex-row md:items-center md:justify-between gap-4 p-6 rounded-2xl bg-slate-950 border border-slate-800 shadow-xl">
+            <div class="flex items-center space-x-4">
+                <div
+                    class="h-14 w-14 rounded-2xl bg-gradient-to-tr from-cyan-600 to-blue-700 flex items-center justify-center text-white font-extrabold text-2xl shadow-lg shadow-cyan-900/50">
+                    {{ company.name|slice:":1"|upper }}
+                </div>
+                <div>
+                    <div class="flex items-center space-x-3">
+                        <h1 class="text-2xl sm:text-3xl font-extrabold tracking-tight text-white">{{ company.name }}
+                        </h1>
+                        <span
+                            class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold bg-emerald-950 text-emerald-300 border border-emerald-800">
+                            <span class="h-1.5 w-1.5 rounded-full bg-emerald-400 mr-1.5 animate-pulse"></span>
+                            Active Client
+                        </span>
+                    </div>
+                    <p class="text-xs text-slate-400 mt-1">
+                        Company ID: <span class="font-mono-code text-cyan-400">CMP-#{{ company.pk|stringformat:"04d" }}</span> &bull; Core Box Dispatch Account &bull; Registered {{ company.created_at|date:"M Y" }}
+                    </p>
+                </div>
+            </div>
+
+            <div class="flex items-center space-x-3">
+                <button type="button" onclick="openEditCompanyModal('{{ company.name|escapejs }}')"
+                    class="px-3.5 py-2 rounded-xl bg-slate-900 hover:bg-slate-800 border border-slate-700 text-xs font-semibold text-slate-300 hover:text-white transition">
+                    Rename Company
+                </button>
+                <button type="button" onclick="openAddEntryModal()"
+                    class="inline-flex items-center space-x-2 px-4 py-2 rounded-xl bg-gradient-to-r from-cyan-600 to-blue-600 hover:from-cyan-500 hover:to-blue-500 text-white text-xs sm:text-sm font-bold shadow-lg shadow-cyan-900/40 hover:shadow-cyan-900/60 transition">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" />
+                    </svg>
+                    <span>Log Core Box Entry</span>
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- CARD AT TOP SHOWING TOTAL CORE BOX TAKEN -->
+    <section aria-label="Company Dispatches Summary" class="grid grid-cols-1 sm:grid-cols-3 gap-5">
+        <!-- 1. PRIMARY HIGHLIGHT CARD: TOTAL CORE BOX TAKEN -->
+        <div
+            class="rounded-2xl bg-gradient-to-br from-slate-950 via-slate-950 to-cyan-950/30 p-6 border border-cyan-800/60 shadow-2xl relative overflow-hidden">
+            <div class="absolute -right-4 -bottom-4 w-28 h-28 bg-cyan-500/10 rounded-full blur-2xl pointer-events-none">
+            </div>
+            <div class="flex items-center justify-between">
+                <p class="text-xs font-extrabold uppercase tracking-wider text-cyan-400">Total Core Box Taken</p>
+                <span class="p-2.5 rounded-xl bg-cyan-950 text-cyan-400 border border-cyan-800/80 shadow-md">
+                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                            d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" />
+                    </svg>
+                </span>
+            </div>
+            <h3 class="mt-4 text-4xl sm:text-5xl font-extrabold text-white font-mono-code tracking-tight">
+                {{ total_core_boxes }} <span class="text-lg font-normal text-cyan-300">Boxes</span>
+            </h3>
+            <p class="mt-2 text-xs text-slate-400">
+                Cumulative core boxes taken across all dates by <span class="text-slate-200 font-medium">{{ company.name }}</span>
+            </p>
+        </div>
+
+        <!-- 2. TOTAL DISPATCH TRIPS / ACTIVE DATES -->
+        <div class="rounded-2xl bg-slate-950 p-6 border border-slate-800 shadow-xl flex flex-col justify-between">
+            <div class="flex items-center justify-between">
+                <p class="text-xs font-semibold uppercase tracking-wider text-slate-400">Total Dispatch Days</p>
+                <span class="p-2.5 rounded-xl bg-blue-950 text-blue-400 border border-blue-800/80">
+                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                            d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                    </svg>
+                </span>
+            </div>
+            <div class="mt-4">
+                <h3 class="text-3xl font-extrabold text-white font-mono-code">{{ total_days }} <span
+                        class="text-sm font-normal text-slate-400">Days</span></h3>
+                <p class="mt-1 text-xs text-slate-400">Distinct calendar dates with core box movements</p>
+            </div>
+        </div>
+
+        <!-- 3. BOX TYPES BREAKDOWN -->
+        <div class="rounded-2xl bg-slate-950 p-6 border border-slate-800 shadow-xl flex flex-col justify-between">
+            <div class="flex items-center justify-between">
+                <p class="text-xs font-semibold uppercase tracking-wider text-slate-400">Core Box Types</p>
+                <span class="p-2.5 rounded-xl bg-emerald-950 text-emerald-400 border border-emerald-800/80">
+                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                            d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z" />
+                    </svg>
+                </span>
+            </div>
+            <div class="mt-3">
+                <h3 class="text-2xl font-extrabold text-white font-mono-code">{{ box_breakdown|length }} <span
+                        class="text-sm font-normal text-slate-400">Types</span></h3>
+                <div class="mt-2 flex flex-wrap gap-1.5 max-h-14 overflow-y-auto">
+                    {% for item in box_breakdown %}
+                    <span
+                        class="inline-flex items-center px-2 py-0.5 rounded-md text-[11px] font-medium bg-slate-900 border border-slate-800 text-slate-300">
+                        <span class="text-cyan-400 font-bold mr-1">{{ item.total_qty }}x</span> {{ item.box_type }}
+                    </span>
+                    {% empty %}
+                    <span class="text-xs text-slate-500 italic">None logged yet</span>
+                    {% endfor %}
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- DATE-WISE DETAIL SECTION -->
+    <section aria-label="Date-wise Dispatch Records"
+        class="rounded-2xl bg-slate-950 border border-slate-800 shadow-xl overflow-hidden">
+        <!-- Section Header & Filter -->
+        <div
+            class="p-4 sm:p-5 border-b border-slate-800 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 bg-slate-950">
+            <div class="flex items-center space-x-2">
+                <span
+                    class="inline-flex items-center px-2.5 py-1 rounded-md text-xs font-bold bg-cyan-950 text-cyan-300 border border-cyan-800">
+                    Date-wise Details
+                </span>
+                <span class="text-xs text-slate-500">({{ dispatches|length }} records)</span>
+                <span class="hidden sm:inline text-xs text-slate-400">&bull; Core box dispatches by date</span>
+            </div>
+
+            <!-- Search by Box Type or Date -->
+            <div class="relative w-full sm:w-72">
+                <input type="text" id="dispatchSearch" placeholder="Search box type or date..."
+                    class="w-full pl-9 pr-4 py-2 rounded-xl bg-slate-900 border border-slate-800 text-white placeholder-slate-500 text-xs focus:border-cyan-500 focus:ring-1 focus:ring-cyan-500 transition">
+                <svg class="w-4 h-4 text-slate-500 absolute left-3 top-2.5" fill="none" stroke="currentColor"
+                    viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                        d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                </svg>
+            </div>
+        </div>
+
+        <!-- Date-wise Table -->
+        <div class="overflow-x-auto">
+            <table class="min-w-full divide-y divide-slate-800 text-left text-sm" id="dispatchesTable">
+                <thead class="bg-slate-900/60 text-xs uppercase font-semibold text-slate-400">
+                    <tr>
+                        <th scope="col" class="py-3.5 pl-6 pr-3">Date</th>
+                        <th scope="col" class="px-3 py-3.5">Core Box Type</th>
+                        <th scope="col" class="px-3 py-3.5">Quantity</th>
+                        <th scope="col" class="py-3.5 pl-3 pr-6 text-right">Actions</th>
+                    </tr>
+                </thead>
+                <tbody class="divide-y divide-slate-800/60 bg-slate-950 text-slate-200" id="dispatchesTableBody">
+                    {% for entry in dispatches %}
+                    <tr class="dispatch-row hover:bg-slate-900/50 transition">
+                        <!-- 1. Date -->
+                        <td class="whitespace-nowrap py-4 pl-6 pr-3">
+                            <div class="flex items-center space-x-2.5">
+                                <span class="p-1.5 rounded-lg bg-slate-900 border border-slate-800 text-cyan-400">
+                                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                            d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                                    </svg>
+                                </span>
+                                <div>
+                                    <span class="font-bold text-white font-mono-code dispatch-date-text">{{
+                                        entry.dispatch_date|date:"d M Y" }}</span>
+                                    <span class="block text-[11px] text-slate-500">{{ entry.dispatch_date|date:"l"
+                                        }}</span>
+                                </div>
+                            </div>
+                        </td>
+
+                        <!-- 2. Core Box Type -->
+                        <td class="py-4 px-3">
+                            <div class="flex items-center space-x-2">
+                                <span class="font-semibold text-white dispatch-box-text">{{ entry.box_type }}</span>
+                                {% if entry.item %}
+                                <span
+                                    class="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-mono-code bg-slate-900 text-cyan-400 border border-slate-800">
+                                    SKU: {{ entry.item.sku }}
+                                </span>
+                                {% endif %}
+                            </div>
+                        </td>
+
+                        <!-- 3. Quantity -->
+                        <td class="whitespace-nowrap px-3 py-4">
+                            <span
+                                class="inline-flex items-center px-3.5 py-1.5 rounded-xl text-sm font-extrabold font-mono-code bg-cyan-950 text-cyan-300 border border-cyan-800 shadow-sm">
+                                {{ entry.quantity }} Boxes
+                            </span>
+                        </td>
+
+                        <!-- 4. Actions: Edit & Delete -->
+                        <td class="whitespace-nowrap py-4 pl-3 pr-6 text-right space-x-1">
+                            <!-- Edit Button -->
+                            <button type="button"
+                                onclick="openEditEntryModal('{{ entry.pk }}', '{{ entry.box_type|escapejs }}', '{{ entry.quantity }}', '{{ entry.dispatch_date|date:'Y-m-d' }}')"
+                                class="p-1.5 rounded-lg text-slate-400 hover:text-cyan-400 hover:bg-slate-900 transition"
+                                title="Edit Entry">
+                                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                        d="M11 5H6a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                                </svg>
+                            </button>
+
+                            <!-- Delete Button -->
+                            <button type="button"
+                                onclick="openDeleteEntryModal('{{ entry.pk }}', '{{ entry.box_type|escapejs }}', '{{ entry.quantity }}', '{{ entry.dispatch_date|date:'d M Y' }}')"
+                                class="p-1.5 rounded-lg text-slate-400 hover:text-rose-400 hover:bg-rose-950/40 transition"
+                                title="Delete Entry">
+                                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                        d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                                </svg>
+                            </button>
+                        </td>
+                    </tr>
+                    {% empty %}
+                    <tr>
+                        <td colspan="4" class="py-12 text-center text-slate-500">
+                            <div class="max-w-sm mx-auto flex flex-col items-center">
+                                <svg class="w-12 h-12 text-slate-600 mb-3" fill="none" stroke="currentColor"
+                                    viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5"
+                                        d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" />
+                                </svg>
+                                <p class="text-sm font-semibold text-slate-400">No dispatch records found</p>
+                                <p class="text-xs text-slate-500 mt-1">Click "Log Core Box Entry" above to add the first
+                                    record for {{ company.name }}.</p>
+                            </div>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </section>
+</div>
+
+<!-- Modal 1: Add Entry for this Company -->
+<div id="addEntryModal"
+    class="hidden fixed inset-0 z-50 overflow-y-auto bg-slate-950/80 backdrop-blur-sm flex items-center justify-center p-4">
+    <div class="relative w-full max-w-lg rounded-2xl bg-slate-900 border border-slate-800 p-6 shadow-2xl">
+        <div class="flex items-center justify-between pb-3 mb-4 border-b border-slate-800">
+            <div class="flex items-center space-x-2 text-cyan-400">
+                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" />
+                </svg>
+                <h3 class="text-lg font-bold text-white">Log Core Box Entry</h3>
+            </div>
+            <button type="button" onclick="closeAddEntryModal()" class="text-slate-400 hover:text-white">
+                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+                </svg>
+            </button>
+        </div>
+
+        <p class="text-xs text-slate-400 mb-5">
+            Recording daily core box dispatch for <span class="text-cyan-300 font-bold">{{ company.name }}</span>.
+        </p>
+
+        <form method="post" action="{% url 'daily-core-box-detail' company.pk %}" class="space-y-4">
+            {% csrf_token %}
+            <input type="hidden" name="action" value="add_entry">
+
+            <!-- Core Box Type -->
+            <div>
+                <label for="modal_box_type"
+                    class="block text-xs font-semibold uppercase tracking-wider text-slate-400 mb-1.5">
+                    Core Box Type <span class="text-rose-400">*</span>
+                </label>
+                <input type="text" name="box_type" id="modal_box_type" list="modalBoxTypeList"
+                    placeholder="e.g. GI Core Box, CB-Standard..." required autocomplete="off"
+                    class="w-full px-3.5 py-2.5 rounded-xl bg-slate-950 border border-slate-800 text-white placeholder-slate-500 text-sm focus:border-cyan-500 focus:ring-1 focus:ring-cyan-500 transition">
+                <datalist id="modalBoxTypeList">
+                    {% for item in box_items %}
+                    <option value="{{ item.name }}">SKU: {{ item.sku }}</option>
+                    {% endfor %}
+                </datalist>
+            </div>
+
+            <!-- Quantity -->
+            <div>
+                <label for="modal_quantity"
+                    class="block text-xs font-semibold uppercase tracking-wider text-slate-400 mb-1.5">
+                    Quantity <span class="text-rose-400">*</span>
+                </label>
+                <input type="number" name="quantity" id="modal_quantity" min="1" placeholder="e.g. 50" required
+                    class="w-full px-3.5 py-2.5 rounded-xl bg-slate-950 border border-slate-800 text-white placeholder-slate-500 text-sm font-mono-code focus:border-cyan-500 focus:ring-1 focus:ring-cyan-500 transition">
+            </div>
+
+            <!-- Date -->
+            <div>
+                <label for="modal_dispatch_date"
+                    class="block text-xs font-semibold uppercase tracking-wider text-slate-400 mb-1.5">
+                    Dispatch Date
+                </label>
+                <input type="date" name="dispatch_date" id="modal_dispatch_date" value="{{ today|date:'Y-m-d' }}"
+                    class="w-full px-3.5 py-2.5 rounded-xl bg-slate-950 border border-slate-800 text-white text-sm font-mono-code focus:border-cyan-500 focus:ring-1 focus:ring-cyan-500 transition">
+            </div>
+
+            <div class="flex items-center justify-end space-x-3 pt-3 border-t border-slate-800">
+                <button type="button" onclick="closeAddEntryModal()"
+                    class="px-4 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-semibold transition">
+                    Cancel
+                </button>
+                <button type="submit"
+                    class="px-5 py-2 rounded-xl bg-gradient-to-r from-cyan-600 to-blue-600 hover:from-cyan-500 hover:to-blue-500 text-white text-xs font-bold transition shadow-lg shadow-cyan-900/40">
+                    Save Dispatch
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- Modal 2: Edit Entry -->
+<div id="editEntryModal"
+    class="hidden fixed inset-0 z-50 overflow-y-auto bg-slate-950/80 backdrop-blur-sm flex items-center justify-center p-4">
+    <div class="relative w-full max-w-lg rounded-2xl bg-slate-900 border border-slate-800 p-6 shadow-2xl">
+        <div class="flex items-center justify-between pb-3 mb-4 border-b border-slate-800">
+            <div class="flex items-center space-x-2 text-cyan-400">
+                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                        d="M11 5H6a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                </svg>
+                <h3 class="text-lg font-bold text-white">Edit Core Box Entry</h3>
+            </div>
+            <button type="button" onclick="closeEditEntryModal()" class="text-slate-400 hover:text-white">
+                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+                </svg>
+            </button>
+        </div>
+
+        <form method="post" action="{% url 'daily-core-box-detail' company.pk %}" class="space-y-4">
+            {% csrf_token %}
+            <input type="hidden" name="action" value="edit_entry">
+            <input type="hidden" name="entry_id" id="edit_entry_id">
+
+            <!-- Core Box Type -->
+            <div>
+                <label for="edit_box_type"
+                    class="block text-xs font-semibold uppercase tracking-wider text-slate-400 mb-1.5">
+                    Core Box Type <span class="text-rose-400">*</span>
+                </label>
+                <input type="text" name="box_type" id="edit_box_type" list="modalBoxTypeList" required
+                    class="w-full px-3.5 py-2.5 rounded-xl bg-slate-950 border border-slate-800 text-white placeholder-slate-500 text-sm focus:border-cyan-500 focus:ring-1 focus:ring-cyan-500 transition">
+            </div>
+
+            <!-- Quantity -->
+            <div>
+                <label for="edit_quantity"
+                    class="block text-xs font-semibold uppercase tracking-wider text-slate-400 mb-1.5">
+                    Quantity <span class="text-rose-400">*</span>
+                </label>
+                <input type="number" name="quantity" id="edit_quantity" min="1" required
+                    class="w-full px-3.5 py-2.5 rounded-xl bg-slate-950 border border-slate-800 text-white text-sm font-mono-code focus:border-cyan-500 focus:ring-1 focus:ring-cyan-500 transition">
+            </div>
+
+            <!-- Date -->
+            <div>
+                <label for="edit_dispatch_date"
+                    class="block text-xs font-semibold uppercase tracking-wider text-slate-400 mb-1.5">
+                    Dispatch Date
+                </label>
+                <input type="date" name="dispatch_date" id="edit_dispatch_date"
+                    class="w-full px-3.5 py-2.5 rounded-xl bg-slate-950 border border-slate-800 text-white text-sm font-mono-code focus:border-cyan-500 focus:ring-1 focus:ring-cyan-500 transition">
+            </div>
+
+            <div class="flex items-center justify-end space-x-3 pt-3 border-t border-slate-800">
+                <button type="button" onclick="closeEditEntryModal()"
+                    class="px-4 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-semibold transition">
+                    Cancel
+                </button>
+                <button type="submit"
+                    class="px-5 py-2 rounded-xl bg-gradient-to-r from-cyan-600 to-blue-600 hover:from-cyan-500 hover:to-blue-500 text-white text-xs font-bold transition shadow-lg shadow-cyan-900/40">
+                    Update Entry
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- Modal 3: Delete Entry Confirmation -->
+<div id="deleteEntryModal"
+    class="hidden fixed inset-0 z-50 overflow-y-auto bg-slate-950/80 backdrop-blur-sm flex items-center justify-center p-4">
+    <div class="relative w-full max-w-md rounded-2xl bg-slate-900 border border-slate-800 p-6 shadow-2xl">
+        <div class="flex items-center space-x-3 text-rose-400 mb-4">
+            <div class="p-2 rounded-xl bg-rose-950/80 border border-rose-800">
+                <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                        d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                </svg>
+            </div>
+            <h3 class="text-lg font-bold text-white">Delete Entry</h3>
+        </div>
+
+        <p class="text-sm text-slate-300 mb-6">
+            Are you sure you want to delete <span id="deleteEntryDesc" class="font-bold text-white"></span>? This will
+            adjust the company's total core box count.
+        </p>
+
+        <form method="post" action="{% url 'daily-core-box-detail' company.pk %}"
+            class="flex items-center justify-end space-x-3">
+            {% csrf_token %}
+            <input type="hidden" name="action" value="delete_entry">
+            <input type="hidden" name="entry_id" id="deleteEntryId">
+
+            <button type="button" onclick="closeDeleteEntryModal()"
+                class="px-4 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-semibold transition">
+                Cancel
+            </button>
+            <button type="submit"
+                class="px-4 py-2 rounded-xl bg-rose-600 hover:bg-rose-500 text-white text-xs font-bold transition shadow-lg shadow-rose-900/40">
+                Yes, Delete
+            </button>
+        </form>
+    </div>
+</div>
+
+<!-- Modal 4: Rename Company -->
+<div id="editCompanyModal"
+    class="hidden fixed inset-0 z-50 overflow-y-auto bg-slate-950/80 backdrop-blur-sm flex items-center justify-center p-4">
+    <div class="relative w-full max-w-md rounded-2xl bg-slate-900 border border-slate-800 p-6 shadow-2xl">
+        <div class="flex items-center justify-between pb-3 mb-4 border-b border-slate-800">
+            <h3 class="text-lg font-bold text-white">Rename Company</h3>
+            <button type="button" onclick="closeEditCompanyModal()" class="text-slate-400 hover:text-white">
+                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+                </svg>
+            </button>
+        </div>
+
+        <form method="post" action="{% url 'daily-core-box-detail' company.pk %}" class="space-y-4">
+            {% csrf_token %}
+            <input type="hidden" name="action" value="edit_company">
+
+            <div>
+                <label for="edit_company_name"
+                    class="block text-xs font-semibold uppercase tracking-wider text-slate-400 mb-1.5">
+                    Company Name
+                </label>
+                <input type="text" name="company_name" id="edit_company_name" value="{{ company.name }}" required
+                    class="w-full px-3.5 py-2.5 rounded-xl bg-slate-950 border border-slate-800 text-white text-sm focus:border-cyan-500 focus:ring-1 focus:ring-cyan-500 transition">
+            </div>
+
+            <div class="flex items-center justify-end space-x-3 pt-3 border-t border-slate-800">
+                <button type="button" onclick="closeEditCompanyModal()"
+                    class="px-4 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-semibold transition">
+                    Cancel
+                </button>
+                <button type="submit"
+                    class="px-5 py-2 rounded-xl bg-gradient-to-r from-cyan-600 to-blue-600 hover:from-cyan-500 hover:to-blue-500 text-white text-xs font-bold transition shadow-lg shadow-cyan-900/40">
+                    Save Changes
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+    // Live Search for Dispatches by Box Type or Date
+    const dispatchSearch = document.getElementById('dispatchSearch');
+    if (dispatchSearch) {
+        dispatchSearch.addEventListener('input', function () {
+            const query = this.value.toLowerCase().trim();
+            const rows = document.querySelectorAll('.dispatch-row');
+            rows.forEach(row => {
+                const dateEl = row.querySelector('.dispatch-date-text');
+                const boxEl = row.querySelector('.dispatch-box-text');
+                const text = (dateEl ? dateEl.textContent : '') + ' ' + (boxEl ? boxEl.textContent : '');
+                if (text.toLowerCase().includes(query)) {
+                    row.style.display = '';
+                } else {
+                    row.style.display = 'none';
+                }
+            });
+        });
+    }
+
+    // Modal Handlers
+    function openAddEntryModal() {
+        document.getElementById('addEntryModal').classList.remove('hidden');
+    }
+    function closeAddEntryModal() {
+        document.getElementById('addEntryModal').classList.add('hidden');
+    }
+
+    function openEditEntryModal(id, boxType, quantity, dateStr) {
+        document.getElementById('edit_entry_id').value = id;
+        document.getElementById('edit_box_type').value = boxType;
+        document.getElementById('edit_quantity').value = quantity;
+        document.getElementById('edit_dispatch_date').value = dateStr;
+        document.getElementById('editEntryModal').classList.remove('hidden');
+    }
+    function closeEditEntryModal() {
+        document.getElementById('editEntryModal').classList.add('hidden');
+    }
+
+    function openDeleteEntryModal(id, boxType, quantity, dateStr) {
+        document.getElementById('deleteEntryId').value = id;
+        document.getElementById('deleteEntryDesc').textContent = quantity + 'x ' + boxType + ' on ' + dateStr;
+        document.getElementById('deleteEntryModal').classList.remove('hidden');
+    }
+    function closeDeleteEntryModal() {
+        document.getElementById('deleteEntryModal').classList.add('hidden');
+    }
+
+    function openEditCompanyModal(currentName) {
+        document.getElementById('edit_company_name').value = currentName;
+        document.getElementById('editCompanyModal').classList.remove('hidden');
+    }
+    function closeEditCompanyModal() {
+        document.getElementById('editCompanyModal').classList.add('hidden');
+    }
+
+    // Close on outside click
+    window.addEventListener('click', function (e) {
+        ['addEntryModal', 'editEntryModal', 'deleteEntryModal', 'editCompanyModal'].forEach(id => {
+            const el = document.getElementById(id);
+            if (e.target === el) {
+                el.classList.add('hidden');
+            }
+        });
+    });
+</script>
+{% endblock %}

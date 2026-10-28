@@ -1216,6 +1216,12 @@ class DailyCoreBoxListView(LoginRequiredMixin, View):
     template_name = 'inventory/daily_core_box_list.html'
 
     def get(self, request, *args, **kwargs):
+        # Auto-sync companies from Contact catalog if Company table is empty
+        if not Company.objects.exists():
+            for contact in Contact.objects.all():
+                if contact.company_name and contact.company_name.strip():
+                    Company.objects.get_or_create(name=contact.company_name.strip())
+
         # Query active companies annotated with total core boxes taken and last dispatch date
         companies = Company.objects.filter(is_active=True).annotate(
             total_boxes=Coalesce(Sum('dispatches__quantity'), Value(0)),
