@@ -1299,8 +1299,7 @@ class DailyCoreBoxListView(LoginRequiredMixin, View):
 
             # 2. Resolve Core Box Type
             if not box_type:
-                messages.error(request, "Please enter or select the Core Box Type.")
-                return redirect('daily-core-box-list')
+                box_type = 'Core Box'
 
             # 3. Resolve Quantity
             try:
@@ -1334,7 +1333,7 @@ class DailyCoreBoxListView(LoginRequiredMixin, View):
 
             messages.success(
                 request,
-                f"Successfully recorded {quantity} units of '{box_type}' for {company.name} on {dispatch_date.strftime('%d %b %Y')}!"
+                f"Successfully recorded {quantity} boxes for {company.name} on {dispatch_date.strftime('%d %b %Y')}!"
             )
             return redirect('daily-core-box-list')
 

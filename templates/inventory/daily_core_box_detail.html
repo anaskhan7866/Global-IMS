@@ -54,7 +54,7 @@
     </div>
 
     <!-- CARD AT TOP SHOWING TOTAL CORE BOX TAKEN -->
-    <section aria-label="Company Dispatches Summary" class="grid grid-cols-1 sm:grid-cols-3 gap-5">
+    <section aria-label="Company Dispatches Summary" class="grid grid-cols-1 sm:grid-cols-2 gap-5">
         <!-- 1. PRIMARY HIGHLIGHT CARD: TOTAL CORE BOX TAKEN -->
         <div
             class="rounded-2xl bg-gradient-to-br from-slate-950 via-slate-950 to-cyan-950/30 p-6 border border-cyan-800/60 shadow-2xl relative overflow-hidden">
@@ -95,33 +95,7 @@
             </div>
         </div>
 
-        <!-- 3. BOX TYPES BREAKDOWN -->
-        <div class="rounded-2xl bg-slate-950 p-6 border border-slate-800 shadow-xl flex flex-col justify-between">
-            <div class="flex items-center justify-between">
-                <p class="text-xs font-semibold uppercase tracking-wider text-slate-400">Core Box Types</p>
-                <span class="p-2.5 rounded-xl bg-emerald-950 text-emerald-400 border border-emerald-800/80">
-                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                            d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z" />
-                    </svg>
-                </span>
-            </div>
-            <div class="mt-3">
-                <h3 class="text-2xl font-extrabold text-white font-mono-code">{{ box_breakdown|length }} <span
-                        class="text-sm font-normal text-slate-400">Types</span></h3>
-                <div class="mt-2 flex flex-wrap gap-1.5 max-h-14 overflow-y-auto">
-                    {% for item in box_breakdown %}
-                    <span
-                        class="inline-flex items-center px-2 py-0.5 rounded-md text-[11px] font-medium bg-slate-900 border border-slate-800 text-slate-300">
-                        <span class="text-cyan-400 font-bold mr-1">{{ item.total_qty }}x</span> {{ item.box_type }}
-                    </span>
-                    {% empty %}
-                    <span class="text-xs text-slate-500 italic">None logged yet</span>
-                    {% endfor %}
-                </div>
-            </div>
-        </div>
-    </section>
+        </section>
 
     <!-- DATE-WISE DETAIL SECTION -->
     <section aria-label="Date-wise Dispatch Records"

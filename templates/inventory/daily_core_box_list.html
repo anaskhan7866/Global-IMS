@@ -79,13 +79,13 @@
             </span>
             <div>
                 <h2 class="text-base font-bold text-white tracking-tight">Record Daily Core Box Taken</h2>
-                <p class="text-xs text-slate-400">Select or enter company name, core box type, quantity, and click Save.
+                <p class="text-xs text-slate-400">Select or enter company name, quantity, and click Save.
                 </p>
             </div>
         </div>
 
         <form method="post" action="{% url 'daily-core-box-list' %}"
-            class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
+            class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
             {% csrf_token %}
             <input type="hidden" name="action" value="add_entry">
 
@@ -107,23 +107,7 @@
                 </div>
             </div>
 
-            <!-- 2. Core Box Type -->
-            <div class="lg:col-span-2">
-                <label for="entry_box_type"
-                    class="block text-xs font-semibold uppercase tracking-wider text-slate-400 mb-1.5">
-                    Core Box Type <span class="text-rose-400">*</span>
-                </label>
-                <div class="relative">
-                    <input type="text" name="box_type" id="entry_box_type" list="boxTypeDatalist"
-                        placeholder="e.g. GI Core Box, CB-10, Heavy Box..." required autocomplete="off"
-                        class="w-full px-3.5 py-2.5 rounded-xl bg-slate-900 border border-slate-800 text-white placeholder-slate-500 text-sm focus:border-cyan-500 focus:ring-1 focus:ring-cyan-500 transition">
-                    <datalist id="boxTypeDatalist">
-                        {% for item in box_items %}
-                        <option value="{{ item.name }}">SKU: {{ item.sku }}{% if item.weight %} &bull; {{ item.weight }}kg{% endif %}</option>
-                        {% endfor %}
-                    </datalist>
-                </div>
-            </div>
+
 
             <!-- 3. Quantity -->
             <div>

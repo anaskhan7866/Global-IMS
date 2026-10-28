@@ -1543,7 +1543,7 @@ class DailyCoreBoxFeatureTestCase(TestCase):
             'dispatch_date': '2026-10-28',
         }, follow=True)
         self.assertEqual(res.status_code, 200)
-        self.assertContains(res, "Successfully recorded 25 units of &#x27;GI Core Box Std&#x27; for Precision Auto Ltd")
+        self.assertContains(res, "Successfully recorded 25 boxes for Precision Auto Ltd")
         self.assertTrue(DailyCoreBoxDispatch.objects.filter(company=self.company, quantity=25).exists())
 
         # 2. Entry for brand new company (auto-creation)
