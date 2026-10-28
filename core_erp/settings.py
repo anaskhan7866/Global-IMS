@@ -6,6 +6,7 @@ with Neon.tech external PostgreSQL instance and WhiteNoise static asset delivery
 """
 
 import os
+import sys
 from pathlib import Path
 import environ
 import dj_database_url
@@ -108,7 +109,17 @@ DATABASES = {
         conn_max_age=600,
     )
 }
-DATABASES['default']['OPTIONS'] = {'sslmode': 'require'}
+if 'postgresql' in DATABASES['default'].get('ENGINE', ''):
+    DATABASES['default'].setdefault('OPTIONS', {})
+    DATABASES['default']['OPTIONS'].setdefault('sslmode', 'require')
+
+if 'test' in sys.argv:
+    DATABASES = {
+        'default': {
+            'ENGINE': 'django.db.backends.sqlite3',
+            'NAME': ':memory:',
+        }
+    }
 
 
 # Password Validation

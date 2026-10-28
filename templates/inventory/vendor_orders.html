@@ -82,7 +82,6 @@
                     <tr>
                         <th scope="col" class="py-3.5 pl-6 pr-3">Company / Vendor</th>
                         <th scope="col" class="px-3 py-3.5">Core Box Type</th>
-                        <th scope="col" class="px-3 py-3.5">Weight</th>
                         <th scope="col" class="px-3 py-3.5">Quantity</th>
                         <th scope="col" class="px-3 py-3.5">Delivery Date</th>
                         <th scope="col" class="py-3.5 pl-3 pr-6 text-right">Actions</th>
@@ -113,21 +112,12 @@
                             <span class="text-xs text-cyan-400 font-mono-code order-sku">{{ order.item.sku }}</span>
                         </td>
 
-                        <!-- 3. Weight -->
-                        <td class="whitespace-nowrap px-3 py-4 font-mono-code text-sm">
-                            {% if order.item.weight %}
-                            <span class="font-bold text-cyan-300">{{ order.item.weight }}</span> <span class="text-xs text-slate-400">kg/box</span>
-                            {% else %}
-                            <span class="text-slate-500">&mdash;</span>
-                            {% endif %}
-                        </td>
-
-                        <!-- 4. Quantity -->
+                        <!-- 3. Quantity -->
                         <td class="whitespace-nowrap px-3 py-4 font-mono-code font-bold text-base text-cyan-300">
                             {{ order.quantity }} <span class="text-xs text-slate-400 font-normal">boxes</span>
                         </td>
 
-                        <!-- 5. Delivery Date -->
+                        <!-- 4. Delivery Date -->
                         <td class="whitespace-nowrap px-3 py-4 font-mono-code text-xs">
                             {% if order.expected_delivery_date < today %}
                             <div class="flex items-center space-x-1.5 text-rose-300 font-bold">
@@ -142,12 +132,12 @@
                             {% endif %}
                         </td>
 
-                        <!-- 6. Actions: Edit & Remove Buttons -->
+                        <!-- 5. Actions: Edit & Remove Buttons -->
                         <td class="whitespace-nowrap py-4 pl-3 pr-6 text-right">
                             <div class="flex items-center justify-end space-x-2">
                                 <button
                                     type="button"
-                                    onclick="openEditOrderModal('{{ order.id }}', '{{ order.vendor.company_name|escapejs }}', '{{ order.item.name|escapejs }}', '{{ order.item.weight|default:'' }}', '{{ order.quantity }}', '{{ order.expected_delivery_date|date:'Y-m-d' }}')"
+                                    onclick="openEditOrderModal('{{ order.id }}', '{{ order.vendor.company_name|escapejs }}', '{{ order.item.name|escapejs }}', '{{ order.quantity }}', '{{ order.expected_delivery_date|date:'Y-m-d' }}')"
                                     class="inline-flex items-center space-x-1.5 px-3 py-1.5 rounded-lg bg-amber-950/70 hover:bg-amber-900 text-amber-300 hover:text-white border border-amber-800/80 hover:border-amber-700 text-xs font-semibold transition shadow-sm"
                                     title="Edit order details"
                                 >
@@ -172,7 +162,7 @@
                     </tr>
                     {% empty %}
                     <tr>
-                        <td colspan="6" class="py-12 text-center text-slate-400">
+                        <td colspan="5" class="py-12 text-center text-slate-400">
                             <div class="flex flex-col items-center justify-center">
                                 <svg class="h-10 w-10 text-slate-600 mb-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
@@ -243,57 +233,45 @@
                 <label for="box_name" class="block text-xs font-bold uppercase tracking-wider text-cyan-400">
                     Type of Core Box <span class="text-rose-400">*</span>
                 </label>
-                <input
-                    type="text"
-                    name="box_name"
-                    id="box_name"
-                    list="items_datalist"
-                    required
-                    autocomplete="off"
-                    placeholder="e.g. GI Core Box 100mm, Polish Box"
-                    oninput="onBoxNameChange(this.value)"
-                    class="w-full px-4 py-2.5 rounded-xl bg-slate-900 border border-slate-700 text-white placeholder-slate-500 text-sm focus:border-cyan-500 focus:ring-1 focus:ring-cyan-500 transition font-medium"
-                >
-                <datalist id="items_datalist">
-                    {% for item in items %}
-                    <option value="{{ item.name }}">{{ item.name }} ({{ item.weight }} kg/box)</option>
-                    {% endfor %}
-                </datalist>
+                <div class="relative">
+                    <select
+                        name="box_name"
+                        id="box_name"
+                        required
+                        class="w-full px-4 py-2.5 rounded-xl bg-slate-900 border border-slate-700 text-white text-sm focus:border-cyan-500 focus:ring-1 focus:ring-cyan-500 transition font-medium appearance-none pr-10 cursor-pointer"
+                    >
+                        <option value="" disabled selected>-- Select Type of Core Box --</option>
+                        <option value="BQ without Lid">BQ without Lid</option>
+                        <option value="NQ with Lid">NQ with Lid</option>
+                        <option value="HQ with Lid">HQ with Lid</option>
+                        <option value="Trunk (Peti)">Trunk (Peti)</option>
+                        {% for item in items %}
+                        {% if item.name != "BQ without Lid" and item.name != "NQ with Lid" and item.name != "HQ with Lid" and item.name != "Trunk (Peti)" %}
+                        <option value="{{ item.name }}">{{ item.name }}</option>
+                        {% endif %}
+                        {% endfor %}
+                    </select>
+                    <div class="pointer-events-none absolute inset-y-0 right-0 flex items-center px-3.5 text-slate-400">
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/></svg>
+                    </div>
+                </div>
             </div>
 
-            <!-- 3. Weight & Quantity Grid -->
-            <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <div class="space-y-1.5">
-                    <label for="order_weight" class="block text-xs font-bold uppercase tracking-wider text-cyan-400">
-                        Weight (kg/box)
-                    </label>
-                    <input
-                        type="number"
-                        name="weight"
-                        id="order_weight"
-                        step="0.001"
-                        min="0"
-                        placeholder="e.g. 7.000"
-                        class="w-full px-4 py-2.5 rounded-xl bg-slate-900 border border-slate-700 text-white placeholder-slate-500 text-sm font-mono-code focus:border-cyan-500 focus:ring-1 focus:ring-cyan-500 transition"
-                    >
-                    <p class="text-[11px] text-slate-500">Weight of each box in kg.</p>
-                </div>
-
-                <div class="space-y-1.5">
-                    <label for="order_quantity" class="block text-xs font-bold uppercase tracking-wider text-cyan-400">
-                        Quantity Needed <span class="text-rose-400">*</span>
-                    </label>
-                    <input
-                        type="number"
-                        name="quantity"
-                        id="order_quantity"
-                        min="1"
-                        required
-                        placeholder="e.g. 100"
-                        class="w-full px-4 py-2.5 rounded-xl bg-slate-900 border border-slate-700 text-white placeholder-slate-500 text-sm font-mono-code focus:border-cyan-500 focus:ring-1 focus:ring-cyan-500 transition"
-                    >
-                    <p class="text-[11px] text-slate-500">Total core boxes needed.</p>
-                </div>
+            <!-- 3. Quantity -->
+            <div class="space-y-1.5">
+                <label for="order_quantity" class="block text-xs font-bold uppercase tracking-wider text-cyan-400">
+                    Quantity Needed <span class="text-rose-400">*</span>
+                </label>
+                <input
+                    type="number"
+                    name="quantity"
+                    id="order_quantity"
+                    min="1"
+                    required
+                    placeholder="e.g. 100"
+                    class="w-full px-4 py-2.5 rounded-xl bg-slate-900 border border-slate-700 text-white placeholder-slate-500 text-sm font-mono-code focus:border-cyan-500 focus:ring-1 focus:ring-cyan-500 transition"
+                >
+                <p class="text-[11px] text-slate-500">Total core boxes needed.</p>
             </div>
 
             <!-- 4. Delivery Date -->
@@ -397,7 +375,7 @@
                 </div>
                 <div>
                     <h3 class="text-base font-bold text-white tracking-tight">Edit Vendor Order</h3>
-                    <p class="text-xs text-slate-400 mt-0.5">Modify company, box type, weight, quantity, or delivery date.</p>
+                    <p class="text-xs text-slate-400 mt-0.5">Modify company, box type, quantity, or delivery date.</p>
                 </div>
             </div>
             <button type="button" onclick="closeEditOrderModal()" class="text-slate-400 hover:text-white transition">
@@ -432,52 +410,45 @@
                 <label for="edit_box_name" class="block text-xs font-bold uppercase tracking-wider text-amber-400">
                     Type of Box <span class="text-rose-400">*</span>
                 </label>
-                <input
-                    type="text"
-                    name="box_name"
-                    id="edit_box_name"
-                    list="items_datalist"
-                    required
-                    autocomplete="off"
-                    placeholder="e.g. GI Core Box 100mm, Polish Box"
-                    oninput="onEditBoxNameChange(this.value)"
-                    class="w-full px-4 py-2.5 rounded-xl bg-slate-900 border border-slate-700 text-white placeholder-slate-500 text-sm focus:border-amber-500 focus:ring-1 focus:ring-amber-500 transition font-medium"
-                >
+                <div class="relative">
+                    <select
+                        name="box_name"
+                        id="edit_box_name"
+                        required
+                        class="w-full px-4 py-2.5 rounded-xl bg-slate-900 border border-slate-700 text-white text-sm focus:border-amber-500 focus:ring-1 focus:ring-amber-500 transition font-medium appearance-none pr-10 cursor-pointer"
+                    >
+                        <option value="" disabled selected>-- Select Type of Box --</option>
+                        <option value="BQ without Lid">BQ without Lid</option>
+                        <option value="NQ with Lid">NQ with Lid</option>
+                        <option value="HQ with Lid">HQ with Lid</option>
+                        <option value="Trunk (Peti)">Trunk (Peti)</option>
+                        {% for item in items %}
+                        {% if item.name != "BQ without Lid" and item.name != "NQ with Lid" and item.name != "HQ with Lid" and item.name != "Trunk (Peti)" %}
+                        <option value="{{ item.name }}">{{ item.name }}</option>
+                        {% endif %}
+                        {% endfor %}
+                    </select>
+                    <div class="pointer-events-none absolute inset-y-0 right-0 flex items-center px-3.5 text-slate-400">
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/></svg>
+                    </div>
+                </div>
             </div>
 
-            <!-- 3. Weight & Quantity Grid -->
-            <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <div class="space-y-1.5">
-                    <label for="edit_weight" class="block text-xs font-bold uppercase tracking-wider text-amber-400">
-                        Weight (kg/box)
-                    </label>
-                    <input
-                        type="number"
-                        name="weight"
-                        id="edit_weight"
-                        step="0.001"
-                        min="0"
-                        placeholder="e.g. 7.000"
-                        class="w-full px-4 py-2.5 rounded-xl bg-slate-900 border border-slate-700 text-white placeholder-slate-500 text-sm font-mono-code focus:border-amber-500 focus:ring-1 focus:ring-amber-500 transition"
-                    >
-                    <p class="text-[11px] text-slate-500">Weight of each box in kg.</p>
-                </div>
-
-                <div class="space-y-1.5">
-                    <label for="edit_quantity" class="block text-xs font-bold uppercase tracking-wider text-amber-400">
-                        Quantity Needed <span class="text-rose-400">*</span>
-                    </label>
-                    <input
-                        type="number"
-                        name="quantity"
-                        id="edit_quantity"
-                        min="1"
-                        required
-                        placeholder="e.g. 100"
-                        class="w-full px-4 py-2.5 rounded-xl bg-slate-900 border border-slate-700 text-white placeholder-slate-500 text-sm font-mono-code focus:border-amber-500 focus:ring-1 focus:ring-amber-500 transition"
-                    >
-                    <p class="text-[11px] text-slate-500">Total core boxes needed.</p>
-                </div>
+            <!-- 3. Quantity -->
+            <div class="space-y-1.5">
+                <label for="edit_quantity" class="block text-xs font-bold uppercase tracking-wider text-amber-400">
+                    Quantity Needed <span class="text-rose-400">*</span>
+                </label>
+                <input
+                    type="number"
+                    name="quantity"
+                    id="edit_quantity"
+                    min="1"
+                    required
+                    placeholder="e.g. 100"
+                    class="w-full px-4 py-2.5 rounded-xl bg-slate-900 border border-slate-700 text-white placeholder-slate-500 text-sm font-mono-code focus:border-amber-500 focus:ring-1 focus:ring-amber-500 transition"
+                >
+                <p class="text-[11px] text-slate-500">Total core boxes needed.</p>
             </div>
 
             <!-- 4. Delivery Date -->
@@ -530,23 +501,6 @@
         });
     });
 
-    // Catalog weight lookup for auto-population
-    const itemsCatalog = {
-        {% for item in items %}
-        "{{ item.name|escapejs }}": "{{ item.weight|default:'' }}",
-        {% endfor %}
-    };
-
-    function onBoxNameChange(val) {
-        const trimmed = (val || '').trim();
-        if (itemsCatalog[trimmed]) {
-            const weightInput = document.getElementById('order_weight');
-            if (weightInput && (!weightInput.value || weightInput.value === '0' || weightInput.value === '0.000')) {
-                weightInput.value = itemsCatalog[trimmed];
-            }
-        }
-    }
-
     // Modal Control: Add Order
     function openAddOrderModal() {
         document.getElementById('addOrderModal').classList.remove('hidden');
@@ -556,27 +510,23 @@
     }
 
     // Modal Control: Edit Order
-    function openEditOrderModal(orderId, companyName, boxName, weight, quantity, deliveryDate) {
+    function openEditOrderModal(orderId, companyName, boxName, quantity, deliveryDate) {
         document.getElementById('editOrderId').value = orderId;
         document.getElementById('edit_company_name').value = companyName;
-        document.getElementById('edit_box_name').value = boxName;
-        document.getElementById('edit_weight').value = weight || '';
+        const editBoxSelect = document.getElementById('edit_box_name');
+        if (editBoxSelect) {
+            if (boxName && !Array.from(editBoxSelect.options).some(o => o.value === boxName)) {
+                const opt = new Option(boxName, boxName, true, true);
+                editBoxSelect.add(opt);
+            }
+            editBoxSelect.value = boxName;
+        }
         document.getElementById('edit_quantity').value = quantity;
         document.getElementById('edit_expected_delivery_date').value = deliveryDate;
         document.getElementById('editOrderModal').classList.remove('hidden');
     }
     function closeEditOrderModal() {
         document.getElementById('editOrderModal').classList.add('hidden');
-    }
-
-    function onEditBoxNameChange(val) {
-        const trimmed = (val || '').trim();
-        if (itemsCatalog[trimmed]) {
-            const weightInput = document.getElementById('edit_weight');
-            if (weightInput && (!weightInput.value || weightInput.value === '0' || weightInput.value === '0.000')) {
-                weightInput.value = itemsCatalog[trimmed];
-            }
-        }
     }
 
     // Modal Control: Remove Order Line

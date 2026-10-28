@@ -247,10 +247,9 @@ class EmployeeListView(LoginRequiredMixin, ListView):
                 production_date=target_date
             )
 
-            weight_info = f" ({item.weight} kg/box)" if item.weight else ""
             messages.success(
                 request,
-                f"Saved {quantity} boxes of '{item.name}'{weight_info} for {emp.full_name} today!"
+                f"Saved {quantity} boxes of '{item.name}' for {emp.full_name} today!"
             )
             return redirect('employee-list')
 
@@ -453,6 +452,7 @@ class EmployeeDetailView(LoginRequiredMixin, DetailView):
         context['daily_average'] = daily_average
         context['finished_goods'] = finished_goods
         context['default_item'] = finished_goods.first() if finished_goods.exists() else None
+        context['employee'] = employee
         context['today'] = today
         return context
 
@@ -499,10 +499,9 @@ class EmployeeDetailView(LoginRequiredMixin, DetailView):
                 production_date=target_date
             )
 
-            weight_info = f" ({item.weight} kg/box)" if item.weight else ""
             messages.success(
                 request,
-                f"Logged {quantity} boxes of '{item.name}'{weight_info} for {self.object.full_name} ({log.production_date})."
+                f"Logged {quantity} boxes of '{item.name}' for {self.object.full_name} ({log.production_date})."
             )
             return redirect('employee-detail', pk=self.object.pk, month=log.production_date.month)
 
@@ -647,10 +646,9 @@ class VendorOrderListView(LoginRequiredMixin, ListView):
                 status=PurchaseOrderStatus.PENDING
             )
 
-            weight_info = f" ({item.weight} kg/box)" if item.weight else ""
             messages.success(
                 request,
-                f"Order registered: '{vendor.company_name}' requested {quantity} boxes of '{item.name}'{weight_info} "
+                f"Order registered: '{vendor.company_name}' requested {quantity} boxes of '{item.name}' "
                 f"(Delivery Date: {order.expected_delivery_date.strftime('%b %d, %Y')})."
             )
             return redirect('vendor-order-list')
@@ -722,11 +720,10 @@ class VendorOrderListView(LoginRequiredMixin, ListView):
                     pass
 
             order.save()
-            weight_info = f" ({order.item.weight} kg/box)" if order.item.weight else ""
             messages.success(
                 request,
                 f"Order updated: '{order.vendor.company_name}' &bull; {order.quantity} boxes of "
-                f"'{order.item.name}'{weight_info}."
+                f"'{order.item.name}'."
             )
             return redirect('vendor-order-list')
 
@@ -821,7 +818,7 @@ class AddInventoryView(LoginRequiredMixin, View):
                 messages.error(request, "Quantity cannot be negative.")
                 return redirect('add-inventory')
 
-            new_weight = Decimal('0.000')
+            new_weight = None
             if raw_weight is not None and str(raw_weight).strip() != '':
                 try:
                     new_weight = Decimal(str(raw_weight).strip())
@@ -851,12 +848,13 @@ class AddInventoryView(LoginRequiredMixin, View):
 
                     locked_item.current_stock = Decimal('0')
                     locked_item.name = new_name
-                    locked_item.weight = new_weight
+                    if new_weight is not None:
+                        locked_item.weight = new_weight
                     try:
                         locked_item.delete()
                     except (ProtectedError, IntegrityError):
                         locked_item.is_active = False
-                        locked_item.save(update_fields=['is_active', 'current_stock', 'name', 'weight', 'updated_at'])
+                        locked_item.save(update_fields=['is_active', 'current_stock', 'name', 'updated_at'])
 
                     messages.success(
                         request,
@@ -864,9 +862,11 @@ class AddInventoryView(LoginRequiredMixin, View):
                     )
                     return redirect('add-inventory')
 
-                update_fields = ['name', 'weight', 'current_stock', 'updated_at']
+                update_fields = ['name', 'current_stock', 'updated_at']
                 locked_item.name = new_name
-                locked_item.weight = new_weight
+                if new_weight is not None:
+                    locked_item.weight = new_weight
+                    update_fields.append('weight')
                 locked_item.current_stock = new_quantity
                 if not locked_item.is_active and new_quantity > Decimal('0'):
                     locked_item.is_active = True
@@ -893,7 +893,7 @@ class AddInventoryView(LoginRequiredMixin, View):
                 messages.success(
                     request,
                     f"Successfully modified product '{locked_item.name}' "
-                    f"(Quantity: {locked_item.current_stock} {locked_item.unit_of_measure}, Weight: {locked_item.weight} kg/box)."
+                    f"(Quantity: {locked_item.current_stock} {locked_item.unit_of_measure})."
                 )
 
             return redirect('add-inventory')
@@ -941,7 +941,7 @@ class AddInventoryView(LoginRequiredMixin, View):
 
                 messages.success(
                     request,
-                    f"Product '{item_name}' (Weight: {item_weight} kg/box, SKU: {item_sku}) "
+                    f"Product '{item_name}' (SKU: {item_sku}) "
                     f"has been completely removed from inventory."
                 )
 
@@ -1000,7 +1000,7 @@ class AddInventoryView(LoginRequiredMixin, View):
                 if locked_item.current_stock < quantity:
                     messages.error(
                         request,
-                        f"Cannot remove {quantity} units from '{locked_item.name}' ({locked_item.weight} kg/box). "
+                        f"Cannot remove {quantity} units from '{locked_item.name}'. "
                         f"Only {locked_item.current_stock} {locked_item.unit_of_measure} available on hand."
                     )
                     return redirect('add-inventory')
@@ -1028,14 +1028,14 @@ class AddInventoryView(LoginRequiredMixin, View):
 
                     messages.success(
                         request,
-                        f"Successfully removed -{quantity} units from '{locked_item.name}' ({locked_item.weight} kg/box). "
+                        f"Successfully removed -{quantity} units from '{locked_item.name}'. "
                         f"Stock reached zero and product has been completely removed from inventory."
                     )
                 else:
                     locked_item.save(update_fields=['current_stock', 'updated_at'])
                     messages.success(
                         request,
-                        f"Successfully removed -{quantity} units from '{locked_item.name}' ({locked_item.weight} kg/box). "
+                        f"Successfully removed -{quantity} units from '{locked_item.name}'. "
                         f"Remaining Stock: {locked_item.current_stock} {locked_item.unit_of_measure}."
                     )
 
@@ -1114,9 +1114,14 @@ class AddInventoryView(LoginRequiredMixin, View):
                 if weight is not None and target_item.weight != effective_weight:
                     target_item = None
 
-            # Look up existing product with the SAME name AND the SAME weight of one core box
+            # Look up existing product with the SAME name
             if not target_item:
-                target_item = Item.objects.filter(name__iexact=product_name, weight=effective_weight).first()
+                if weight is not None:
+                    target_item = Item.objects.filter(name__iexact=product_name, weight=effective_weight).first()
+                else:
+                    target_item = Item.objects.filter(name__iexact=product_name, is_active=True).first()
+                    if not target_item:
+                        target_item = Item.objects.filter(name__iexact=product_name).first()
 
             if target_item:
                 # Same product with same unit weight: increment stock
@@ -1141,7 +1146,6 @@ class AddInventoryView(LoginRequiredMixin, View):
                 locked_item.current_stock = new_stock
                 locked_item.save(update_fields=update_fields)
 
-                weight_info = f" | Weight (One Core Box): {locked_item.weight} kg" if locked_item.weight else ""
                 default_narration = narration or f"Stock addition of {quantity} units for '{locked_item.name}'."
                 effective_cost = unit_cost if unit_cost > 0 else locked_item.moving_average_cost
 
@@ -1159,7 +1163,7 @@ class AddInventoryView(LoginRequiredMixin, View):
                 messages.success(
                     request,
                     f"Successfully updated '{locked_item.name}'! Added +{quantity} units. "
-                    f"New On-Hand Stock: {locked_item.current_stock} {locked_item.unit_of_measure}{weight_info}"
+                    f"New On-Hand Stock: {locked_item.current_stock} {locked_item.unit_of_measure}."
                 )
             else:
                 # Same core box with different weight, or new core box product:
@@ -1183,8 +1187,7 @@ class AddInventoryView(LoginRequiredMixin, View):
                 )
 
                 default_narration = narration or (
-                    f"Created distinct core box '{new_item.name}' "
-                    f"(Weight: {effective_weight} kg/box) with {quantity} units."
+                    f"Created product '{new_item.name}' with {quantity} units."
                 )
                 InventoryLedger.objects.create(
                     item=new_item,
@@ -1199,8 +1202,7 @@ class AddInventoryView(LoginRequiredMixin, View):
 
                 messages.success(
                     request,
-                    f"Created distinct product '{new_item.name}' "
-                    f"(Weight: {effective_weight} kg/box, SKU: {new_item.sku}) with {quantity} units."
+                    f"Created product '{new_item.name}' (SKU: {new_item.sku}) with {quantity} units."
                 )
 
         return redirect('add-inventory')

@@ -617,56 +617,51 @@ class EmployeeAndVendorOrderViewsTestCase(TestCase):
         self.assertEqual(list_post_res.status_code, 302)
         self.assertFalse(ProductionLog.objects.filter(pk=log_for_list.pk).exists())
 
-    def test_employee_production_logging_with_weight_feature(self):
+    def test_employee_production_logging_without_weight_input(self):
         """
-        Validates the weight feature in employee production logging:
-        - Employee list table renders type of box, weight, and number of boxes inputs.
-        - Logging output with box_name, weight, and quantity records the item with weight.
-        - Employee detail modal provides box type, weight, and quantity fields.
-        - Employee detail breakdown renders the weight in kg/box for the produced item.
+        Validates employee production logging with weight input removed:
+        - Employee list table renders type of box and quantity inputs without weight input.
+        - Logging output with box_name and quantity records the item and production log.
+        - Employee detail modal provides box type and quantity fields without weight input.
         """
         from decimal import Decimal
         from django.urls import reverse
         from inventory.models import Item, ProductionLog
 
-        # 1. GET /employees/ renders weight input
+        # 1. GET /employees/ does not render weight input
         list_res = self.client.get(reverse('employee-list'))
         self.assertEqual(list_res.status_code, 200)
-        self.assertContains(list_res, 'placeholder="Weight (kg)"')
-        self.assertContains(list_res, 'name="weight"')
+        self.assertNotContains(list_res, 'placeholder="Weight (kg)"')
+        self.assertNotContains(list_res, 'row-weight-input')
+        self.assertNotContains(list_res, 'name="weight"')
 
-        # 2. POST log_production with box_name, weight, and quantity
+        # 2. POST log_production with box_name and quantity
         log_res = self.client.post(reverse('employee-list'), {
             'action': 'log_production',
             'employee_id': self.emp1.pk,
             'box_name': 'Reinforced Heavy Box',
-            'weight': '6.850',
             'quantity': '24'
         })
         self.assertEqual(log_res.status_code, 302)
 
         heavy_box = Item.objects.filter(name='Reinforced Heavy Box').first()
         self.assertIsNotNone(heavy_box)
-        self.assertEqual(heavy_box.weight, Decimal('6.850'))
 
         log_entry = ProductionLog.objects.filter(employee=self.emp1, item=heavy_box).first()
         self.assertIsNotNone(log_entry)
         self.assertEqual(log_entry.quantity, 24)
 
-        # 3. GET employee detail page renders weight input in modal
+        # 3. GET employee detail page does not render weight input in modal
         detail_url = reverse('employee-detail', kwargs={'pk': self.emp1.pk, 'month': self.current_month})
         detail_res = self.client.get(detail_url)
         self.assertEqual(detail_res.status_code, 200)
-        self.assertContains(detail_res, 'id="modal_weight"')
-        self.assertContains(detail_res, 'Weight (kg/box)')
-        # Breakdown should display the weight in the log breakdown
-        self.assertContains(detail_res, '(6.850 kg/box)')
+        self.assertNotContains(detail_res, 'id="modal_weight"')
+        self.assertNotContains(detail_res, 'name="weight"')
 
-        # 4. POST log_production via employee detail modal with weight
+        # 4. POST log_production via employee detail modal without weight
         detail_post_res = self.client.post(detail_url, {
             'action': 'log_production',
             'box_name': 'Precision Die Box',
-            'weight': '3.250',
             'quantity': '15',
             'production_date': self.today.strftime('%Y-%m-%d')
         })
@@ -674,15 +669,10 @@ class EmployeeAndVendorOrderViewsTestCase(TestCase):
 
         die_box = Item.objects.filter(name='Precision Die Box').first()
         self.assertIsNotNone(die_box)
-        self.assertEqual(die_box.weight, Decimal('3.250'))
 
         die_log = ProductionLog.objects.filter(employee=self.emp1, item=die_box).first()
         self.assertIsNotNone(die_log)
         self.assertEqual(die_log.quantity, 15)
-
-        # 5. Subsequent GET on detail view renders the new weight
-        detail_check = self.client.get(detail_url)
-        self.assertContains(detail_check, '(3.250 kg/box)')
 
     def test_vendor_orders_view_template_and_overdue_highlight(self):
         """
@@ -739,14 +729,12 @@ class EmployeeAndVendorOrderViewsTestCase(TestCase):
         self.assertEqual(order.item.weight, Decimal('7.500'))
         self.assertEqual(order.expected_delivery_date.isoformat(), future_date)
 
-        # 2. GET /vendor-orders/ renders the order with weight and remove action button
+        # 2. GET /vendor-orders/ renders the order without weight column and with remove action button
         get_res = self.client.get(reverse('vendor-order-list'))
         self.assertEqual(get_res.status_code, 200)
         self.assertContains(get_res, 'Steel Corp')
         self.assertContains(get_res, 'Test GI Core Box')
-        self.assertContains(get_res, 'Weight')
-        self.assertContains(get_res, '7.500')
-        self.assertContains(get_res, 'kg/box')
+        self.assertNotContains(get_res, '<th scope="col" class="px-3 py-3.5">Weight</th>')
         self.assertContains(get_res, 'openRemoveOrderModal')
         self.assertContains(get_res, 'openEditOrderModal')
         self.assertContains(get_res, 'editOrderModal')
@@ -814,7 +802,6 @@ class EmployeeAndVendorOrderViewsTestCase(TestCase):
         self.assertEqual(get_res.status_code, 200)
         self.assertContains(get_res, 'Apex Electricals Updated')
         self.assertContains(get_res, 'Super Core Box')
-        self.assertContains(get_res, '8.250')
         self.assertContains(get_res, '45')
         self.assertContains(get_res, 'openEditOrderModal')
         self.assertContains(get_res, 'editOrderModal')
@@ -1112,10 +1099,9 @@ class EmployeeAndVendorOrderViewsTestCase(TestCase):
         self.assertContains(response, 'Test GI Core Box')
         self.assertContains(response, 'Name of Product')
         self.assertContains(response, 'Quantity')
-        self.assertContains(response, 'Weight')
         self.assertContains(response, 'Action')
-        self.assertContains(response, '3.500')
-        # Classification and Total weight calculations must NOT be in the response
+        # Weight calculations and column must NOT be in the table
+        self.assertNotContains(response, '<th class="px-3 py-3.5">Weight</th>')
         self.assertNotContains(response, 'Classification')
         self.assertNotContains(response, 'Total Weight on Hand')
         self.assertNotContains(response, 'Total Stock Weight')
