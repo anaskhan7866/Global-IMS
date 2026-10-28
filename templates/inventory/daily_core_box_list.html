@@ -79,13 +79,13 @@
             </span>
             <div>
                 <h2 class="text-base font-bold text-white tracking-tight">Record Daily Core Box Taken</h2>
-                <p class="text-xs text-slate-400">Select or enter company name, quantity, and click Save.
+                <p class="text-xs text-slate-400">Select or enter company name, core box type, quantity, and click Save.
                 </p>
             </div>
         </div>
 
         <form method="post" action="{% url 'daily-core-box-list' %}"
-            class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+            class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
             {% csrf_token %}
             <input type="hidden" name="action" value="add_entry">
 
@@ -104,6 +104,36 @@
                         <option value="{{ comp.name }}"></option>
                         {% endfor %}
                     </datalist>
+                </div>
+            </div>
+
+            <!-- 2. Type of Core Box -->
+            <div class="space-y-1.5">
+                <label for="entry_box_type"
+                    class="block text-xs font-semibold uppercase tracking-wider text-slate-400 mb-1.5">
+                    Type of Core Box <span class="text-rose-400">*</span>
+                </label>
+                <div class="relative">
+                    <select
+                        name="box_type"
+                        id="entry_box_type"
+                        required
+                        class="w-full px-4 py-2.5 rounded-xl bg-slate-900 border border-slate-700 text-white text-sm focus:border-cyan-500 focus:ring-1 focus:ring-cyan-500 transition font-medium appearance-none pr-10 cursor-pointer"
+                    >
+                        <option value="" disabled selected>-- Select Type of Core Box --</option>
+                        <option value="BQ without Lid">BQ without Lid</option>
+                        <option value="NQ with Lid">NQ with Lid</option>
+                        <option value="HQ with Lid">HQ with Lid</option>
+                        <option value="Trunk (Peti)">Trunk (Peti)</option>
+                        {% for item in box_items %}
+                        {% if item.name != "BQ without Lid" and item.name != "NQ with Lid" and item.name != "HQ with Lid" and item.name != "Trunk (Peti)" %}
+                        <option value="{{ item.name }}">{{ item.name }}</option>
+                        {% endif %}
+                        {% endfor %}
+                    </select>
+                    <div class="pointer-events-none absolute inset-y-0 right-0 flex items-center px-3.5 text-slate-400">
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/></svg>
+                    </div>
                 </div>
             </div>
 

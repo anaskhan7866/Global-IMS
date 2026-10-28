@@ -95,7 +95,87 @@
             </div>
         </div>
 
-        </section>
+    </section>
+
+    <!-- RECORD DAILY CORE BOX TAKEN FORM -->
+    <section aria-label="Record Daily Core Box Taken"
+        class="rounded-2xl bg-slate-950 border border-slate-800 shadow-xl p-5 sm:p-6">
+        <div class="flex items-center space-x-2 pb-3 mb-4 border-b border-slate-800/80">
+            <span class="p-1.5 rounded-lg bg-cyan-950 text-cyan-400 border border-cyan-800">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                        d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
+                </svg>
+            </span>
+            <div>
+                <h2 class="text-base font-bold text-white tracking-tight">Record Daily Core Box Taken</h2>
+                <p class="text-xs text-slate-400">Log a core box dispatch directly for <span class="text-cyan-300 font-semibold">{{ company.name }}</span>.</p>
+            </div>
+        </div>
+
+        <form method="post" action="{% url 'daily-core-box-detail' company.pk %}"
+            class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+            {% csrf_token %}
+            <input type="hidden" name="action" value="add_entry">
+
+            <!-- 1. Type of Core Box -->
+            <div class="space-y-1.5">
+                <label for="detail_quick_box_type"
+                    class="block text-xs font-semibold uppercase tracking-wider text-slate-400 mb-1.5">
+                    Type of Core Box <span class="text-rose-400">*</span>
+                </label>
+                <div class="relative">
+                    <select name="box_type" id="detail_quick_box_type" required
+                        class="w-full px-4 py-2.5 rounded-xl bg-slate-900 border border-slate-800 text-white text-sm focus:border-cyan-500 focus:ring-1 focus:ring-cyan-500 transition font-medium appearance-none pr-10 cursor-pointer">
+                        <option value="" disabled selected>-- Select Type of Core Box --</option>
+                        <option value="BQ without Lid">BQ without Lid</option>
+                        <option value="NQ with Lid">NQ with Lid</option>
+                        <option value="HQ with Lid">HQ with Lid</option>
+                        <option value="Trunk (Peti)">Trunk (Peti)</option>
+                        {% for item in box_items %}
+                        {% if item.name != "BQ without Lid" and item.name != "NQ with Lid" and item.name != "HQ with Lid" and item.name != "Trunk (Peti)" %}
+                        <option value="{{ item.name }}">{{ item.name }}</option>
+                        {% endif %}
+                        {% endfor %}
+                    </select>
+                    <div class="pointer-events-none absolute inset-y-0 right-0 flex items-center px-3.5 text-slate-400">
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/></svg>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 2. Quantity -->
+            <div>
+                <label for="detail_quick_quantity"
+                    class="block text-xs font-semibold uppercase tracking-wider text-slate-400 mb-1.5">
+                    Quantity <span class="text-rose-400">*</span>
+                </label>
+                <input type="number" name="quantity" id="detail_quick_quantity" min="1" placeholder="e.g. 50" required
+                    class="w-full px-3.5 py-2.5 rounded-xl bg-slate-900 border border-slate-800 text-white placeholder-slate-500 text-sm font-mono-code focus:border-cyan-500 focus:ring-1 focus:ring-cyan-500 transition">
+            </div>
+
+            <!-- 3. Dispatch Date -->
+            <div>
+                <label for="detail_quick_date"
+                    class="block text-xs font-semibold uppercase tracking-wider text-slate-400 mb-1.5">
+                    Dispatch Date
+                </label>
+                <input type="date" name="dispatch_date" id="detail_quick_date" value="{{ today|date:'Y-m-d' }}"
+                    class="w-full px-3 py-2 rounded-xl bg-slate-900 border border-slate-800 text-white text-xs font-mono-code focus:border-cyan-500 focus:ring-1 focus:ring-cyan-500 transition">
+            </div>
+
+            <!-- 4. Save Button -->
+            <div class="flex items-end">
+                <button type="submit"
+                    class="w-full inline-flex items-center justify-center space-x-2 px-4 py-2.5 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white text-sm font-bold shadow-lg shadow-emerald-900/40 hover:shadow-emerald-900/60 transition focus:outline-none focus:ring-2 focus:ring-emerald-400">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" />
+                    </svg>
+                    <span>Save Entry</span>
+                </button>
+            </div>
+        </form>
+    </section>
 
     <!-- DATE-WISE DETAIL SECTION -->
     <section aria-label="Date-wise Dispatch Records"
@@ -248,20 +328,30 @@
             {% csrf_token %}
             <input type="hidden" name="action" value="add_entry">
 
-            <!-- Core Box Type -->
-            <div>
+            <!-- Type of Core Box -->
+            <div class="space-y-1.5">
                 <label for="modal_box_type"
                     class="block text-xs font-semibold uppercase tracking-wider text-slate-400 mb-1.5">
-                    Core Box Type <span class="text-rose-400">*</span>
+                    Type of Core Box <span class="text-rose-400">*</span>
                 </label>
-                <input type="text" name="box_type" id="modal_box_type" list="modalBoxTypeList"
-                    placeholder="e.g. GI Core Box, CB-Standard..." required autocomplete="off"
-                    class="w-full px-3.5 py-2.5 rounded-xl bg-slate-950 border border-slate-800 text-white placeholder-slate-500 text-sm focus:border-cyan-500 focus:ring-1 focus:ring-cyan-500 transition">
-                <datalist id="modalBoxTypeList">
-                    {% for item in box_items %}
-                    <option value="{{ item.name }}">SKU: {{ item.sku }}</option>
-                    {% endfor %}
-                </datalist>
+                <div class="relative">
+                    <select name="box_type" id="modal_box_type" required
+                        class="w-full px-4 py-2.5 rounded-xl bg-slate-950 border border-slate-800 text-white text-sm focus:border-cyan-500 focus:ring-1 focus:ring-cyan-500 transition font-medium appearance-none pr-10 cursor-pointer">
+                        <option value="" disabled selected>-- Select Type of Core Box --</option>
+                        <option value="BQ without Lid">BQ without Lid</option>
+                        <option value="NQ with Lid">NQ with Lid</option>
+                        <option value="HQ with Lid">HQ with Lid</option>
+                        <option value="Trunk (Peti)">Trunk (Peti)</option>
+                        {% for item in box_items %}
+                        {% if item.name != "BQ without Lid" and item.name != "NQ with Lid" and item.name != "HQ with Lid" and item.name != "Trunk (Peti)" %}
+                        <option value="{{ item.name }}">{{ item.name }}</option>
+                        {% endif %}
+                        {% endfor %}
+                    </select>
+                    <div class="pointer-events-none absolute inset-y-0 right-0 flex items-center px-3.5 text-slate-400">
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/></svg>
+                    </div>
+                </div>
             </div>
 
             <!-- Quantity -->
@@ -322,14 +412,30 @@
             <input type="hidden" name="action" value="edit_entry">
             <input type="hidden" name="entry_id" id="edit_entry_id">
 
-            <!-- Core Box Type -->
-            <div>
+            <!-- Type of Core Box -->
+            <div class="space-y-1.5">
                 <label for="edit_box_type"
                     class="block text-xs font-semibold uppercase tracking-wider text-slate-400 mb-1.5">
-                    Core Box Type <span class="text-rose-400">*</span>
+                    Type of Core Box <span class="text-rose-400">*</span>
                 </label>
-                <input type="text" name="box_type" id="edit_box_type" list="modalBoxTypeList" required
-                    class="w-full px-3.5 py-2.5 rounded-xl bg-slate-950 border border-slate-800 text-white placeholder-slate-500 text-sm focus:border-cyan-500 focus:ring-1 focus:ring-cyan-500 transition">
+                <div class="relative">
+                    <select name="box_type" id="edit_box_type" required
+                        class="w-full px-4 py-2.5 rounded-xl bg-slate-950 border border-slate-800 text-white text-sm focus:border-cyan-500 focus:ring-1 focus:ring-cyan-500 transition font-medium appearance-none pr-10 cursor-pointer">
+                        <option value="" disabled selected>-- Select Type of Core Box --</option>
+                        <option value="BQ without Lid">BQ without Lid</option>
+                        <option value="NQ with Lid">NQ with Lid</option>
+                        <option value="HQ with Lid">HQ with Lid</option>
+                        <option value="Trunk (Peti)">Trunk (Peti)</option>
+                        {% for item in box_items %}
+                        {% if item.name != "BQ without Lid" and item.name != "NQ with Lid" and item.name != "HQ with Lid" and item.name != "Trunk (Peti)" %}
+                        <option value="{{ item.name }}">{{ item.name }}</option>
+                        {% endif %}
+                        {% endfor %}
+                    </select>
+                    <div class="pointer-events-none absolute inset-y-0 right-0 flex items-center px-3.5 text-slate-400">
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/></svg>
+                    </div>
+                </div>
             </div>
 
             <!-- Quantity -->
@@ -476,7 +582,21 @@
 
     function openEditEntryModal(id, boxType, quantity, dateStr) {
         document.getElementById('edit_entry_id').value = id;
-        document.getElementById('edit_box_type').value = boxType;
+        const editBoxSelect = document.getElementById('edit_box_type');
+        if (editBoxSelect) {
+            let found = false;
+            for (let i = 0; i < editBoxSelect.options.length; i++) {
+                if (editBoxSelect.options[i].value === boxType) {
+                    editBoxSelect.selectedIndex = i;
+                    found = true;
+                    break;
+                }
+            }
+            if (!found && boxType) {
+                const opt = new Option(boxType, boxType, true, true);
+                editBoxSelect.add(opt);
+            }
+        }
         document.getElementById('edit_quantity').value = quantity;
         document.getElementById('edit_dispatch_date').value = dateStr;
         document.getElementById('editEntryModal').classList.remove('hidden');

@@ -1639,3 +1639,36 @@ class DailyCoreBoxFeatureTestCase(TestCase):
         self.assertEqual(res_del.status_code, 200)
         self.assertFalse(DailyCoreBoxDispatch.objects.filter(pk=entry.pk).exists())
 
+
+    def test_core_box_type_dropdown_options_and_submission(self):
+        """Verify Type of Core Box dropdown is present on list and detail pages and handles dispatch submissions."""
+        from django.urls import reverse
+        from inventory.models import DailyCoreBoxDispatch
+
+        # 1. Check dropdown on list page
+        res_list = self.client.get(reverse('daily-core-box-list'))
+        self.assertEqual(res_list.status_code, 200)
+        self.assertContains(res_list, 'Type of Core Box')
+        self.assertContains(res_list, 'BQ without Lid')
+        self.assertContains(res_list, 'NQ with Lid')
+        self.assertContains(res_list, 'HQ with Lid')
+        self.assertContains(res_list, 'Trunk (Peti)')
+
+        # 2. Check dropdown on detail page
+        res_detail = self.client.get(reverse('daily-core-box-detail', kwargs={'pk': self.company.pk}))
+        self.assertEqual(res_detail.status_code, 200)
+        self.assertContains(res_detail, 'Type of Core Box')
+        self.assertContains(res_detail, 'BQ without Lid')
+        self.assertContains(res_detail, 'NQ with Lid')
+        self.assertContains(res_detail, 'HQ with Lid')
+        self.assertContains(res_detail, 'Trunk (Peti)')
+
+        # 3. Post dispatch using dropdown value
+        res_post = self.client.post(reverse('daily-core-box-detail', kwargs={'pk': self.company.pk}), {
+            'action': 'add_entry',
+            'box_type': 'HQ with Lid',
+            'quantity': '35',
+            'dispatch_date': '2026-10-28',
+        }, follow=True)
+        self.assertEqual(res_post.status_code, 200)
+        self.assertTrue(DailyCoreBoxDispatch.objects.filter(company=self.company, box_type='HQ with Lid', quantity=35).exists())
