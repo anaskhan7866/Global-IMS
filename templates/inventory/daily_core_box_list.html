@@ -21,48 +21,6 @@
         </div>
     </div>
 
-    <!-- Quick Metrics Summary Bar -->
-    <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
-        <!-- Metric 1: Total Companies -->
-        <div class="rounded-xl bg-slate-950 p-4 border border-slate-800 shadow-xl flex items-center justify-between">
-            <div>
-                <p class="text-xs font-semibold uppercase tracking-wider text-slate-400">Registered Companies</p>
-                <h3 class="mt-1 text-2xl font-extrabold text-white font-mono-code">{{ total_companies_count }}</h3>
-            </div>
-            <div class="p-3 rounded-xl bg-slate-900 border border-slate-800 text-cyan-400">
-                <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
-                </svg>
-            </div>
-        </div>
-
-        <!-- Metric 2: Total Core Boxes Dispatched -->
-        <div class="rounded-xl bg-slate-950 p-4 border border-slate-800 shadow-xl flex items-center justify-between">
-            <div>
-                <p class="text-xs font-semibold uppercase tracking-wider text-slate-400">Total Core Boxes Taken</p>
-                <h3 class="mt-1 text-2xl font-extrabold text-cyan-400 font-mono-code">{{ total_all_core_boxes }} <span class="text-xs font-normal text-slate-400">Boxes</span></h3>
-            </div>
-            <div class="p-3 rounded-xl bg-slate-900 border border-slate-800 text-cyan-400">
-                <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" />
-                </svg>
-            </div>
-        </div>
-
-        <!-- Metric 3: Today's Core Boxes -->
-        <div class="rounded-xl bg-slate-950 p-4 border border-slate-800 shadow-xl flex items-center justify-between">
-            <div>
-                <p class="text-xs font-semibold uppercase tracking-wider text-slate-400">Dispatched Today</p>
-                <h3 class="mt-1 text-2xl font-extrabold text-emerald-400 font-mono-code">{{ today_core_boxes }} <span class="text-xs font-normal text-slate-400">Boxes</span></h3>
-            </div>
-            <div class="p-3 rounded-xl bg-slate-900 border border-slate-800 text-emerald-400">
-                <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
-                </svg>
-            </div>
-        </div>
-    </div>
-
     <!-- 1. TOP SECTION: ADD COMPANY NAME FORM -->
     <div class="rounded-2xl bg-slate-950 border border-slate-800 shadow-xl p-5 sm:p-6">
         <div class="flex items-center space-x-2 pb-3 mb-4 border-b border-slate-800/80">
