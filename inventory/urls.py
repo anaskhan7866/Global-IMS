@@ -1,5 +1,12 @@
 from django.urls import path
-from .views import EmployeeListView, EmployeeDetailView, VendorOrderListView, AddInventoryView
+from .views import (
+    EmployeeListView,
+    EmployeeDetailView,
+    VendorOrderListView,
+    AddInventoryView,
+    DailyCoreBoxListView,
+    DailyCoreBoxDetailView,
+)
 
 urlpatterns = [
     # Primary Inventory Route (Application Root)
@@ -15,4 +22,8 @@ urlpatterns = [
 
     # Vendor Purchase Orders View
     path('vendor-orders/', VendorOrderListView.as_view(), name='vendor-order-list'),
+
+    # Daily Core Box Dispatches (Company Daily Tracking)
+    path('daily-core-box/', DailyCoreBoxListView.as_view(), name='daily-core-box-list'),
+    path('daily-core-box/company/<int:pk>/', DailyCoreBoxDetailView.as_view(), name='daily-core-box-detail'),
 ]

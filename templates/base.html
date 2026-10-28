@@ -78,6 +78,14 @@
                         </svg>
                         Vendor Orders
                     </a>
+
+                    <!-- 4. Daily Core Box Link -->
+                    <a href="/daily-core-box/" class="group flex items-center px-3 py-2.5 text-sm font-medium rounded-lg transition {% if '/daily-core-box' in request.path %}bg-cyan-950 text-cyan-300 border border-cyan-800/80 shadow-sm{% else %}text-slate-300 hover:bg-slate-900 hover:text-white{% endif %}">
+                        <svg class="mr-3 h-5 w-5 flex-shrink-0 transition {% if '/daily-core-box' in request.path %}text-cyan-400{% else %}text-slate-400 group-hover:text-cyan-400{% endif %}" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 4H6a2 2 0 00-2 2v12a2 2 0 002 2h12a2 2 0 002-2V6a2 2 0 00-2-2h-2m-4-1v8m0 0l3-3m-3 3L9 8m-5 5h2.586a1 1 0 01.707.293l2.414 2.414a1 1 0 00.707.293h3.172a1 1 0 00.707-.293l2.414-2.414a1 1 0 01.707-.293H20" />
+                        </svg>
+                        Daily Core Box
+                    </a>
                 </nav>
 
                 <!-- Sidebar Footer Status & Admin Link -->
@@ -116,10 +124,11 @@
                 </div>
                 <span class="font-bold text-white text-base">Global-IMS</span>
             </a>
-            <div class="flex items-center space-x-3 text-xs">
-                <a href="/" class="text-slate-300 hover:text-white">Inventory</a>
-                <a href="/employees/" class="text-slate-300 hover:text-white">Employees</a>
-                <a href="/vendor-orders/" class="text-slate-300 hover:text-white">Vendor Orders</a>
+            <div class="flex items-center space-x-3 text-xs overflow-x-auto py-1">
+                <a href="/" class="text-slate-300 hover:text-white whitespace-nowrap">Inventory</a>
+                <a href="/employees/" class="text-slate-300 hover:text-white whitespace-nowrap">Employees</a>
+                <a href="/vendor-orders/" class="text-slate-300 hover:text-white whitespace-nowrap">Vendor Orders</a>
+                <a href="/daily-core-box/" class="text-slate-300 hover:text-white whitespace-nowrap">Daily Core Box</a>
             </div>
         </div>
 

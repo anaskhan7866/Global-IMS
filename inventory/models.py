@@ -313,3 +313,88 @@ class ProductionLog(models.Model):
 
     def __str__(self) -> str:
         return f"[{self.production_date}] {self.employee.full_name}: {self.quantity} x {self.item.sku}"
+
+
+class Company(models.Model):
+    """
+    Represents customer / client companies that take or receive core boxes daily or in bulk.
+    """
+    name = models.CharField(
+        max_length=255,
+        unique=True,
+        db_index=True,
+        help_text=_("Registered or operating company name.")
+    )
+    is_active = models.BooleanField(
+        default=True,
+        help_text=_("Designates whether this company is actively taking deliveries.")
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ['name']
+        verbose_name = _('Company')
+        verbose_name_plural = _('Companies')
+
+    def clean(self):
+        super().clean()
+        if self.name:
+            self.name = self.name.strip()
+
+    def __str__(self) -> str:
+        return self.name
+
+
+class DailyCoreBoxDispatch(models.Model):
+    """
+    Tracks daily core boxes taken by a company, including box type, quantity, and date.
+    """
+    company = models.ForeignKey(
+        Company,
+        on_delete=models.CASCADE,
+        related_name='dispatches',
+        help_text=_("Company taking the core box.")
+    )
+    box_type = models.CharField(
+        max_length=255,
+        db_index=True,
+        help_text=_("Name or type of core box taken.")
+    )
+    item = models.ForeignKey(
+        'inventory.Item',
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='daily_core_box_dispatches',
+        help_text=_("Catalog item if linked to a standard finished good.")
+    )
+    quantity = models.PositiveIntegerField(
+        help_text=_("Quantity of core boxes taken.")
+    )
+    dispatch_date = models.DateField(
+        default=timezone.localdate,
+        db_index=True,
+        help_text=_("Date when core boxes were taken.")
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ['-dispatch_date', '-id']
+        verbose_name = _('Daily Core Box Dispatch')
+        verbose_name_plural = _('Daily Core Box Dispatches')
+        constraints = [
+            models.CheckConstraint(
+                condition=models.Q(quantity__gt=0),
+                name='daily_core_box_quantity_positive'
+            )
+        ]
+        indexes = [
+            models.Index(fields=['company', 'dispatch_date']),
+            models.Index(fields=['dispatch_date']),
+        ]
+
+    def __str__(self) -> str:
+        return f"[{self.dispatch_date}] {self.company.name}: {self.quantity} x {self.box_type}"
+

@@ -1467,3 +1467,175 @@ class EmployeeAndVendorOrderViewsTestCase(TestCase):
         self.assertContains(res3, 'Precision Cast Box')
         self.assertContains(res3, 'Heavy Duty Core Box')
         self.assertContains(res3, '12')
+
+
+class DailyCoreBoxFeatureTestCase(TestCase):
+    """
+    Tests for the Daily Core Box feature:
+    - Adding companies
+    - Logging daily core box dispatches (company, core box type, quantity, date)
+    - Viewing all companies with total core boxes taken
+    - Date-wise detail page for each company with total core box taken top card
+    - Editing and deleting dispatches
+    """
+
+    def setUp(self):
+        from django.contrib.auth.models import User
+        from django.urls import reverse
+        from inventory.models import Company, DailyCoreBoxDispatch, Item, ItemType
+
+        self.user = User.objects.create_user(username='dispatchmgr', password='SecretPassword123!')
+        self.client.force_login(self.user)
+
+        self.item = Item.objects.create(
+            name='GI Core Box Std',
+            sku='FG-BOX-STD',
+            type=ItemType.FINISHED_GOOD,
+            unit_of_measure='pcs',
+            current_stock=Decimal('50.0000')
+        )
+
+        self.company = Company.objects.create(name='Precision Auto Ltd')
+
+    def test_daily_core_box_list_get(self):
+        """Test GET request to /daily-core-box/ loads with company list and form."""
+        from django.urls import reverse
+        res = self.client.get(reverse('daily-core-box-list'))
+        self.assertEqual(res.status_code, 200)
+        self.assertContains(res, 'Daily Core Box Dispatches')
+        self.assertContains(res, 'Add Company')
+        self.assertContains(res, 'Record Daily Core Box Taken')
+        self.assertContains(res, 'Precision Auto Ltd')
+
+    def test_add_company_success_and_duplicate(self):
+        """Test adding new company and preventing duplicates."""
+        from django.urls import reverse
+        from inventory.models import Company
+
+        # Add unique company
+        res = self.client.post(reverse('daily-core-box-list'), {
+            'action': 'add_company',
+            'company_name': 'Apex Foundry Corp'
+        }, follow=True)
+        self.assertEqual(res.status_code, 200)
+        self.assertTrue(Company.objects.filter(name='Apex Foundry Corp').exists())
+        self.assertContains(res, "Apex Foundry Corp")
+        self.assertContains(res, "added successfully")
+
+        # Attempt to add same company name
+        res_dup = self.client.post(reverse('daily-core-box-list'), {
+            'action': 'add_company',
+            'company_name': 'Apex Foundry Corp'
+        }, follow=True)
+        self.assertContains(res_dup, "already exists")
+
+    def test_add_entry_with_existing_and_new_company(self):
+        """Test recording daily core box dispatches."""
+        from django.urls import reverse
+        from inventory.models import DailyCoreBoxDispatch, Company
+
+        # 1. Entry for existing company
+        res = self.client.post(reverse('daily-core-box-list'), {
+            'action': 'add_entry',
+            'company_name': 'Precision Auto Ltd',
+            'box_type': 'GI Core Box Std',
+            'quantity': '25',
+            'dispatch_date': '2026-10-28',
+        }, follow=True)
+        self.assertEqual(res.status_code, 200)
+        self.assertContains(res, "Successfully recorded 25 units of &#x27;GI Core Box Std&#x27; for Precision Auto Ltd")
+        self.assertTrue(DailyCoreBoxDispatch.objects.filter(company=self.company, quantity=25).exists())
+
+        # 2. Entry for brand new company (auto-creation)
+        res_new = self.client.post(reverse('daily-core-box-list'), {
+            'action': 'add_entry',
+            'company_name': 'Brand New Castings',
+            'box_type': 'Heavy Core Box 10kg',
+            'quantity': '40',
+            'dispatch_date': '2026-10-28',
+        }, follow=True)
+        self.assertEqual(res_new.status_code, 200)
+        new_comp = Company.objects.filter(name='Brand New Castings').first()
+        self.assertIsNotNone(new_comp)
+        self.assertTrue(DailyCoreBoxDispatch.objects.filter(company=new_comp, quantity=40).exists())
+
+    def test_add_entry_invalid_quantity(self):
+        """Test rejection of non-positive quantities."""
+        from django.urls import reverse
+        res = self.client.post(reverse('daily-core-box-list'), {
+            'action': 'add_entry',
+            'company_name': 'Precision Auto Ltd',
+            'box_type': 'GI Core Box Std',
+            'quantity': '-5',
+        }, follow=True)
+        self.assertContains(res, "Quantity must be a positive number greater than 0")
+
+    def test_company_detail_view_and_top_card(self):
+        """Test company detail page shows total core box taken card and date-wise rows."""
+        from django.urls import reverse
+        from inventory.models import DailyCoreBoxDispatch
+
+        # Create two date-wise dispatch entries
+        DailyCoreBoxDispatch.objects.create(
+            company=self.company,
+            box_type='GI Core Box Std',
+            quantity=30,
+            dispatch_date=datetime.date(2026, 10, 27)
+        )
+        DailyCoreBoxDispatch.objects.create(
+            company=self.company,
+            box_type='Heavy Core Box',
+            quantity=45,
+            dispatch_date=datetime.date(2026, 10, 28)
+        )
+
+        res = self.client.get(reverse('daily-core-box-detail', kwargs={'pk': self.company.pk}))
+        self.assertEqual(res.status_code, 200)
+        # Total core boxes taken = 30 + 45 = 75
+        self.assertContains(res, '75')
+        self.assertContains(res, 'Total Core Box Taken')
+        self.assertContains(res, 'GI Core Box Std')
+        self.assertContains(res, 'Heavy Core Box')
+        self.assertContains(res, '30 Boxes')
+        self.assertContains(res, '45 Boxes')
+        self.assertContains(res, '27 Oct 2026')
+        self.assertContains(res, '28 Oct 2026')
+
+    def test_company_detail_add_edit_delete_entry(self):
+        """Test adding, editing, and deleting dispatches on the company detail page."""
+        from django.urls import reverse
+        from inventory.models import DailyCoreBoxDispatch
+
+        # 1. Add entry
+        res_add = self.client.post(reverse('daily-core-box-detail', kwargs={'pk': self.company.pk}), {
+            'action': 'add_entry',
+            'box_type': 'Pattern Core Box',
+            'quantity': '60',
+            'dispatch_date': '2026-10-28',
+        }, follow=True)
+        self.assertEqual(res_add.status_code, 200)
+        entry = DailyCoreBoxDispatch.objects.filter(company=self.company, box_type='Pattern Core Box').first()
+        self.assertIsNotNone(entry)
+        self.assertEqual(entry.quantity, 60)
+
+        # 2. Edit entry
+        res_edit = self.client.post(reverse('daily-core-box-detail', kwargs={'pk': self.company.pk}), {
+            'action': 'edit_entry',
+            'entry_id': str(entry.pk),
+            'box_type': 'Pattern Core Box Updated',
+            'quantity': '85',
+            'dispatch_date': '2026-10-28',
+        }, follow=True)
+        self.assertEqual(res_edit.status_code, 200)
+        entry.refresh_from_db()
+        self.assertEqual(entry.quantity, 85)
+        self.assertEqual(entry.box_type, 'Pattern Core Box Updated')
+
+        # 3. Delete entry
+        res_del = self.client.post(reverse('daily-core-box-detail', kwargs={'pk': self.company.pk}), {
+            'action': 'delete_entry',
+            'entry_id': str(entry.pk),
+        }, follow=True)
+        self.assertEqual(res_del.status_code, 200)
+        self.assertFalse(DailyCoreBoxDispatch.objects.filter(pk=entry.pk).exists())
+

@@ -1,7 +1,8 @@
 from django.contrib import admin
+from django.db import models
 from django.utils.html import format_html
 from django.utils.translation import gettext_lazy as _
-from .models import Item, BillOfMaterials, BOMComponent, Employee, ProductionLog
+from .models import Item, BillOfMaterials, BOMComponent, Employee, ProductionLog, Company, DailyCoreBoxDispatch
 
 
 class BOMComponentInline(admin.TabularInline):
@@ -161,3 +162,49 @@ class ProductionLogAdmin(admin.ModelAdmin):
     autocomplete_fields = ['employee', 'item']
     date_hierarchy = 'production_date'
     readonly_fields = ('production_date',)
+
+
+@admin.register(Company)
+class CompanyAdmin(admin.ModelAdmin):
+    list_display = (
+        'name',
+        'is_active',
+        'total_dispatched_boxes',
+        'created_at',
+    )
+    list_filter = (
+        'is_active',
+        'created_at',
+    )
+    search_fields = (
+        'name',
+    )
+    readonly_fields = ('created_at', 'updated_at')
+
+    @admin.display(description=_('Total Core Boxes Dispatched'))
+    def total_dispatched_boxes(self, obj: Company) -> int:
+        total = obj.dispatches.aggregate(models.Sum('quantity'))['quantity__sum']
+        return total or 0
+
+
+@admin.register(DailyCoreBoxDispatch)
+class DailyCoreBoxDispatchAdmin(admin.ModelAdmin):
+    list_display = (
+        'dispatch_date',
+        'company',
+        'box_type',
+        'quantity',
+        'created_at',
+    )
+    list_filter = (
+        'dispatch_date',
+        'company',
+    )
+    search_fields = (
+        'company__name',
+        'box_type',
+    )
+    autocomplete_fields = ['company', 'item']
+    date_hierarchy = 'dispatch_date'
+    readonly_fields = ('created_at', 'updated_at')
+

@@ -2,7 +2,7 @@ import datetime
 import re
 from decimal import Decimal
 from django.db import transaction, IntegrityError
-from django.db.models import Count, Sum, Q, Value, ProtectedError
+from django.db.models import Count, Sum, Q, Value, ProtectedError, Max
 from django.db.models.functions import Coalesce
 from django.shortcuts import render, redirect, get_object_or_404
 from django.urls import reverse
@@ -12,7 +12,7 @@ from django.utils import timezone
 from django.views import View
 from django.views.generic import ListView, DetailView
 
-from inventory.models import Employee, ProductionLog, Item, ItemType
+from inventory.models import Employee, ProductionLog, Item, ItemType, Company, DailyCoreBoxDispatch
 from transactions.models import PurchaseOrder, Contact, ContactType, InventoryLedger, TransactionType, PurchaseOrderStatus
 
 
@@ -1206,4 +1206,309 @@ class AddInventoryView(LoginRequiredMixin, View):
                 )
 
         return redirect('add-inventory')
+
+
+class DailyCoreBoxListView(LoginRequiredMixin, View):
+    """
+    Main portal for companies taking core boxes daily.
+    Displays quick add company form, daily entry form, and full directory of companies with totals.
+    """
+    template_name = 'inventory/daily_core_box_list.html'
+
+    def get(self, request, *args, **kwargs):
+        # Query active companies annotated with total core boxes taken and last dispatch date
+        companies = Company.objects.filter(is_active=True).annotate(
+            total_boxes=Coalesce(Sum('dispatches__quantity'), Value(0)),
+            last_dispatch_date=Max('dispatches__dispatch_date'),
+            dispatch_count=Count('dispatches')
+        ).order_by('name')
+
+        today = timezone.localdate()
+        total_all_core_boxes = DailyCoreBoxDispatch.objects.aggregate(total=Sum('quantity'))['total'] or 0
+        today_core_boxes = DailyCoreBoxDispatch.objects.filter(dispatch_date=today).aggregate(total=Sum('quantity'))['total'] or 0
+
+        # Suggested core box items from catalog
+        box_items = Item.objects.filter(is_active=True).order_by('name')
+
+        context = {
+            'companies': companies,
+            'total_all_core_boxes': total_all_core_boxes,
+            'today_core_boxes': today_core_boxes,
+            'total_companies_count': companies.count(),
+            'today': today,
+            'box_items': box_items,
+        }
+        return render(request, self.template_name, context)
+
+    def post(self, request, *args, **kwargs):
+        action = request.POST.get('action')
+
+        # -------------------------------------------------------------
+        # Action 1: Add Company Name
+        # -------------------------------------------------------------
+        if action == 'add_company':
+            company_name = (request.POST.get('company_name') or '').strip()
+            if not company_name:
+                messages.error(request, "Company name cannot be empty.")
+                return redirect('daily-core-box-list')
+
+            existing = Company.objects.filter(name__iexact=company_name).first()
+            if existing:
+                if not existing.is_active:
+                    existing.is_active = True
+                    existing.save(update_fields=['is_active'])
+                    messages.success(request, f"Re-activated company '{existing.name}'.")
+                else:
+                    messages.error(request, f"Company '{company_name}' already exists.")
+                return redirect('daily-core-box-list')
+
+            company = Company.objects.create(name=company_name)
+            Contact.objects.get_or_create(company_name=company_name, defaults={'type': ContactType.CLIENT})
+            messages.success(request, f"Company '{company.name}' added successfully!")
+            return redirect('daily-core-box-list')
+
+        # -------------------------------------------------------------
+        # Action 2: Record Daily Core Box (Company, Box Type, Quantity, Save)
+        # -------------------------------------------------------------
+        if action == 'add_entry':
+            company_id = request.POST.get('company_id')
+            company_name = (request.POST.get('company_name') or '').strip()
+            box_type = (request.POST.get('box_type') or request.POST.get('core_box_type') or '').strip()
+            raw_quantity = request.POST.get('quantity')
+            raw_date = request.POST.get('dispatch_date')
+
+            # 1. Resolve Company
+            company = None
+            if company_id:
+                company = Company.objects.filter(pk=company_id).first()
+            if not company and company_name:
+                company = Company.objects.filter(name__iexact=company_name).first()
+                if not company:
+                    company = Company.objects.create(name=company_name)
+                    Contact.objects.get_or_create(company_name=company_name, defaults={'type': ContactType.CLIENT})
+
+            if not company:
+                messages.error(request, "Please provide or select a Company name.")
+                return redirect('daily-core-box-list')
+
+            # 2. Resolve Core Box Type
+            if not box_type:
+                messages.error(request, "Please enter or select the Core Box Type.")
+                return redirect('daily-core-box-list')
+
+            # 3. Resolve Quantity
+            try:
+                quantity = int(raw_quantity)
+                if quantity <= 0:
+                    raise ValueError
+            except (ValueError, TypeError):
+                messages.error(request, "Quantity must be a positive number greater than 0.")
+                return redirect('daily-core-box-list')
+
+            # 4. Resolve Date
+            dispatch_date = timezone.localdate()
+            if raw_date:
+                try:
+                    dispatch_date = datetime.date.fromisoformat(raw_date.strip())
+                except (ValueError, TypeError):
+                    pass
+
+            # 5. Link with catalog Item if matching
+            matched_item = Item.objects.filter(name__iexact=box_type, is_active=True).first()
+            if not matched_item:
+                matched_item = Item.objects.filter(sku__iexact=box_type, is_active=True).first()
+
+            DailyCoreBoxDispatch.objects.create(
+                company=company,
+                box_type=box_type,
+                item=matched_item,
+                quantity=quantity,
+                dispatch_date=dispatch_date
+            )
+
+            messages.success(
+                request,
+                f"Successfully recorded {quantity} units of '{box_type}' for {company.name} on {dispatch_date.strftime('%d %b %Y')}!"
+            )
+            return redirect('daily-core-box-list')
+
+        # -------------------------------------------------------------
+        # Action 3: Delete Company
+        # -------------------------------------------------------------
+        if action == 'delete_company':
+            company_id = request.POST.get('company_id')
+            if company_id:
+                comp = Company.objects.filter(pk=company_id).first()
+                if comp:
+                    cname = comp.name
+                    comp.delete()
+                    messages.success(request, f"Company '{cname}' and its dispatches were successfully removed.")
+            return redirect('daily-core-box-list')
+
+        messages.warning(request, "Unknown action requested.")
+        return redirect('daily-core-box-list')
+
+
+class DailyCoreBoxDetailView(LoginRequiredMixin, View):
+    """
+    Detailed date-wise log of all core boxes taken by a specific company.
+    Features top metric card with total core boxes taken, type breakdown, and date-wise entry table.
+    """
+    template_name = 'inventory/daily_core_box_detail.html'
+
+    def get(self, request, pk, *args, **kwargs):
+        company = get_object_or_404(Company, pk=pk)
+
+        # Date-wise entries ordered by latest first
+        dispatches = company.dispatches.select_related('item').all().order_by('-dispatch_date', '-id')
+
+        # Total core boxes taken (for the top card)
+        total_core_boxes = dispatches.aggregate(total=Sum('quantity'))['total'] or 0
+
+        # Unique dispatch days
+        total_days = dispatches.values('dispatch_date').distinct().count()
+
+        # Breakdown by core box type
+        box_breakdown = dispatches.values('box_type').annotate(
+            total_qty=Sum('quantity'),
+            entries_count=Count('id')
+        ).order_by('-total_qty')
+
+        # Available catalog items for autocomplete
+        box_items = Item.objects.filter(is_active=True).order_by('name')
+
+        context = {
+            'company': company,
+            'dispatches': dispatches,
+            'total_core_boxes': total_core_boxes,
+            'total_days': total_days,
+            'box_breakdown': box_breakdown,
+            'box_items': box_items,
+            'today': timezone.localdate(),
+        }
+        return render(request, self.template_name, context)
+
+    def post(self, request, pk, *args, **kwargs):
+        company = get_object_or_404(Company, pk=pk)
+        action = request.POST.get('action')
+
+        # -------------------------------------------------------------
+        # Action 1: Add Entry Directly for this Company
+        # -------------------------------------------------------------
+        if action == 'add_entry':
+            box_type = (request.POST.get('box_type') or request.POST.get('core_box_type') or '').strip()
+            raw_quantity = request.POST.get('quantity')
+            raw_date = request.POST.get('dispatch_date')
+
+            if not box_type:
+                messages.error(request, "Please enter or select the Core Box Type.")
+                return redirect('daily-core-box-detail', pk=company.pk)
+
+            try:
+                quantity = int(raw_quantity)
+                if quantity <= 0:
+                    raise ValueError
+            except (ValueError, TypeError):
+                messages.error(request, "Quantity must be a positive number greater than 0.")
+                return redirect('daily-core-box-detail', pk=company.pk)
+
+            dispatch_date = timezone.localdate()
+            if raw_date:
+                try:
+                    dispatch_date = datetime.date.fromisoformat(raw_date.strip())
+                except (ValueError, TypeError):
+                    pass
+
+            matched_item = Item.objects.filter(name__iexact=box_type, is_active=True).first()
+            if not matched_item:
+                matched_item = Item.objects.filter(sku__iexact=box_type, is_active=True).first()
+
+            DailyCoreBoxDispatch.objects.create(
+                company=company,
+                box_type=box_type,
+                item=matched_item,
+                quantity=quantity,
+                dispatch_date=dispatch_date
+            )
+
+            messages.success(
+                request,
+                f"Recorded {quantity} boxes of '{box_type}' on {dispatch_date.strftime('%d %b %Y')}."
+            )
+            return redirect('daily-core-box-detail', pk=company.pk)
+
+        # -------------------------------------------------------------
+        # Action 2: Edit Existing Dispatch Entry
+        # -------------------------------------------------------------
+        if action == 'edit_entry':
+            entry_id = request.POST.get('entry_id')
+            box_type = (request.POST.get('box_type') or '').strip()
+            raw_quantity = request.POST.get('quantity')
+            raw_date = request.POST.get('dispatch_date')
+
+            dispatch = get_object_or_404(DailyCoreBoxDispatch, pk=entry_id, company=company)
+
+            if not box_type:
+                messages.error(request, "Core box type cannot be empty.")
+                return redirect('daily-core-box-detail', pk=company.pk)
+
+            try:
+                quantity = int(raw_quantity)
+                if quantity <= 0:
+                    raise ValueError
+            except (ValueError, TypeError):
+                messages.error(request, "Quantity must be a positive number greater than 0.")
+                return redirect('daily-core-box-detail', pk=company.pk)
+
+            dispatch_date = dispatch.dispatch_date
+            if raw_date:
+                try:
+                    dispatch_date = datetime.date.fromisoformat(raw_date.strip())
+                except (ValueError, TypeError):
+                    pass
+
+            matched_item = Item.objects.filter(name__iexact=box_type, is_active=True).first()
+            if not matched_item:
+                matched_item = Item.objects.filter(sku__iexact=box_type, is_active=True).first()
+
+            dispatch.box_type = box_type
+            dispatch.quantity = quantity
+            dispatch.dispatch_date = dispatch_date
+            dispatch.item = matched_item
+            dispatch.save()
+
+            messages.success(request, f"Updated entry for {dispatch_date.strftime('%d %b %Y')}.")
+            return redirect('daily-core-box-detail', pk=company.pk)
+
+        # -------------------------------------------------------------
+        # Action 3: Delete Entry
+        # -------------------------------------------------------------
+        if action == 'delete_entry':
+            entry_id = request.POST.get('entry_id')
+            dispatch = get_object_or_404(DailyCoreBoxDispatch, pk=entry_id, company=company)
+            dispatch.delete()
+            messages.success(request, "Dispatch entry successfully removed.")
+            return redirect('daily-core-box-detail', pk=company.pk)
+
+        # -------------------------------------------------------------
+        # Action 4: Edit Company Name
+        # -------------------------------------------------------------
+        if action == 'edit_company':
+            new_name = (request.POST.get('company_name') or '').strip()
+            if not new_name:
+                messages.error(request, "Company name cannot be empty.")
+                return redirect('daily-core-box-detail', pk=company.pk)
+
+            if Company.objects.filter(name__iexact=new_name).exclude(pk=company.pk).exists():
+                messages.error(request, f"Another company with name '{new_name}' already exists.")
+                return redirect('daily-core-box-detail', pk=company.pk)
+
+            company.name = new_name
+            company.save(update_fields=['name', 'updated_at'])
+            messages.success(request, f"Company renamed to '{company.name}'.")
+            return redirect('daily-core-box-detail', pk=company.pk)
+
+        messages.warning(request, "Unknown action requested.")
+        return redirect('daily-core-box-detail', pk=company.pk)
+
 
