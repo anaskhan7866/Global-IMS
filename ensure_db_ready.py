@@ -24,57 +24,64 @@ def ensure_tables():
 
     print(f"Total existing tables found: {len(existing_tables)}")
 
-    # 1. Handle contenttypes (faked because legacy 'name' column was dropped)
-    if 'django_content_type' in existing_tables:
-        print("django_content_type table exists. Ensuring contenttypes migration is recorded.")
-        try:
-            call_command('migrate', 'contenttypes', '--fake')
-        except Exception as e:
-            print(f"contenttypes fake notice: {e}")
-
-    # 2. Handle auth
-    if 'auth_user' in existing_tables:
-        print("auth_user table exists. Ensuring auth migration is recorded.")
-        try:
-            call_command('migrate', 'auth', '--fake')
-        except Exception as e:
-            print(f"auth fake notice: {e}")
-
-    # 3. Handle admin
-    if 'django_admin_log' in existing_tables:
-        print("django_admin_log table exists. Ensuring admin migration is recorded.")
-        try:
-            call_command('migrate', 'admin', '--fake')
-        except Exception as e:
-            print(f"admin fake notice: {e}")
-
-    # 4. Handle sessions - CRITICAL FOR LOGIN!
-    if 'django_session' not in existing_tables:
-        print("WARNING: django_session table is MISSING! Creating django_session now...")
-        with connection.cursor() as cursor:
-            if connection.vendor == 'postgresql':
-                cursor.execute("DELETE FROM django_migrations WHERE app = 'sessions';")
-        call_command('migrate', 'sessions')
-        print("django_session table created successfully!")
+    # CASE 1: Fresh / Empty Database
+    # When no tables or only django_migrations exists, run standard migrations cleanly
+    if 'django_migrations' not in existing_tables and len(existing_tables) <= 1:
+        print("Fresh database detected. Applying all migrations from scratch...")
+        call_command('migrate')
     else:
-        print("django_session table exists.")
-        try:
-            call_command('migrate', 'sessions', '--fake')
-        except Exception:
-            pass
+        # CASE 2: Pre-existing database schema (e.g. legacy or imported tables)
+        print("Existing database schema detected. Reconciling migrations safely...")
 
-    # 5. Run remaining app migrations
-    print("Running migrations for inventory and transactions...")
-    try:
-        call_command('migrate', '--fake-initial')
-    except Exception as e:
-        print(f"migrate --fake-initial notice: {e}, falling back to selective fake")
-        try:
-            call_command('migrate', '--fake')
-        except Exception as e2:
-            print(f"migrate --fake notice: {e2}")
+        # If contenttypes table exists, fake it to prevent 'name' column alteration failure
+        if 'django_content_type' in existing_tables:
+            try:
+                call_command('migrate', 'contenttypes', '--fake')
+            except Exception as e:
+                print(f"contenttypes fake notice: {e}")
 
-    # 6. Configure admin superuser
+        # If auth_user already exists, fake auth
+        if 'auth_user' in existing_tables:
+            try:
+                call_command('migrate', 'auth', '--fake')
+            except Exception as e:
+                print(f"auth fake notice: {e}")
+
+        # If django_admin_log already exists, fake admin
+        if 'django_admin_log' in existing_tables:
+            try:
+                call_command('migrate', 'admin', '--fake')
+            except Exception as e:
+                print(f"admin fake notice: {e}")
+
+        # Ensure django_session table exists
+        if 'django_session' not in existing_tables:
+            print("Creating missing django_session...")
+            if 'django_migrations' in existing_tables:
+                try:
+                    with connection.cursor() as cursor:
+                        cursor.execute("DELETE FROM django_migrations WHERE app = 'sessions';")
+                except Exception:
+                    pass
+            call_command('migrate', 'sessions')
+        else:
+            try:
+                call_command('migrate', 'sessions', '--fake')
+            except Exception:
+                pass
+
+        # Apply all remaining migrations with --fake-initial
+        try:
+            call_command('migrate', '--fake-initial')
+        except Exception as e:
+            print(f"migrate --fake-initial notice: {e}")
+            try:
+                call_command('migrate', '--fake')
+            except Exception:
+                pass
+
+    # Ensure superuser admin is created/updated
+    print("Configuring superuser admin...")
     superuser_password = os.environ.get('DJANGO_SUPERUSER_PASSWORD', 'azsxd12345')
     User = get_user_model()
     admin_user, created = User.objects.get_or_create(username='admin')
