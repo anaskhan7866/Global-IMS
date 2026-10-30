@@ -1,0 +1,29 @@
+{
+  "appId": "com.globalenterprises.ims",
+  "appName": "Global-IMS",
+  "webDir": "mobile_shell",
+  "server": {
+    "url": "https://global-ims.onrender.com",
+    "cleartext": false,
+    "androidScheme": "https"
+  },
+  "plugins": {
+    "StatusBar": {
+      "style": "DARK",
+      "backgroundColor": "#020617",
+      "overlaysWebView": false
+    },
+    "SplashScreen": {
+      "launchShowDuration": 1500,
+      "launchAutoHide": true,
+      "backgroundColor": "#020617",
+      "androidSplashResourceName": "splash",
+      "androidScaleType": "CENTER_CROP",
+      "showSpinner": true,
+      "spinnerColor": "#0891b2"
+    },
+    "App": {
+      "launchShowDuration": 0
+    }
+  }
+}
