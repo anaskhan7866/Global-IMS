@@ -63,7 +63,8 @@
         </div>
 
         <!-- Table Display: name of employee | boxes | current month boxes | daily log | delete -->
-        <div class="overflow-x-auto">
+        <!-- 1. Desktop & Tablet Table (>= 768px) -->
+        <div class="hidden md:block overflow-x-auto">
             <table class="min-w-full divide-y divide-slate-800 text-left text-sm" id="employeesTable">
                 <thead class="bg-slate-900/60 text-xs uppercase font-semibold text-slate-400">
                     <tr>
@@ -190,12 +191,116 @@
                 </tbody>
             </table>
         </div>
+
+        <!-- 2. Mobile Stacked Employees Cards (< 768px) with 44px Touch Targets -->
+        <div class="md:hidden divide-y divide-slate-800/80 bg-slate-950" id="mobileEmployeesCards">
+            {% for emp in employees %}
+            <div class="employee-row p-4 space-y-3.5 transition hover:bg-slate-900/40">
+                <div class="flex items-center justify-between gap-2">
+                    <div class="flex items-center space-x-2.5 min-w-0">
+                        <div class="w-8 h-8 rounded-lg bg-cyan-950/80 border border-cyan-800/60 text-cyan-400 font-bold text-xs flex items-center justify-center flex-shrink-0">
+                            {{ emp.first_name|slice:":1"|upper }}
+                        </div>
+                        <span class="font-bold text-white text-base employee-name truncate">{{ emp.full_name }}</span>
+                    </div>
+                    <div class="text-right flex-shrink-0">
+                        <span class="text-[10px] uppercase tracking-wider text-slate-400 block font-semibold">Month Total</span>
+                        <span class="text-sm font-extrabold font-mono-code text-cyan-400">{{ emp.total_boxes }} <span class="text-[10px] text-slate-400 font-normal">Boxes</span></span>
+                    </div>
+                </div>
+
+                <!-- Touch-friendly inline logging form for mobile -->
+                <form method="post" action="{% url 'employee-list' %}" class="space-y-2 pt-1 pb-1">
+                    {% csrf_token %}
+                    <input type="hidden" name="action" value="log_production">
+                    <input type="hidden" name="employee_id" value="{{ emp.pk }}">
+
+                    <label class="block text-[11px] font-bold uppercase tracking-wider text-slate-400">
+                        Record Today's Production
+                        {% if emp.today_boxes > 0 %}
+                        <span class="text-emerald-400 font-mono-code normal-case font-bold ml-1">({{ emp.today_boxes }} logged today)</span>
+                        {% endif %}
+                    </label>
+
+                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                        <div class="relative">
+                            <select
+                                name="box_name"
+                                required
+                                class="w-full px-3 py-2.5 min-h-[44px] rounded-xl bg-slate-900 border border-slate-700 text-white text-sm font-medium focus:border-cyan-500 focus:ring-1 focus:ring-cyan-500 transition appearance-none pr-8 cursor-pointer"
+                            >
+                                <option value="" disabled selected>Select Type of Box</option>
+                                <option value="BQ without Lid">BQ without Lid</option>
+                                <option value="NQ with Lid">NQ with Lid</option>
+                                <option value="HQ with Lid">HQ with Lid</option>
+                                <option value="Trunk (Peti)">Trunk (Peti)</option>
+                                {% for fg in finished_goods %}
+                                {% if fg.name != "BQ without Lid" and fg.name != "NQ with Lid" and fg.name != "HQ with Lid" and fg.name != "Trunk (Peti)" %}
+                                <option value="{{ fg.name }}">{{ fg.name }}</option>
+                                {% endif %}
+                                {% endfor %}
+                            </select>
+                            <div class="pointer-events-none absolute inset-y-0 right-0 flex items-center px-2.5 text-slate-400">
+                                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/></svg>
+                            </div>
+                        </div>
+
+                        <div class="flex items-center space-x-2">
+                            <input
+                                type="number"
+                                name="quantity"
+                                min="1"
+                                required
+                                placeholder="Qty"
+                                class="w-full px-3 py-2.5 min-h-[44px] rounded-xl bg-slate-900 border border-slate-700 text-white placeholder-slate-500 text-sm font-mono-code focus:border-cyan-500 focus:ring-1 focus:ring-cyan-500 transition"
+                            >
+                            <button
+                                type="submit"
+                                class="inline-flex items-center justify-center space-x-1 px-4 py-2.5 min-h-[44px] rounded-xl text-xs font-bold bg-cyan-600 hover:bg-cyan-500 text-white shadow-md shadow-cyan-900/30 transition flex-shrink-0 active:bg-cyan-700"
+                            >
+                                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>
+                                <span>Save</span>
+                            </button>
+                        </div>
+                    </div>
+                </form>
+
+                <!-- 44px Action Buttons: Daily Log & Delete -->
+                <div class="grid grid-cols-2 gap-2 pt-1 border-t border-slate-800/80">
+                    <a
+                        href="{% url 'employee-detail' emp.pk current_month %}"
+                        class="inline-flex items-center justify-center space-x-1.5 px-3 py-2.5 min-h-[44px] rounded-xl bg-slate-900 hover:bg-slate-800 text-cyan-400 border border-slate-800 text-xs font-semibold transition active:bg-slate-700"
+                    >
+                        <svg class="w-4 h-4 text-cyan-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01" />
+                        </svg>
+                        <span>Daily Log</span>
+                    </a>
+                    <button
+                        type="button"
+                        onclick="openDeleteEmployeeModal('{{ emp.pk }}', '{{ emp.full_name|escapejs }}')"
+                        class="inline-flex items-center justify-center space-x-1.5 px-3 py-2.5 min-h-[44px] rounded-xl bg-rose-950/70 hover:bg-rose-900 text-rose-300 border border-rose-800 text-xs font-semibold transition active:bg-rose-800"
+                    >
+                        <svg class="w-4 h-4 text-rose-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                        </svg>
+                        <span>Delete</span>
+                    </button>
+                </div>
+            </div>
+            {% empty %}
+            <div class="py-12 text-center text-slate-500 p-4">
+                <p class="text-sm font-semibold text-slate-400">No active employees found.</p>
+                <p class="text-xs text-slate-500 mt-1">Click "Add Employee" above to register an employee.</p>
+            </div>
+            {% endfor %}
+        </div>
     </div>
 </div>
 
 <!-- Modal: Add New Employee -->
 <div id="addEmployeeModal" class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm hidden transition-opacity">
-    <div class="relative w-full max-w-md rounded-2xl bg-slate-950 border border-slate-800 shadow-2xl overflow-hidden p-6 space-y-5">
+    <div class="relative w-full max-w-md max-h-[92vh] overflow-y-auto rounded-2xl bg-slate-950 border border-slate-800 shadow-2xl p-5 sm:p-6 space-y-5">
         <div class="flex items-center justify-between border-b border-slate-800 pb-3.5">
             <div class="flex items-center space-x-3">
                 <div class="w-9 h-9 rounded-xl bg-cyan-950 border border-cyan-800 text-cyan-400 flex items-center justify-center">

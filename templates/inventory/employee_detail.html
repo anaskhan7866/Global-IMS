@@ -3,11 +3,11 @@
 {% block title %}{{ employee.full_name }} - Daily Logs & Productivity | Global-IMS{% endblock %}
 
 {% block content %}
-<div class="space-y-8">
+<div class="space-y-6 sm:space-y-8">
     <!-- Top Navigation Bar & Employee Banner -->
     <div>
         <a href="{% url 'employee-list' %}"
-            class="inline-flex items-center space-x-2 text-xs font-semibold text-slate-400 hover:text-cyan-400 transition mb-3">
+            class="inline-flex items-center space-x-2 text-xs font-semibold text-slate-400 hover:text-cyan-400 transition mb-3 min-h-[44px] py-2 px-1">
             <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18" />
             </svg>
@@ -15,15 +15,15 @@
         </a>
 
         <div
-            class="flex flex-col md:flex-row md:items-center md:justify-between gap-4 p-6 rounded-2xl bg-slate-950 border border-slate-800 shadow-xl">
+            class="flex flex-col md:flex-row md:items-center md:justify-between gap-4 p-5 sm:p-6 rounded-2xl bg-slate-950 border border-slate-800 shadow-xl">
             <div class="flex items-center space-x-4">
                 <div
-                    class="h-14 w-14 rounded-2xl bg-gradient-to-tr from-cyan-600 to-blue-700 flex items-center justify-center text-white font-extrabold text-xl shadow-lg shadow-cyan-900/50">
+                    class="h-14 w-14 rounded-2xl bg-gradient-to-tr from-cyan-600 to-blue-700 flex items-center justify-center text-white font-extrabold text-xl shadow-lg shadow-cyan-900/50 shrink-0">
                     {{ employee.first_name|slice:":1" }}{{ employee.last_name|slice:":1" }}
                 </div>
                 <div>
-                    <div class="flex items-center space-x-3">
-                        <h1 class="text-2xl sm:text-3xl font-extrabold tracking-tight text-white">{{ employee.full_name }}</h1>
+                    <div class="flex items-center space-x-3 flex-wrap gap-y-1">
+                        <h1 class="text-xl sm:text-2xl md:text-3xl font-extrabold tracking-tight text-white">{{ employee.full_name }}</h1>
                         {% if employee.is_active %}
                         <span
                             class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold bg-emerald-950 text-emerald-300 border border-emerald-800">
@@ -48,7 +48,7 @@
                 <form method="get" class="flex items-center space-x-2">
                     <label for="month" class="text-xs text-slate-400 font-medium">Period:</label>
                     <select name="month" id="month" onchange="this.form.submit()"
-                        class="px-3 py-1.5 rounded-lg bg-slate-900 border border-slate-700 text-xs font-semibold text-slate-200 focus:border-cyan-500 focus:ring-1 focus:ring-cyan-500">
+                        class="min-h-[44px] px-3.5 py-2 rounded-xl bg-slate-900 border border-slate-700 text-xs font-semibold text-slate-200 focus:border-cyan-500 focus:ring-1 focus:ring-cyan-500 cursor-pointer">
                         <option value="1" {% if selected_month == 1 %}selected{% endif %}>January</option>
                         <option value="2" {% if selected_month == 2 %}selected{% endif %}>February</option>
                         <option value="3" {% if selected_month == 3 %}selected{% endif %}>March</option>
@@ -65,8 +65,8 @@
                 </form>
 
                 <button type="button" onclick="openLogProductionModal()"
-                    class="inline-flex items-center space-x-1.5 px-3.5 py-1.5 rounded-lg bg-gradient-to-r from-cyan-600 to-blue-600 hover:from-cyan-500 hover:to-blue-500 text-white text-xs font-bold shadow-md shadow-cyan-900/40 transition">
-                    <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    class="min-h-[44px] inline-flex items-center justify-center space-x-2 px-4 py-2.5 rounded-xl bg-gradient-to-r from-cyan-600 to-blue-600 hover:from-cyan-500 hover:to-blue-500 text-white text-xs sm:text-sm font-bold shadow-md shadow-cyan-900/40 transition">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" />
                     </svg>
                     <span>Log Box Output</span>
@@ -76,7 +76,7 @@
     </div>
 
     <!-- Monthly Production Metric Cards -->
-    <section aria-label="Monthly Output Statistics" class="grid grid-cols-1 sm:grid-cols-3 gap-5">
+    <section aria-label="Monthly Output Statistics" class="grid grid-cols-1 sm:grid-cols-3 gap-4 sm:gap-5">
         <div class="rounded-xl bg-slate-950 p-5 border border-slate-800 shadow-xl">
             <div class="flex items-center justify-between">
                 <p class="text-xs font-semibold uppercase tracking-wider text-slate-400">Total Boxes Built</p>
@@ -130,7 +130,7 @@
         </div>
     </section>
 
-    <!-- Daily Breakdown Table: Shows each date, total made, detail if one box type, or breakdown of multiple box types -->
+    <!-- Daily Breakdown Table & Mobile Cards -->
     <section aria-label="Daily Production Breakdown"
         class="rounded-2xl bg-slate-950 border border-slate-800 shadow-xl overflow-hidden">
         <div
@@ -143,12 +143,13 @@
                 </p>
             </div>
             <span
-                class="inline-flex items-center space-x-1.5 px-3 py-1 rounded-md text-xs font-mono-code font-semibold bg-slate-900 text-cyan-400 border border-slate-800">
+                class="inline-flex items-center space-x-1.5 px-3 py-1 rounded-md text-xs font-mono-code font-semibold bg-slate-900 text-cyan-400 border border-slate-800 self-start sm:self-auto">
                 <span>{{ daily_groups|length }} Active Day{{ daily_groups|length|pluralize }}</span>
             </span>
         </div>
 
-        <div class="overflow-x-auto">
+        <!-- 1. Desktop Table View (>= 768px) -->
+        <div class="hidden md:block overflow-x-auto">
             <table class="min-w-full divide-y divide-slate-800 text-left text-sm">
                 <thead class="bg-slate-900/60 text-xs uppercase font-semibold text-slate-400">
                     <tr>
@@ -183,7 +184,7 @@
                                 <span class="text-[11px] text-slate-500 font-mono-code block mt-0.5">Single box type</span>
                             </div>
                             {% else %}
-                            <!-- Multiple different box types breakdown (e.g. 50 core box, 10 polish box, 10 plastic box) -->
+                            <!-- Multiple different box types breakdown -->
                             <div class="space-y-2">
                                 <span class="text-[11px] text-emerald-400/90 font-mono-code font-semibold block">
                                     {{ row.items|length }} different box types
@@ -229,9 +230,9 @@
                                     value="{{ row.production_date|date:'Y-m-d' }}">
                                 <input type="hidden" name="year" value="{{ selected_year }}">
                                 <button type="submit"
-                                    class="inline-flex items-center space-x-1.5 px-3 py-1.5 rounded-lg bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 hover:text-rose-300 border border-rose-500/30 hover:border-rose-500/50 text-xs font-semibold shadow-sm transition group"
+                                    class="min-h-[44px] inline-flex items-center space-x-1.5 px-3.5 py-2 rounded-xl bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 hover:text-rose-300 border border-rose-500/30 hover:border-rose-500/50 text-xs font-semibold shadow-sm transition group"
                                     title="Delete all production logs for {{ row.production_date|date:'Y-m-d' }}">
-                                    <svg class="w-3.5 h-3.5 group-hover:scale-110 transition-transform text-rose-400"
+                                    <svg class="w-4 h-4 group-hover:scale-110 transition-transform text-rose-400"
                                         fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
                                             d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
@@ -254,7 +255,7 @@
                                 <p class="text-xs text-slate-500 mt-1 max-w-sm">No finished goods assembly was recorded
                                     for {{ employee.full_name }} in {{ selected_month_name }}.</p>
                                 <button type="button" onclick="openLogProductionModal()"
-                                    class="mt-4 px-4 py-2 rounded-xl bg-cyan-600 hover:bg-cyan-500 text-white text-xs font-semibold shadow-md transition">
+                                    class="min-h-[44px] mt-4 px-5 py-2.5 rounded-xl bg-cyan-600 hover:bg-cyan-500 text-white text-xs font-semibold shadow-md transition">
                                     Log First Output
                                 </button>
                             </div>
@@ -263,6 +264,84 @@
                     {% endfor %}
                 </tbody>
             </table>
+        </div>
+
+        <!-- 2. Mobile Stacked Cards Layout (< 768px) -->
+        <div class="md:hidden divide-y divide-slate-800/80">
+            {% for row in daily_groups %}
+            <div class="p-4 sm:p-5 space-y-3.5 bg-slate-950">
+                <!-- Date, Day and Total Quantity -->
+                <div class="flex items-center justify-between">
+                    <div>
+                        <div class="flex items-center space-x-2">
+                            <span class="font-bold text-white font-mono-code text-sm">{{ row.production_date|date:"Y-m-d" }}</span>
+                            <span class="text-xs text-cyan-400 font-medium">({{ row.production_date|date:"l" }})</span>
+                        </div>
+                        <span class="text-[11px] text-slate-500 font-mono-code block mt-0.5">{{ employee.full_name }} &bull; OP-#{{ employee.pk }}</span>
+                    </div>
+                    <span class="inline-flex items-center px-3 py-1.5 rounded-xl text-sm font-extrabold font-mono-code {% if row.is_single_type %}bg-cyan-950 text-cyan-300 border border-cyan-800{% else %}bg-emerald-950 text-emerald-300 border border-emerald-800{% endif %}">
+                        {{ row.total_quantity }} Boxes
+                    </span>
+                </div>
+
+                <!-- Box Breakdown -->
+                <div class="bg-slate-900/70 p-3 rounded-xl border border-slate-800 space-y-2">
+                    <p class="text-[11px] font-semibold uppercase tracking-wider text-slate-400">Box Types Manufactured:</p>
+                    {% if row.is_single_type %}
+                    <div class="flex items-center space-x-2 text-xs">
+                        <span class="font-mono-code font-extrabold text-cyan-300 text-sm">{{ row.single_item.quantity }}&times;</span>
+                        <span class="text-white font-bold">{{ row.single_item.name }}</span>
+                        {% if row.single_item.sku %}
+                        <span class="text-[10px] text-slate-400 font-mono-code">[{{ row.single_item.sku }}]</span>
+                        {% endif %}
+                    </div>
+                    {% else %}
+                    <div class="flex flex-wrap gap-2">
+                        {% for item in row.items %}
+                        <div class="inline-flex items-center space-x-1.5 px-2.5 py-1 rounded-lg bg-slate-950 border border-slate-700 text-xs">
+                            <span class="font-mono-code font-bold text-emerald-400">{{ item.quantity }}&times;</span>
+                            <span class="text-slate-200 font-medium">{{ item.name }}</span>
+                        </div>
+                        {% endfor %}
+                    </div>
+                    {% endif %}
+                </div>
+
+                <!-- Delete Action -->
+                <div>
+                    <form method="post" action="{% url 'employee-detail' employee.pk selected_month %}"
+                        onsubmit="return confirm('Are you sure you want to delete all daily logs for {{ row.production_date|date:"Y-m-d" }} ({{ row.total_quantity }} boxes)?');" class="w-full">
+                        {% csrf_token %}
+                        <input type="hidden" name="action" value="delete_date">
+                        <input type="hidden" name="production_date" value="{{ row.production_date|date:'Y-m-d' }}">
+                        <input type="hidden" name="year" value="{{ selected_year }}">
+                        <button type="submit"
+                            class="w-full min-h-[44px] inline-flex items-center justify-center space-x-2 px-4 py-2.5 rounded-xl bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 border border-rose-500/30 text-xs font-semibold shadow-sm transition active:scale-[0.98]">
+                            <svg class="w-4 h-4 text-rose-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                    d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                            </svg>
+                            <span>Delete Date ({{ row.total_quantity }} Boxes)</span>
+                        </button>
+                    </form>
+                </div>
+            </div>
+            {% empty %}
+            <div class="py-12 px-4 text-center text-slate-400">
+                <div class="flex flex-col items-center justify-center">
+                    <svg class="h-10 w-10 text-slate-600 mb-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                            d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
+                    </svg>
+                    <p class="text-sm font-bold text-slate-200">No Production Logs Found</p>
+                    <p class="text-xs text-slate-500 mt-1 max-w-sm">No finished goods assembly was recorded for {{ employee.full_name }} in {{ selected_month_name }}.</p>
+                    <button type="button" onclick="openLogProductionModal()"
+                        class="min-h-[44px] mt-4 px-5 py-2.5 rounded-xl bg-cyan-600 hover:bg-cyan-500 text-white text-xs font-semibold shadow-md transition">
+                        Log First Output
+                    </button>
+                </div>
+            </div>
+            {% endfor %}
         </div>
     </section>
 </div>
@@ -286,7 +365,7 @@
                 </div>
             </div>
             <button type="button" onclick="closeLogProductionModal()"
-                class="text-slate-400 hover:text-white transition">
+                class="min-h-[44px] min-w-[44px] flex items-center justify-center text-slate-400 hover:text-white transition">
                 <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
                 </svg>
@@ -303,7 +382,7 @@
                     Production Date <span class="text-rose-400">*</span>
                 </label>
                 <input type="date" name="production_date" id="modal_prod_date" required value="{{ today|date:'Y-m-d' }}"
-                    class="w-full px-4 py-2.5 rounded-xl bg-slate-900 border border-slate-700 text-white text-sm font-mono-code focus:border-cyan-500 focus:ring-2 focus:ring-cyan-500/20 transition">
+                    class="min-h-[44px] w-full px-4 py-2.5 rounded-xl bg-slate-900 border border-slate-700 text-white text-sm font-mono-code focus:border-cyan-500 focus:ring-2 focus:ring-cyan-500/20 transition">
             </div>
 
             <!-- Box Type Dropdown -->
@@ -316,7 +395,7 @@
                         name="box_name"
                         id="modal_box_name"
                         required
-                        class="w-full px-4 py-2.5 rounded-xl bg-slate-900 border border-slate-700 text-white text-sm focus:border-cyan-500 focus:ring-2 focus:ring-cyan-500/20 transition font-medium appearance-none pr-10 cursor-pointer"
+                        class="min-h-[44px] w-full px-4 py-2.5 rounded-xl bg-slate-900 border border-slate-700 text-white text-sm focus:border-cyan-500 focus:ring-2 focus:ring-cyan-500/20 transition font-medium appearance-none pr-10 cursor-pointer"
                     >
                         <option value="" disabled selected>-- Select Type of Box --</option>
                         <option value="BQ without Lid">BQ without Lid</option>
@@ -343,20 +422,20 @@
                 </label>
                 <div class="relative">
                     <input type="number" name="quantity" id="modal_quantity" min="1" required placeholder="e.g. 50"
-                        class="w-full px-4 py-2.5 rounded-xl bg-slate-900 border border-slate-700 text-white font-mono-code text-sm focus:border-cyan-500 focus:ring-2 focus:ring-cyan-500/20 transition">
+                        class="min-h-[44px] w-full px-4 py-2.5 rounded-xl bg-slate-900 border border-slate-700 text-white font-mono-code text-sm focus:border-cyan-500 focus:ring-2 focus:ring-cyan-500/20 transition">
                     <span
-                        class="absolute right-3.5 top-2.5 text-xs text-slate-400 font-mono-code font-bold pointer-events-none">boxes</span>
+                        class="absolute right-3.5 top-3 text-xs text-slate-400 font-mono-code font-bold pointer-events-none">boxes</span>
                 </div>
                 <p class="text-[11px] text-slate-400">Total units manufactured.</p>
             </div>
 
             <div class="pt-3 border-t border-slate-800 flex items-center justify-end space-x-3">
                 <button type="button" onclick="closeLogProductionModal()"
-                    class="px-4 py-2.5 rounded-xl bg-slate-900 hover:bg-slate-800 text-slate-300 text-xs font-semibold border border-slate-800 transition">
+                    class="min-h-[44px] px-4 py-2.5 rounded-xl bg-slate-900 hover:bg-slate-800 text-slate-300 text-xs font-semibold border border-slate-800 transition">
                     Cancel
                 </button>
                 <button type="submit"
-                    class="inline-flex items-center space-x-2 px-6 py-2.5 rounded-xl bg-gradient-to-r from-cyan-600 to-blue-600 hover:from-cyan-500 hover:to-blue-500 text-white text-xs font-bold shadow-lg shadow-cyan-950/50 transition focus:outline-none focus:ring-2 focus:ring-cyan-400">
+                    class="min-h-[44px] inline-flex items-center space-x-2 px-6 py-2.5 rounded-xl bg-gradient-to-r from-cyan-600 to-blue-600 hover:from-cyan-500 hover:to-blue-500 text-white text-xs font-bold shadow-lg shadow-cyan-950/50 transition focus:outline-none focus:ring-2 focus:ring-cyan-400">
                     <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" />
                     </svg>

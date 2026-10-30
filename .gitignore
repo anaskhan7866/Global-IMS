@@ -29,3 +29,13 @@ local_settings.py
 .idea/
 .vscode/
 *.swp
+
+# Node & Mobile Dependencies
+node_modules/
+android/.gradle/
+android/app/build/
+android/build/
+android/local.properties
+ios/App/build/
+ios/App/Pods/
+.gradle/

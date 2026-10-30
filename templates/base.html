@@ -3,7 +3,7 @@
 
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
     <title>{% block title %}Global-IMS | Manufacturing & Financial Operations{% endblock %}</title>
     <!-- Tailwind CSS CDN -->
     <script src="https://cdn.tailwindcss.com"></script>
@@ -30,10 +30,45 @@
     <style>
         body {
             font-family: 'Inter', sans-serif;
+            padding-top: env(safe-area-inset-top, 0px);
+            padding-bottom: env(safe-area-inset-bottom, 0px);
+            -webkit-tap-highlight-color: transparent;
         }
 
         .font-mono-code {
             font-family: 'JetBrains Mono', monospace;
+        }
+
+        /* Mobile Touch Target & Typography Optimization */
+        @media (max-width: 768px) {
+            button, 
+            input[type="submit"], 
+            input[type="button"], 
+            .touch-target,
+            .btn {
+                min-height: 44px;
+            }
+
+            /* Prevent auto-zooming on focus in mobile WebViews */
+            input[type="text"],
+            input[type="number"],
+            input[type="email"],
+            input[type="password"],
+            input[type="date"],
+            select,
+            textarea {
+                min-height: 44px;
+                font-size: 16px !important;
+            }
+
+            .mobile-bottom-safe {
+                padding-bottom: max(5rem, calc(4.5rem + env(safe-area-inset-bottom, 0px)));
+            }
+        }
+
+        /* Momentum scrolling for touch data tables */
+        .overflow-x-auto {
+            -webkit-overflow-scrolling: touch;
         }
     </style>
     {% block extra_head %}{% endblock %}
@@ -41,8 +76,8 @@
 
 <body class="h-full bg-slate-900 text-slate-100 antialiased selection:bg-cyan-500 selection:text-white">
 
-    <div class="min-h-full flex">
-        <!-- 1. FIXED LEFT SIDEBAR NAVIGATION -->
+    <div class="min-h-full flex flex-col">
+        <!-- 1. FIXED LEFT SIDEBAR NAVIGATION (Desktop: >= 768px) -->
         <aside
             class="hidden md:flex md:w-64 md:flex-col md:fixed md:inset-y-0 z-50 bg-slate-950 border-r border-slate-800">
             <!-- Brand Logo -->
@@ -57,8 +92,7 @@
                     </div>
                     <div>
                         <span class="text-lg font-bold tracking-tight text-white block">Global-IMS</span>
-                        <span class="text-[10px] text-cyan-400 font-mono-code uppercase tracking-wider block">MRP II
-                            System</span>
+                        <span class="text-[10px] text-cyan-400 font-mono-code uppercase tracking-wider block">MRP II System</span>
                     </div>
                 </a>
             </div>
@@ -66,8 +100,7 @@
             <!-- Navigation Links -->
             <div class="flex-1 flex flex-col justify-between overflow-y-auto px-4 py-6 space-y-6">
                 <nav class="space-y-1.5" aria-label="Sidebar">
-                    <p class="px-3 text-[11px] font-semibold uppercase tracking-wider text-slate-400 mb-2">Core
-                        Navigation</p>
+                    <p class="px-3 text-[11px] font-semibold uppercase tracking-wider text-slate-400 mb-2">Core Navigation</p>
 
                     <!-- 1. Inventory Link -->
                     <a href="/"
@@ -144,53 +177,154 @@
             </div>
         </aside>
 
-        <!-- Mobile Header Bar -->
-        <div
-            class="md:hidden fixed top-0 left-0 right-0 z-40 bg-slate-950 border-b border-slate-800 px-4 h-16 flex items-center justify-between">
-            <a href="/" class="flex items-center space-x-2">
-                <div class="h-8 w-8 rounded-lg bg-cyan-600 flex items-center justify-center">
+        <!-- 2. MOBILE TOP APP BAR (< 768px) with Safe Area & Hamburger Menu Toggle -->
+        <header
+            class="md:hidden fixed top-0 left-0 right-0 z-40 bg-slate-950/95 backdrop-blur-md border-b border-slate-800 px-4 h-16 flex items-center justify-between"
+            style="padding-top: env(safe-area-inset-top, 0px);">
+            <a href="/" class="flex items-center space-x-2.5 touch-target">
+                <div class="h-8 w-8 rounded-lg bg-gradient-to-tr from-cyan-600 to-blue-600 flex items-center justify-center shadow">
                     <svg class="h-4 w-4 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
                             d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" />
                     </svg>
                 </div>
-                <span class="font-bold text-white text-base">Global-IMS</span>
+                <div>
+                    <span class="font-bold text-white text-base leading-tight block">Global-IMS</span>
+                    <span class="text-[9px] text-cyan-400 font-mono-code uppercase tracking-wider block">MRP System</span>
+                </div>
             </a>
-            <div class="flex items-center space-x-3 text-xs overflow-x-auto py-1">
-                <a href="/" class="text-slate-300 hover:text-white whitespace-nowrap">Inventory</a>
-                <a href="/employees/" class="text-slate-300 hover:text-white whitespace-nowrap">Employees</a>
-                <a href="/vendor-orders/" class="text-slate-300 hover:text-white whitespace-nowrap">Vendor Orders</a>
-                <a href="/daily-core-box/" class="text-slate-300 hover:text-white whitespace-nowrap">Daily Core Box</a>
-            </div>
-        </div>
 
-        <!-- 2. MAIN CONTENT AREA -->
-        <div class="md:pl-64 flex flex-col flex-1 w-full pt-16 md:pt-0">
-            <main class="flex-1 py-8 px-4 sm:px-6 lg:px-8 max-w-7xl w-full mx-auto">
+            <!-- Right Controls: Status Badge + Hamburger Toggle Button (Minimum 44x44px Touch Target) -->
+            <div class="flex items-center space-x-2">
+                <div class="flex items-center space-x-1.5 px-2 py-1 rounded-md bg-slate-900 border border-slate-800 text-[10px] text-slate-300">
+                    <span class="h-2 w-2 rounded-full bg-emerald-500 animate-pulse"></span>
+                    <span class="font-mono-code font-bold">ACID</span>
+                </div>
+                <button
+                    id="mobileMenuToggleBtn"
+                    type="button"
+                    onclick="toggleMobileMenu()"
+                    aria-label="Toggle Mobile Navigation Menu"
+                    class="h-11 w-11 flex items-center justify-center rounded-xl bg-slate-900 hover:bg-slate-800 text-slate-300 hover:text-white border border-slate-800 transition focus:outline-none focus:ring-2 focus:ring-cyan-500">
+                    <svg id="hamburgerIcon" class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"/>
+                    </svg>
+                    <svg id="closeIcon" class="w-5 h-5 hidden" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
+                    </svg>
+                </button>
+            </div>
+        </header>
+
+        <!-- 3. MOBILE SLIDE-OVER DRAWER MENU (< 768px) -->
+        <div id="mobileDrawerBackdrop" onclick="toggleMobileMenu()" class="fixed inset-0 z-40 bg-black/70 backdrop-blur-sm hidden transition-opacity md:hidden"></div>
+        <nav
+            id="mobileDrawer"
+            class="fixed top-16 right-0 bottom-0 z-40 w-72 max-w-[85vw] bg-slate-950 border-l border-slate-800 transform translate-x-full transition-transform duration-300 ease-in-out md:hidden flex flex-col justify-between p-5 overflow-y-auto">
+            <div class="space-y-4">
+                <p class="text-[11px] font-bold uppercase tracking-wider text-slate-400">Navigation Menu</p>
+                <div class="space-y-2">
+                    <a href="/" onclick="toggleMobileMenu()" class="flex items-center px-3.5 py-3 rounded-xl text-sm font-semibold transition {% if request.path == '/' or '/inventory' in request.path or '/add-inventory/' in request.path %}bg-cyan-950 text-cyan-300 border border-cyan-800{% else %}text-slate-300 hover:bg-slate-900 hover:text-white{% endif %}">
+                        <svg class="mr-3 h-5 w-5 text-cyan-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4"/></svg>
+                        <span>Inventory</span>
+                    </a>
+                    <a href="/employees/" onclick="toggleMobileMenu()" class="flex items-center px-3.5 py-3 rounded-xl text-sm font-semibold transition {% if '/employees/' in request.path %}bg-cyan-950 text-cyan-300 border border-cyan-800{% else %}text-slate-300 hover:bg-slate-900 hover:text-white{% endif %}">
+                        <svg class="mr-3 h-5 w-5 text-cyan-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z"/></svg>
+                        <span>Employees Directory</span>
+                    </a>
+                    <a href="/vendor-orders/" onclick="toggleMobileMenu()" class="flex items-center px-3.5 py-3 rounded-xl text-sm font-semibold transition {% if '/vendor-orders/' in request.path %}bg-cyan-950 text-cyan-300 border border-cyan-800{% else %}text-slate-300 hover:bg-slate-900 hover:text-white{% endif %}">
+                        <svg class="mr-3 h-5 w-5 text-cyan-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01"/></svg>
+                        <span>Vendor Orders</span>
+                    </a>
+                    <a href="/daily-core-box/" onclick="toggleMobileMenu()" class="flex items-center px-3.5 py-3 rounded-xl text-sm font-semibold transition {% if '/daily-core-box' in request.path %}bg-cyan-950 text-cyan-300 border border-cyan-800{% else %}text-slate-300 hover:bg-slate-900 hover:text-white{% endif %}">
+                        <svg class="mr-3 h-5 w-5 text-cyan-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 4H6a2 2 0 00-2 2v12a2 2 0 002 2h12a2 2 0 002-2V6a2 2 0 00-2-2h-2m-4-1v8m0 0l3-3m-3 3L9 8m-5 5h2.586a1 1 0 01.707.293l2.414 2.414a1 1 0 00.707.293h3.172a1 1 0 00.707-.293l2.414-2.414a1 1 0 01.707-.293H20"/></svg>
+                        <span>Daily Core Box</span>
+                    </a>
+                </div>
+            </div>
+
+            <div class="pt-6 border-t border-slate-800 space-y-3">
+                <a href="/admin/" class="flex items-center justify-between px-3.5 py-3 rounded-xl bg-slate-900 hover:bg-slate-800 border border-slate-800 text-sm font-semibold text-slate-200">
+                    <span class="flex items-center space-x-2">
+                        <svg class="w-4 h-4 text-cyan-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/></svg>
+                        <span>Django Admin</span>
+                    </span>
+                    <svg class="w-4 h-4 text-slate-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/></svg>
+                </a>
+                <p class="text-[10px] text-center text-slate-500 font-mono-code">ACID Ledger Strict Concurrency</p>
+            </div>
+        </nav>
+
+        <!-- 4. NATIVE MOBILE BOTTOM TAB BAR (< 768px) with Touch Targets & Safe Area Insets -->
+        <nav
+            aria-label="Mobile Navigation"
+            class="md:hidden fixed bottom-0 left-0 right-0 z-40 bg-slate-950/95 backdrop-blur-lg border-t border-slate-800 grid grid-cols-4 items-center justify-around px-1"
+            style="padding-bottom: max(0.5rem, env(safe-area-inset-bottom, 0px));">
+            
+            <!-- Tab 1: Inventory -->
+            <a href="/"
+                class="flex flex-col items-center justify-center py-2 px-1 text-center min-h-[48px] rounded-lg transition {% if request.path == '/' or '/inventory' in request.path or '/add-inventory/' in request.path %}text-cyan-400 font-bold{% else %}text-slate-400 hover:text-slate-200{% endif %}">
+                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4"/>
+                </svg>
+                <span class="text-[10px] mt-1 tracking-tight">Inventory</span>
+            </a>
+
+            <!-- Tab 2: Employees -->
+            <a href="/employees/"
+                class="flex flex-col items-center justify-center py-2 px-1 text-center min-h-[48px] rounded-lg transition {% if '/employees/' in request.path %}text-cyan-400 font-bold{% else %}text-slate-400 hover:text-slate-200{% endif %}">
+                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z"/>
+                </svg>
+                <span class="text-[10px] mt-1 tracking-tight">Employees</span>
+            </a>
+
+            <!-- Tab 3: Vendor Orders -->
+            <a href="/vendor-orders/"
+                class="flex flex-col items-center justify-center py-2 px-1 text-center min-h-[48px] rounded-lg transition {% if '/vendor-orders/' in request.path %}text-cyan-400 font-bold{% else %}text-slate-400 hover:text-slate-200{% endif %}">
+                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01"/>
+                </svg>
+                <span class="text-[10px] mt-1 tracking-tight">Orders</span>
+            </a>
+
+            <!-- Tab 4: Daily Core Box -->
+            <a href="/daily-core-box/"
+                class="flex flex-col items-center justify-center py-2 px-1 text-center min-h-[48px] rounded-lg transition {% if '/daily-core-box' in request.path %}text-cyan-400 font-bold{% else %}text-slate-400 hover:text-slate-200{% endif %}">
+                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 4H6a2 2 0 00-2 2v12a2 2 0 002 2h12a2 2 0 002-2V6a2 2 0 00-2-2h-2m-4-1v8m0 0l3-3m-3 3L9 8m-5 5h2.586a1 1 0 01.707.293l2.414 2.414a1 1 0 00.707.293h3.172a1 1 0 00.707-.293l2.414-2.414a1 1 0 01.707-.293H20"/>
+                </svg>
+                <span class="text-[10px] mt-1 tracking-tight">Daily Core</span>
+            </a>
+        </nav>
+
+        <!-- 5. MAIN CONTENT AREA (Responsive margins & Safe Bottom padding) -->
+        <div class="md:pl-64 flex flex-col flex-1 w-full pt-16 md:pt-0 mobile-bottom-safe">
+            <main class="flex-1 py-5 sm:py-8 px-3 sm:px-6 lg:px-8 max-w-7xl w-full mx-auto">
                 <!-- Global Django Alerts & Messages -->
                 {% if messages %}
-                <div class="mb-6 space-y-3">
+                <div class="mb-5 space-y-3">
                     {% for message in messages %}
-                    <div class="flex items-center justify-between p-4 rounded-xl text-sm font-medium border shadow-lg transition
+                    <div class="flex items-center justify-between p-3.5 sm:p-4 rounded-xl text-xs sm:text-sm font-medium border shadow-lg transition
                         {% if message.tags == 'error' %}bg-rose-950/80 text-rose-200 border-rose-800
                         {% elif message.tags == 'warning' %}bg-amber-950/80 text-amber-200 border-amber-800
                         {% elif message.tags == 'info' %}bg-blue-950/80 text-blue-200 border-blue-800
                         {% else %}bg-emerald-950/80 text-emerald-200 border-emerald-800{% endif %}">
-                        <div class="flex items-center space-x-3">
+                        <div class="flex items-center space-x-2.5">
                             {% if message.tags == 'error' %}
-                            <svg class="w-5 h-5 text-rose-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <svg class="w-5 h-5 text-rose-400 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
                                     d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
                             </svg>
                             {% else %}
-                            <svg class="w-5 h-5 text-emerald-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <svg class="w-5 h-5 text-emerald-400 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
                                     d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
                             </svg>
                             {% endif %}
                             <span>{{ message }}</span>
                         </div>
-                        <button onclick="this.parentElement.remove()" class="text-slate-400 hover:text-white">
+                        <button onclick="this.parentElement.remove()" class="text-slate-400 hover:text-white p-1">
                             <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
                                     d="M6 18L18 6M6 6l12 12" />
@@ -206,15 +340,39 @@
                 {% endblock %}
             </main>
 
-            <footer class="border-t border-slate-800 bg-slate-950 py-6 text-center text-xs text-slate-500">
+            <footer class="border-t border-slate-800 bg-slate-950 py-5 text-center text-xs text-slate-500 mb-12 md:mb-0">
                 <div class="max-w-7xl mx-auto px-4 flex flex-col sm:flex-row items-center justify-between gap-2">
                     <span>Global-IMS MRP &bull; Discrete Manufacturing Architecture</span>
-                    <span class="font-mono-code">ACID Ledger Concurrency: Strict (select_for_update)</span>
+                    <span class="font-mono-code text-[11px]">ACID Ledger: Strict (select_for_update)</span>
                 </div>
             </footer>
         </div>
     </div>
 
+    <!-- Mobile Drawer Toggle Script -->
+    <script>
+        function toggleMobileMenu() {
+            const drawer = document.getElementById('mobileDrawer');
+            const backdrop = document.getElementById('mobileDrawerBackdrop');
+            const hamburgerIcon = document.getElementById('hamburgerIcon');
+            const closeIcon = document.getElementById('closeIcon');
+            
+            if (drawer && backdrop) {
+                const isOpen = !drawer.classList.contains('translate-x-full');
+                if (isOpen) {
+                    drawer.classList.add('translate-x-full');
+                    backdrop.classList.add('hidden');
+                    hamburgerIcon?.classList.remove('hidden');
+                    closeIcon?.classList.add('hidden');
+                } else {
+                    drawer.classList.remove('translate-x-full');
+                    backdrop.classList.remove('hidden');
+                    hamburgerIcon?.classList.add('hidden');
+                    closeIcon?.classList.remove('hidden');
+                }
+            }
+        }
+    </script>
     {% block extra_scripts %}{% endblock %}
 </body>
 

@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">Global-IMS</string>
+    <string name="title_activity_main">Global-IMS</string>
+    <string name="package_name">com.globalenterprises.ims</string>
+    <string name="custom_url_scheme">com.globalenterprises.ims</string>
+</resources>

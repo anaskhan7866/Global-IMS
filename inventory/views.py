@@ -159,7 +159,7 @@ class EmployeeListView(LoginRequiredMixin, ListView):
         context['default_item'] = finished_goods.first() if finished_goods.exists() else None
 
         employees = context.get('employees', [])
-        context['total_today_boxes'] = sum(e.today_boxes for e in employees)
+        context['total_today_boxes'] = sum((getattr(e, 'today_boxes', 0) or 0) for e in employees)
         return context
 
     def post(self, request, *args, **kwargs):
@@ -435,7 +435,7 @@ class EmployeeDetailView(LoginRequiredMixin, DetailView):
             finished_goods = Item.objects.filter(is_active=True).order_by('name')
 
         # Summary calculations for KPI cards
-        total_units = sum(entry['quantity__sum'] for entry in daily_breakdown) if daily_breakdown else 0
+        total_units = sum((entry.get('quantity__sum') or 0) for entry in daily_breakdown) if daily_breakdown else 0
         active_days = len(daily_breakdown)
         daily_average = round(total_units / active_days, 1) if active_days > 0 else 0.0
 
@@ -771,7 +771,7 @@ class AddInventoryView(LoginRequiredMixin, View):
 
         # Summary calculations for KPI badges (no total weight calculation)
         total_items_count = items.count()
-        total_units = sum(item.current_stock for item in items)
+        total_units = sum((item.current_stock or 0) for item in items)
         low_stock_count = sum(1 for item in items if item.current_stock < 10)
 
         return render(request, self.template_name, {

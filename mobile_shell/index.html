@@ -1,0 +1,113 @@
+<!DOCTYPE html>
+<html lang="en" class="h-full bg-slate-950">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+  <title>Global-IMS</title>
+  <style>
+    body {
+      margin: 0;
+      padding: 0;
+      background-color: #020617;
+      color: #f8fafc;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      height: 100vh;
+      text-align: center;
+      padding: 24px;
+      box-sizing: border-box;
+    }
+    .card {
+      background: #0f172a;
+      border: 1px solid #1e293b;
+      padding: 32px 24px;
+      border-radius: 16px;
+      max-width: 380px;
+      width: 100%;
+      box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.5);
+    }
+    .logo {
+      width: 56px;
+      height: 56px;
+      background: linear-gradient(135deg, #0891b2, #2563eb);
+      border-radius: 12px;
+      margin: 0 auto 16px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    .logo svg {
+      width: 32px;
+      height: 32px;
+      fill: none;
+      stroke: #ffffff;
+      stroke-width: 2;
+    }
+    h1 {
+      font-size: 20px;
+      font-weight: 700;
+      margin-bottom: 8px;
+    }
+    p {
+      font-size: 14px;
+      color: #94a3b8;
+      line-height: 1.5;
+      margin-bottom: 24px;
+    }
+    button {
+      background-color: #0891b2;
+      color: #ffffff;
+      border: none;
+      padding: 12px 24px;
+      border-radius: 8px;
+      font-size: 14px;
+      font-weight: 600;
+      cursor: pointer;
+      width: 100%;
+      transition: background-color 0.2s;
+    }
+    button:active {
+      background-color: #0e7490;
+    }
+  </style>
+</head>
+<body>
+  <div class="card">
+    <div class="logo">
+      <svg viewBox="0 0 24 24">
+        <path stroke-linecap="round" stroke-linejoin="round" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4"/>
+      </svg>
+    </div>
+    <h1>Global-IMS</h1>
+    <p>Unable to connect to the manufacturing server. Please verify your network connection.</p>
+    <button onclick="retryConnection()">Retry Connection</button>
+  </div>
+
+  <script>
+    const TARGET_URL = 'https://global-ims.onrender.com';
+
+    function retryConnection() {
+      fetch(TARGET_URL, { mode: 'no-cors' })
+        .then(() => {
+          window.location.href = TARGET_URL;
+        })
+        .catch(() => {
+          alert('Server unreachable. Please check connection and try again.');
+        });
+    }
+
+    window.addEventListener('load', () => {
+      fetch(TARGET_URL, { mode: 'no-cors' })
+        .then(() => {
+          window.location.href = TARGET_URL;
+        })
+        .catch(() => {
+          console.log('App running in offline fallback mode.');
+        });
+    });
+  </script>
+</body>
+</html>

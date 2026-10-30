@@ -28,17 +28,30 @@ if env_file.exists():
     environ.Env.read_env(env_file)
 
 # Core Security Configuration
-SECRET_KEY = env('SECRET_KEY')
+SECRET_KEY = env('SECRET_KEY', default='django-insecure-ims-core-erp-discrete-mrp-key')
 if not SECRET_KEY:
     raise ValueError("CRITICAL: SECRET_KEY environment variable is missing or empty in .env.")
 
 DEBUG = env('DEBUG')
 
-ALLOWED_HOSTS = ['*']
+if not DEBUG and ('django-insecure' in SECRET_KEY or len(SECRET_KEY) < 32):
+    raise ValueError(
+        "CRITICAL: In production (DEBUG=False), you must provide a secure, unique SECRET_KEY "
+        "of at least 32 characters in the environment variables."
+    )
 
-CSRF_TRUSTED_ORIGINS = [
-    'https://*.onrender.com',
-]
+ALLOWED_HOSTS = env.list('ALLOWED_HOSTS', default=['*'])
+
+CSRF_TRUSTED_ORIGINS = env.list(
+    'CSRF_TRUSTED_ORIGINS',
+    default=[
+        'https://*.onrender.com',
+        'capacitor://localhost',
+        'http://localhost',
+        'http://127.0.0.1',
+        'http://10.0.2.2:8000',
+    ]
+)
 
 
 # Application Definition
@@ -188,7 +201,25 @@ LOGIN_URL = 'admin:login'
 LOGIN_REDIRECT_URL = '/'
 LOGOUT_REDIRECT_URL = 'admin:login'
 
+# Session & CSRF Cookie Hardening for Mobile Shell
+SESSION_COOKIE_AGE = 60 * 60 * 24 * 30  # 30 days persistent login for shop-floor operators
+SESSION_EXPIRE_AT_BROWSER_CLOSE = False
+SESSION_SAVE_EVERY_REQUEST = True
+SESSION_COOKIE_SECURE = not DEBUG
+CSRF_COOKIE_SECURE = not DEBUG
+SESSION_COOKIE_SAMESITE = 'Lax'
+CSRF_COOKIE_SAMESITE = 'Lax'
+CSRF_COOKIE_HTTPONLY = False
+
 # Security Hardening
 SECURE_BROWSER_XSS_FILTER = True
 SECURE_CONTENT_TYPE_NOSNIFF = True
 X_FRAME_OPTIONS = 'DENY'
+
+if not DEBUG:
+    # Forwarded SSL proto header for Cloud deployment reverse proxies (Render, AWS, Heroku)
+    SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
+    SECURE_SSL_REDIRECT = env.bool('SECURE_SSL_REDIRECT', default=True)
+    SECURE_HSTS_SECONDS = env.int('SECURE_HSTS_SECONDS', default=31536000)
+    SECURE_HSTS_INCLUDE_SUBDOMAINS = True
+    SECURE_HSTS_PRELOAD = True
