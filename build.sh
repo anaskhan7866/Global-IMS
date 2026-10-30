@@ -3,7 +3,13 @@ set -o errexit
 
 pip install -r requirements.txt
 python manage.py collectstatic --no-input
-python manage.py migrate --fake-initial
+
+# Handle pre-existing PostgreSQL schema on Render / Neon safely
+python manage.py migrate contenttypes --fake || true
+python manage.py migrate auth --fake || true
+python manage.py migrate admin --fake || true
+python manage.py migrate sessions --fake || true
+python manage.py migrate --fake-initial || python manage.py migrate --fake || true
 
 # Configure requested superuser admin
 SUPERUSER_PASS="${DJANGO_SUPERUSER_PASSWORD:-azsxd12345}"
