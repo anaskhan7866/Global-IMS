@@ -1,7 +1,25 @@
-Django>=5.1,<6.2
-django-environ>=0.11.2
-gunicorn>=23.0.0
-uvicorn[standard]>=0.30.0
-whitenoise>=6.8.2
-dj-database-url>=2.1.0
-psycopg2-binary>=2.9.9
+# Requires Python 3.12 or newer (Django 6.x does not support Python 3.11 or older).
+# Install everything in one step:
+#   pip install -r requirements.txt
+
+# Core framework (6.x required: templates use Django 6 tags such as {% csp_nonce_attr %})
+Django==6.1.2
+asgiref==3.12.1
+sqlparse==0.6.0
+tzdata==2026.5
+
+# Configuration & database
+django-environ==0.14.0
+dj-database-url==3.1.2
+psycopg2-binary==2.9.13
+
+# Static files
+whitenoise==6.12.0
+
+# Excel export
+openpyxl==3.1.5
+et-xmlfile==2.0.0
+
+# Production servers (Render)
+gunicorn==26.2.0
+uvicorn[standard]==0.54.0
