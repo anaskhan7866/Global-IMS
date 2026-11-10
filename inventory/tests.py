@@ -2143,6 +2143,23 @@ class InputRobustnessTestCase(TestCase):
             'action': 'add_employee', 'first_name': long_text, 'last_name': long_text}).status_code, 302)
         self.assertTrue(Employee.objects.filter(first_name='A' * 100).exists())
 
+    def test_pages_use_prebuilt_css_and_no_render_blocking_cdns(self):
+        """Pages must load the pre-built stylesheet, not the in-browser Tailwind compiler or web fonts."""
+        from django.conf import settings
+        from django.urls import reverse
+
+        css_path = settings.BASE_DIR / 'static' / 'css' / 'app.css'
+        self.assertTrue(css_path.exists(), "Run `npm run build:css` to generate static/css/app.css")
+        self.assertGreater(css_path.stat().st_size, 1000)
+
+        for url in (reverse('add-inventory'), reverse('employee-list'), reverse('vendor-order-list'),
+                    reverse('daily-core-box-list'), '/dashboard/'):
+            html = self.client.get(url).content.decode()
+            self.assertIn('/static/css/app.css', html, url)
+            self.assertNotIn('cdn.tailwindcss.com', html, url)
+            self.assertNotIn('fonts.googleapis.com', html, url)
+            self.assertNotIn('backdrop-blur', html, url)
+
     def test_no_hardcoded_admin_account_is_created(self):
         """A fresh database must not contain an automatically created 'admin' account."""
         from django.contrib.auth import get_user_model

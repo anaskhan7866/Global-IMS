@@ -25,7 +25,6 @@
 
         <!-- Card 1: Revenue -->
         <div class="relative overflow-hidden rounded-xl bg-slate-950 p-5 border border-slate-800 shadow-xl shadow-slate-950/40 hover:border-emerald-500/50 transition">
-            <div class="absolute top-0 right-0 w-24 h-24 bg-emerald-500/10 rounded-full blur-2xl -mr-6 -mt-6"></div>
             <div class="flex items-center justify-between">
                 <p class="text-xs font-semibold uppercase tracking-wider text-slate-400">Monthly Revenue</p>
                 <span class="p-2 rounded-lg bg-emerald-950 text-emerald-400 border border-emerald-800">
@@ -48,7 +47,6 @@
 
         <!-- Card 2: COGS -->
         <div class="relative overflow-hidden rounded-xl bg-slate-950 p-5 border border-slate-800 shadow-xl shadow-slate-950/40 hover:border-amber-500/50 transition">
-            <div class="absolute top-0 right-0 w-24 h-24 bg-amber-500/10 rounded-full blur-2xl -mr-6 -mt-6"></div>
             <div class="flex items-center justify-between">
                 <p class="text-xs font-semibold uppercase tracking-wider text-slate-400">Total COGS</p>
                 <span class="p-2 rounded-lg bg-amber-950 text-amber-400 border border-amber-800">
@@ -68,7 +66,6 @@
 
         <!-- Card 3: Gross Profit -->
         <div class="relative overflow-hidden rounded-xl bg-slate-950 p-5 border border-slate-800 shadow-xl shadow-slate-950/40 hover:border-cyan-500/50 transition">
-            <div class="absolute top-0 right-0 w-24 h-24 bg-cyan-500/10 rounded-full blur-2xl -mr-6 -mt-6"></div>
             <div class="flex items-center justify-between">
                 <p class="text-xs font-semibold uppercase tracking-wider text-slate-400">Gross Profit</p>
                 <span class="p-2 rounded-lg bg-cyan-950 text-cyan-400 border border-cyan-800">
@@ -94,7 +91,6 @@
 
         <!-- Card 4: Inventory Value -->
         <div class="relative overflow-hidden rounded-xl bg-slate-950 p-5 border border-slate-800 shadow-xl shadow-slate-950/40 hover:border-purple-500/50 transition">
-            <div class="absolute top-0 right-0 w-24 h-24 bg-purple-500/10 rounded-full blur-2xl -mr-6 -mt-6"></div>
             <div class="flex items-center justify-between">
                 <p class="text-xs font-semibold uppercase tracking-wider text-slate-400">Inventory Value</p>
                 <span class="p-2 rounded-lg bg-purple-950 text-purple-400 border border-purple-800">
@@ -203,7 +199,7 @@
                         <td class="whitespace-nowrap px-3 py-4 font-mono-code text-xs text-slate-300">
                             ${{ item.moving_average_cost|floatformat:2 }}
                         </td>
-                        <td class="whitespace-nowrap px-3 py-4 font-mono-code text-sm font-bold {% if item.current_stock < 5 %}text-rose-500 font-extrabold animate-pulse{% else %}text-amber-400{% endif %}">
+                        <td class="whitespace-nowrap px-3 py-4 font-mono-code text-sm font-bold {% if item.current_stock < 5 %}text-rose-500 font-extrabold{% else %}text-amber-400{% endif %}">
                             {{ item.current_stock|floatformat:2 }} {{ item.unit_of_measure }}
                         </td>
                         <td class="whitespace-nowrap py-4 pl-3 pr-6 text-right text-xs">
@@ -245,7 +241,7 @@
 {% block extra_scripts %}
 {{ sales_trend|json_script:"sales-trend-data" }}
 <!-- Chart.js: exact version + integrity hash, so a tampered or changed CDN file is refused -->
-<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.9/dist/chart.umd.js"
+<script defer src="https://cdn.jsdelivr.net/npm/chart.js@4.4.9/dist/chart.umd.js"
     integrity="sha384-4W8gMhOYqk0FPg9sAMkb3g/P2fXtzbUyDUUgMlA1EEig8z/U/13EYUjErc1H382b"
     crossorigin="anonymous"></script>
 <script>
@@ -359,7 +355,7 @@
                         ticks: {
                             color: '#94a3b8',
                             font: {
-                                family: 'Inter',
+                                family: 'system-ui',
                                 size: 11
                             }
                         }
@@ -372,7 +368,7 @@
                         ticks: {
                             color: '#94a3b8',
                             font: {
-                                family: 'JetBrains Mono',
+                                family: 'ui-monospace',
                                 size: 11
                             },
                             callback: function(value) {

@@ -1,0 +1,62 @@
+/*
+ * Source stylesheet. Compiled (and minified) into static/css/app.css by:  npm run build:css
+ * Do not edit static/css/app.css by hand - edit this file and the templates instead.
+ */
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  body {
+    padding-top: env(safe-area-inset-top, 0px);
+    padding-bottom: env(safe-area-inset-bottom, 0px);
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  /* Momentum scrolling for touch data tables */
+  .overflow-x-auto {
+    -webkit-overflow-scrolling: touch;
+  }
+
+  /* Mobile touch targets & no auto-zoom on focus in mobile WebViews */
+  @media (max-width: 768px) {
+    button,
+    input[type="submit"],
+    input[type="button"],
+    .touch-target,
+    .btn {
+      min-height: 44px;
+    }
+
+    input[type="text"],
+    input[type="number"],
+    input[type="email"],
+    input[type="password"],
+    input[type="date"],
+    select,
+    textarea {
+      min-height: 44px;
+      font-size: 16px !important;
+    }
+  }
+
+  /* Respect the OS "reduce motion" setting */
+  @media (prefers-reduced-motion: reduce) {
+    *, *::before, *::after {
+      transition-duration: 0.01ms !important;
+      animation-duration: 0.01ms !important;
+    }
+  }
+}
+
+@layer components {
+  .font-mono-code {
+    @apply font-mono;
+  }
+
+  @media (max-width: 768px) {
+    .mobile-bottom-safe {
+      padding-bottom: max(5rem, calc(4.5rem + env(safe-area-inset-bottom, 0px)));
+    }
+  }
+}

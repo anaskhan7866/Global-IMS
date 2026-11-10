@@ -1,3 +1,4 @@
+{% load static %}
 <!DOCTYPE html>
 <html lang="en" class="h-full bg-slate-900">
 
@@ -5,74 +6,12 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
     <title>{% block title %}Global-IMS | Manufacturing & Financial Operations{% endblock %}</title>
-    <!-- Tailwind CSS CDN -->
-    <script src="https://cdn.tailwindcss.com"></script>
-    <!-- Google Fonts: Inter & JetBrains Mono -->
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link
-        href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap"
-        rel="stylesheet">
-    <script>
-        tailwind.config = {
-            theme: {
-                extend: {
-                    fontFamily: {
-                        sans: ['Inter', 'sans-serif'],
-                        mono: ['JetBrains Mono', 'monospace'],
-                    }
-                }
-            }
-        }
-    </script>
-    <style>
-        body {
-            font-family: 'Inter', sans-serif;
-            padding-top: env(safe-area-inset-top, 0px);
-            padding-bottom: env(safe-area-inset-bottom, 0px);
-            -webkit-tap-highlight-color: transparent;
-        }
-
-        .font-mono-code {
-            font-family: 'JetBrains Mono', monospace;
-        }
-
-        /* Mobile Touch Target & Typography Optimization */
-        @media (max-width: 768px) {
-            button, 
-            input[type="submit"], 
-            input[type="button"], 
-            .touch-target,
-            .btn {
-                min-height: 44px;
-            }
-
-            /* Prevent auto-zooming on focus in mobile WebViews */
-            input[type="text"],
-            input[type="number"],
-            input[type="email"],
-            input[type="password"],
-            input[type="date"],
-            select,
-            textarea {
-                min-height: 44px;
-                font-size: 16px !important;
-            }
-
-            .mobile-bottom-safe {
-                padding-bottom: max(5rem, calc(4.5rem + env(safe-area-inset-bottom, 0px)));
-            }
-        }
-
-        /* Momentum scrolling for touch data tables */
-        .overflow-x-auto {
-            -webkit-overflow-scrolling: touch;
-        }
-    </style>
+    <!-- Pre-built, minified stylesheet (npm run build:css). No runtime CSS compiler, no web fonts. -->
+    <link rel="stylesheet" href="{% static 'css/app.css' %}">
     {% block extra_head %}{% endblock %}
 </head>
 
-<body class="h-full bg-slate-900 text-slate-100 antialiased selection:bg-cyan-500 selection:text-white">
+<body class="h-full bg-slate-900 text-slate-100 font-sans antialiased selection:bg-cyan-500 selection:text-white">
 
     <div class="min-h-full flex flex-col">
         <!-- 1. FIXED LEFT SIDEBAR NAVIGATION (Desktop: >= 768px) -->
@@ -149,7 +88,7 @@
                 <div class="pt-4 border-t border-slate-800/80 space-y-3">
                     <div class="px-3 py-2.5 rounded-lg bg-slate-900/60 border border-slate-800 text-xs">
                         <div class="flex items-center space-x-2">
-                            <span class="h-2 w-2 rounded-full bg-emerald-500 animate-pulse"></span>
+                            <span class="h-2 w-2 rounded-full bg-emerald-500"></span>
                             <span class="font-semibold text-slate-300">ACID Concurrency</span>
                         </div>
                         <p class="text-[11px] text-slate-400 mt-1">Pessimistic Row Locks Active</p>
@@ -177,7 +116,7 @@
 
         <!-- 2. MOBILE TOP APP BAR (< 768px) with Safe Area & Hamburger Menu Toggle -->
         <header
-            class="md:hidden fixed top-0 left-0 right-0 z-40 bg-slate-950/95 backdrop-blur-md border-b border-slate-800 px-4 h-16 flex items-center justify-between"
+            class="md:hidden fixed top-0 left-0 right-0 z-40 bg-slate-950/95 border-b border-slate-800 px-4 h-16 flex items-center justify-between"
             style="padding-top: env(safe-area-inset-top, 0px);">
             <a href="/" class="flex items-center space-x-2.5 touch-target">
                 <div class="h-8 w-8 rounded-lg bg-gradient-to-tr from-cyan-600 to-blue-600 flex items-center justify-center shadow">
@@ -195,7 +134,7 @@
             <!-- Right Controls: Status Badge + Hamburger Toggle Button (Minimum 44x44px Touch Target) -->
             <div class="flex items-center space-x-2">
                 <div class="flex items-center space-x-1.5 px-2 py-1 rounded-md bg-slate-900 border border-slate-800 text-[10px] text-slate-300">
-                    <span class="h-2 w-2 rounded-full bg-emerald-500 animate-pulse"></span>
+                    <span class="h-2 w-2 rounded-full bg-emerald-500"></span>
                     <span class="font-mono-code font-bold">ACID</span>
                 </div>
                 <button
@@ -215,7 +154,7 @@
         </header>
 
         <!-- 3. MOBILE SLIDE-OVER DRAWER MENU (< 768px) -->
-        <div id="mobileDrawerBackdrop" onclick="toggleMobileMenu()" class="fixed inset-0 z-40 bg-black/70 backdrop-blur-sm hidden transition-opacity md:hidden"></div>
+        <div id="mobileDrawerBackdrop" onclick="toggleMobileMenu()" class="fixed inset-0 z-40 bg-black/70 hidden transition-opacity md:hidden"></div>
         <nav
             id="mobileDrawer"
             class="fixed top-16 right-0 bottom-0 z-40 w-72 max-w-[85vw] bg-slate-950 border-l border-slate-800 transform translate-x-full transition-transform duration-300 ease-in-out md:hidden flex flex-col justify-between p-5 overflow-y-auto">
@@ -256,7 +195,7 @@
         <!-- 4. NATIVE MOBILE BOTTOM TAB BAR (< 768px) with Touch Targets & Safe Area Insets -->
         <nav
             aria-label="Mobile Navigation"
-            class="md:hidden fixed bottom-0 left-0 right-0 z-40 bg-slate-950/95 backdrop-blur-lg border-t border-slate-800 grid grid-cols-4 items-center justify-around px-1"
+            class="md:hidden fixed bottom-0 left-0 right-0 z-40 bg-slate-950/95 border-t border-slate-800 grid grid-cols-4 items-center justify-around px-1"
             style="padding-bottom: max(0.5rem, env(safe-area-inset-bottom, 0px));">
             
             <!-- Tab 1: Inventory -->
@@ -370,6 +309,39 @@
                 }
             }
         }
+    </script>
+    <script>
+        // Instant navigation: start loading a page as soon as the pointer rests on (or a finger
+        // touches) one of its links, so it is usually ready by the time the click lands.
+        // Skips other sites, downloads/exports, the admin and the current page.
+        (function () {
+            var done = {}, timer = null;
+            function eligible(a) {
+                if (!a || !a.href || a.target || a.hasAttribute('download') || a.dataset.noPrefetch !== undefined) return false;
+                var url = new URL(a.href, location.href);
+                if (url.origin !== location.origin || url.hash && url.pathname === location.pathname) return false;
+                if (/\/(export|admin|image)\b/.test(url.pathname) || url.href === location.href) return false;
+                return url.href;
+            }
+            function prefetch(href) {
+                if (done[href]) return;
+                done[href] = true;
+                var l = document.createElement('link');
+                l.rel = 'prefetch'; l.href = href; l.as = 'document';
+                document.head.appendChild(l);
+            }
+            document.addEventListener('mouseover', function (e) {
+                var href = eligible(e.target.closest && e.target.closest('a'));
+                if (!href) return;
+                clearTimeout(timer);
+                timer = setTimeout(function () { prefetch(href); }, 65);
+            }, { passive: true });
+            document.addEventListener('mouseout', function () { clearTimeout(timer); }, { passive: true });
+            document.addEventListener('touchstart', function (e) {
+                var href = eligible(e.target.closest && e.target.closest('a'));
+                if (href) prefetch(href);
+            }, { passive: true });
+        })();
     </script>
     {% block extra_scripts %}{% endblock %}
 </body>

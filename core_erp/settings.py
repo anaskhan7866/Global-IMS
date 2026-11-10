@@ -223,6 +223,13 @@ STORAGES = {
         'BACKEND': 'whitenoise.storage.CompressedManifestStaticFilesStorage',
     },
 }
+if 'test' in sys.argv:
+    # Tests render pages without running collectstatic first, so use plain (un-hashed) storage.
+    STORAGES['staticfiles'] = {'BACKEND': 'django.contrib.staticfiles.storage.StaticFilesStorage'}
+
+# Long-lived browser caching for static files. In production the file names contain a content
+# hash (app.3f9a1c.css), so a changed file always gets a new URL and the cache can never be stale.
+WHITENOISE_MAX_AGE = 0 if DEBUG else 31536000
 
 # Media Files (User-uploaded documents, attachments)
 MEDIA_URL = '/media/'

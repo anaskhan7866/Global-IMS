@@ -10,7 +10,9 @@
     "mobile:android": "npx cap open android",
     "mobile:ios": "npx cap open ios",
     "mobile:build:android": "cd android && .\\gradlew.bat assembleDebug",
-    "mobile:build:android-release": "cd android && .\\gradlew.bat assembleRelease"
+    "mobile:build:android-release": "cd android && .\\gradlew.bat assembleRelease",
+    "build:css": "tailwindcss -c tailwind.config.cjs -i static/src/app.css -o static/css/app.css --minify",
+    "watch:css": "tailwindcss -c tailwind.config.cjs -i static/src/app.css -o static/css/app.css --watch"
   },
   "dependencies": {
     "@capacitor/android": "^8.6.0",
@@ -22,6 +24,7 @@
     "@capacitor/status-bar": "^8.0.4"
   },
   "devDependencies": {
+    "tailwindcss": "3.4.17",
     "typescript": "^7.0.2"
   }
 }
