@@ -59,7 +59,7 @@
                 <span class="inline-flex items-center px-2.5 py-1 rounded-md text-xs font-bold bg-cyan-950 text-cyan-300 border border-cyan-800">
                     Active Orders List
                 </span>
-                <span class="text-xs text-slate-500">({{ total_orders_count }} orders)</span>
+                <span class="text-xs text-slate-500">(<span id="visibleOrdersCount">{{ total_orders_count }}</span>{% if filters_active %} of {{ all_orders_count }}{% endif %} orders)</span>
             </div>
 
             <!-- Live Search Bar -->
@@ -67,7 +67,7 @@
                 <input
                     type="text"
                     id="orderSearch"
-                    placeholder="Search company, product, or SKU..."
+                    placeholder="Search company, location, product, or SKU..."
                     class="w-full pl-9 pr-4 py-2 rounded-xl bg-slate-900 border border-slate-800 text-white placeholder-slate-500 text-xs focus:border-cyan-500 focus:ring-1 focus:ring-cyan-500 transition"
                 >
                 <svg class="w-4 h-4 text-slate-500 absolute left-3 top-2.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -75,6 +75,70 @@
                 </svg>
             </div>
         </div>
+
+        <!-- Filter Bar -->
+        <form method="get" action="{% url 'vendor-order-list' %}" id="orderFilterForm" onsubmit="return false;" class="p-4 sm:p-5 border-b border-slate-800 bg-slate-900/30">
+            <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-6 gap-3">
+                <div class="space-y-1">
+                    <label for="filter_vendor" class="block text-[10px] font-bold uppercase tracking-wider text-slate-400">Company / Vendor</label>
+                    <input type="text" name="vendor" id="filter_vendor" list="vendors_datalist" value="{{ filters.vendor }}" autocomplete="off" placeholder="Any company"
+                        class="w-full px-3 py-2 rounded-lg bg-slate-900 border border-slate-800 text-white placeholder-slate-500 text-xs focus:border-cyan-500 focus:ring-1 focus:ring-cyan-500 transition">
+                </div>
+                <div class="space-y-1">
+                    <label for="filter_location" class="block text-[10px] font-bold uppercase tracking-wider text-slate-400">Location</label>
+                    <input type="text" name="location" id="filter_location" list="locations_datalist" value="{{ filters.location }}" autocomplete="off" placeholder="Any location"
+                        class="w-full px-3 py-2 rounded-lg bg-slate-900 border border-slate-800 text-white placeholder-slate-500 text-xs focus:border-cyan-500 focus:ring-1 focus:ring-cyan-500 transition">
+                </div>
+                <div class="space-y-1">
+                    <label for="filter_box" class="block text-[10px] font-bold uppercase tracking-wider text-slate-400">Core Box Type</label>
+                    <select name="box" id="filter_box"
+                        class="w-full px-3 py-2 rounded-lg bg-slate-900 border border-slate-800 text-white text-xs focus:border-cyan-500 focus:ring-1 focus:ring-cyan-500 transition cursor-pointer">
+                        <option value="">All types</option>
+                        {% for box_type in order_box_types %}
+                        <option value="{{ box_type }}" {% if filters.box == box_type %}selected{% endif %}>{{ box_type }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="space-y-1">
+                    <label for="filter_order_from" class="block text-[10px] font-bold uppercase tracking-wider text-slate-400">Order Date From</label>
+                    <input type="date" name="order_from" id="filter_order_from" value="{{ filters.order_from }}"
+                        class="w-full px-3 py-2 rounded-lg bg-slate-900 border border-slate-800 text-white text-xs font-mono-code focus:border-cyan-500 focus:ring-1 focus:ring-cyan-500 transition">
+                </div>
+                <div class="space-y-1">
+                    <label for="filter_order_to" class="block text-[10px] font-bold uppercase tracking-wider text-slate-400">Order Date To</label>
+                    <input type="date" name="order_to" id="filter_order_to" value="{{ filters.order_to }}"
+                        class="w-full px-3 py-2 rounded-lg bg-slate-900 border border-slate-800 text-white text-xs font-mono-code focus:border-cyan-500 focus:ring-1 focus:ring-cyan-500 transition">
+                </div>
+                <div class="space-y-1">
+                    <label for="filter_status" class="block text-[10px] font-bold uppercase tracking-wider text-slate-400">Delivery Status</label>
+                    <select name="status" id="filter_status"
+                        class="w-full px-3 py-2 rounded-lg bg-slate-900 border border-slate-800 text-white text-xs focus:border-cyan-500 focus:ring-1 focus:ring-cyan-500 transition cursor-pointer">
+                        <option value="" {% if not filters.status %}selected{% endif %}>All</option>
+                        <option value="due" {% if filters.status == 'due' %}selected{% endif %}>Due (date passed)</option>
+                        <option value="upcoming" {% if filters.status == 'upcoming' %}selected{% endif %}>Upcoming</option>
+                    </select>
+                </div>
+            </div>
+            <div class="flex items-center justify-end gap-2 mt-3">
+                {% if filters_active %}
+                <!-- Page was opened with filters in the URL: reload the full list -->
+                <a href="{% url 'vendor-order-list' %}" id="clearFiltersBtn"
+                    class="inline-flex items-center justify-center px-4 py-2 min-h-[36px] rounded-lg bg-slate-900 hover:bg-slate-800 text-slate-300 text-xs font-semibold border border-slate-800 transition">
+                    Clear Filters
+                </a>
+                {% else %}
+                <button type="button" id="clearFiltersBtn" onclick="clearOrderFilters()"
+                    class="hidden inline-flex items-center justify-center px-4 py-2 min-h-[36px] rounded-lg bg-slate-900 hover:bg-slate-800 text-slate-300 text-xs font-semibold border border-slate-800 transition">
+                    Clear Filters
+                </button>
+                {% endif %}
+            </div>
+            <datalist id="locations_datalist">
+                {% for loc in order_locations %}
+                <option value="{{ loc }}"></option>
+                {% endfor %}
+            </datalist>
+        </form>
 
         <!-- 1. Desktop & Tablet Table (>= 768px) -->
         <div class="hidden md:block overflow-x-auto">
@@ -84,6 +148,7 @@
                         <th scope="col" class="py-3.5 pl-6 pr-3">Company / Vendor</th>
                         <th scope="col" class="px-3 py-3.5">Core Box Type</th>
                         <th scope="col" class="px-3 py-3.5">Quantity</th>
+                        <th scope="col" class="px-3 py-3.5">Order Date</th>
                         <th scope="col" class="px-3 py-3.5">Delivery Date</th>
                         <th scope="col" class="py-3.5 pl-3 pr-6 text-right">Actions</th>
                     </tr>
@@ -92,14 +157,24 @@
                     {% for order in purchase_orders %}
                     {% if order.expected_delivery_date < today %}
                     <!-- Due Date Passed: subtle highlight -->
-                    <tr class="order-row bg-rose-950/20 hover:bg-rose-950/30 transition">
+                    <tr class="order-row bg-rose-950/20 hover:bg-rose-950/30 transition"
+                        data-company="{{ order.vendor.company_name|lower }}" data-location="{{ order.location|lower }}"
+                        data-box="{{ order.item.name }}" data-order-date="{{ order.order_date|date:'Y-m-d' }}" data-due="1">
                     {% else %}
                     <!-- Normal Row -->
-                    <tr class="order-row hover:bg-slate-900/50 transition">
+                    <tr class="order-row hover:bg-slate-900/50 transition"
+                        data-company="{{ order.vendor.company_name|lower }}" data-location="{{ order.location|lower }}"
+                        data-box="{{ order.item.name }}" data-order-date="{{ order.order_date|date:'Y-m-d' }}" data-due="0">
                     {% endif %}
                         <!-- 1. Company / Vendor Name -->
                         <td class="whitespace-nowrap py-4 pl-6 pr-3">
                             <span class="font-bold text-white text-sm block order-company">{{ order.vendor.company_name }}</span>
+                            {% if order.location %}
+                            <span class="text-xs text-emerald-300 flex items-center gap-1 mt-0.5">
+                                <svg class="w-3 h-3 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17.657 16.657L13.414 20.9a2 2 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z"/></svg>
+                                <span class="order-location">{{ order.location }}</span>
+                            </span>
+                            {% endif %}
                             {% if order.vendor.contact_person or order.vendor.phone %}
                             <span class="text-xs text-slate-400 block mt-0.5">
                                 {{ order.vendor.contact_person }}{% if order.vendor.phone %} &bull; {{ order.vendor.phone }}{% endif %}
@@ -116,6 +191,11 @@
                         <!-- 3. Quantity -->
                         <td class="whitespace-nowrap px-3 py-4 font-mono-code font-bold text-base text-cyan-300">
                             {{ order.quantity }} <span class="text-xs text-slate-400 font-normal">boxes</span>
+                        </td>
+
+                        <!-- 4. Order Date -->
+                        <td class="whitespace-nowrap px-3 py-4 font-mono-code text-xs text-slate-300 font-medium">
+                            {{ order.order_date|date:"Y-m-d" }}
                         </td>
 
                         <!-- 4. Delivery Date -->
@@ -138,7 +218,7 @@
                             <div class="flex items-center justify-end space-x-2">
                                 <button
                                     type="button"
-                                    onclick="openEditOrderModal('{{ order.id }}', '{{ order.vendor.company_name|escapejs }}', '{{ order.item.name|escapejs }}', '{{ order.quantity }}', '{{ order.expected_delivery_date|date:'Y-m-d' }}')"
+                                    onclick="openEditOrderModal('{{ order.id }}', '{{ order.vendor.company_name|escapejs }}', '{{ order.item.name|escapejs }}', '{{ order.quantity }}', '{{ order.expected_delivery_date|date:'Y-m-d' }}', '{{ order.order_date|date:'Y-m-d' }}', '{{ order.location|escapejs }}')"
                                     class="inline-flex items-center space-x-1.5 px-3 py-1.5 rounded-lg bg-amber-950/70 hover:bg-amber-900 text-amber-300 hover:text-white border border-amber-800/80 hover:border-amber-700 text-xs font-semibold transition shadow-sm"
                                     title="Edit order details"
                                 >
@@ -163,17 +243,28 @@
                     </tr>
                     {% empty %}
                     <tr>
-                        <td colspan="5" class="py-12 text-center text-slate-400">
+                        <td colspan="6" class="py-12 text-center text-slate-400">
                             <div class="flex flex-col items-center justify-center">
                                 <svg class="h-10 w-10 text-slate-600 mb-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
                                 </svg>
+                                {% if filters_active %}
+                                <p class="text-sm font-bold text-slate-200">No Orders Match These Filters</p>
+                                <p class="text-xs text-slate-500 mt-1 max-w-sm">Change the filters above or click "Clear Filters" to see all orders.</p>
+                                {% else %}
                                 <p class="text-sm font-bold text-slate-200">No Orders in List</p>
                                 <p class="text-xs text-slate-500 mt-1 max-w-sm">Click "Add Order" above to register an incoming company order for core boxes.</p>
+                                {% endif %}
                             </div>
                         </td>
                     </tr>
                     {% endfor %}
+                    <tr id="noMatchRow" class="hidden">
+                        <td colspan="6" class="py-12 text-center">
+                            <p class="text-sm font-bold text-slate-200">No Orders Match These Filters</p>
+                            <p class="text-xs text-slate-500 mt-1">Change the filters above or click "Clear Filters" to see all orders.</p>
+                        </td>
+                    </tr>
                 </tbody>
             </table>
         </div>
@@ -181,10 +272,19 @@
         <!-- 2. Mobile Stacked Cards (< 768px) with 44px Minimum Touch Targets -->
         <div class="md:hidden divide-y divide-slate-800/80 bg-slate-950" id="mobileCardsBody">
             {% for order in purchase_orders %}
-            <div class="order-row p-4 space-y-3 transition hover:bg-slate-900/40 {% if order.expected_delivery_date < today %}bg-rose-950/15{% endif %}">
+            <div class="order-row p-4 space-y-3 transition hover:bg-slate-900/40 {% if order.expected_delivery_date < today %}bg-rose-950/15{% endif %}"
+                data-company="{{ order.vendor.company_name|lower }}" data-location="{{ order.location|lower }}"
+                data-box="{{ order.item.name }}" data-order-date="{{ order.order_date|date:'Y-m-d' }}"
+                data-due="{% if order.expected_delivery_date < today %}1{% else %}0{% endif %}">
                 <div class="flex items-start justify-between gap-2">
                     <div class="min-w-0 flex-1">
                         <h3 class="font-bold text-white text-base order-company truncate">{{ order.vendor.company_name }}</h3>
+                        {% if order.location %}
+                        <p class="text-xs text-emerald-300 flex items-center gap-1 mt-0.5">
+                            <svg class="w-3 h-3 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17.657 16.657L13.414 20.9a2 2 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z"/></svg>
+                            <span class="order-location truncate">{{ order.location }}</span>
+                        </p>
+                        {% endif %}
                         {% if order.vendor.contact_person or order.vendor.phone %}
                         <p class="text-xs text-slate-400 mt-0.5">
                             {{ order.vendor.contact_person }}{% if order.vendor.phone %} &bull; {{ order.vendor.phone }}{% endif %}
@@ -211,6 +311,11 @@
                 </div>
 
                 <div class="flex items-center justify-between text-xs text-slate-400 pt-0.5">
+                    <span class="text-[11px]">Order Date:</span>
+                    <span class="font-mono-code font-medium text-slate-200">{{ order.order_date|date:"Y-m-d" }}</span>
+                </div>
+
+                <div class="flex items-center justify-between text-xs text-slate-400 pt-0.5">
                     <span class="text-[11px]">Delivery Date:</span>
                     <span class="font-mono-code font-medium {% if order.expected_delivery_date < today %}text-rose-400 font-bold{% else %}text-slate-200{% endif %}">
                         {{ order.expected_delivery_date|date:"Y-m-d" }}
@@ -221,7 +326,7 @@
                 <div class="grid grid-cols-2 gap-2 pt-1">
                     <button
                         type="button"
-                        onclick="openEditOrderModal('{{ order.id }}', '{{ order.vendor.company_name|escapejs }}', '{{ order.item.name|escapejs }}', '{{ order.quantity }}', '{{ order.expected_delivery_date|date:'Y-m-d' }}')"
+                        onclick="openEditOrderModal('{{ order.id }}', '{{ order.vendor.company_name|escapejs }}', '{{ order.item.name|escapejs }}', '{{ order.quantity }}', '{{ order.expected_delivery_date|date:'Y-m-d' }}', '{{ order.order_date|date:'Y-m-d' }}', '{{ order.location|escapejs }}')"
                         class="inline-flex items-center justify-center space-x-1.5 px-3 py-2.5 min-h-[44px] rounded-xl bg-amber-950/70 hover:bg-amber-900 text-amber-300 hover:text-white border border-amber-800/80 text-xs font-semibold transition shadow-sm active:bg-amber-800"
                     >
                         <svg class="w-4 h-4 text-amber-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -243,10 +348,19 @@
             </div>
             {% empty %}
             <div class="py-12 text-center text-slate-400 p-4">
+                {% if filters_active %}
+                <p class="text-sm font-bold text-slate-200">No Orders Match These Filters</p>
+                <p class="text-xs text-slate-500 mt-1">Change the filters above or tap "Clear Filters" to see all orders.</p>
+                {% else %}
                 <p class="text-sm font-bold text-slate-200">No Orders in List</p>
                 <p class="text-xs text-slate-500 mt-1">Click "Add Order" above to register an incoming company order for core boxes.</p>
+                {% endif %}
             </div>
             {% endfor %}
+            <div id="noMatchCard" class="hidden py-12 text-center p-4">
+                <p class="text-sm font-bold text-slate-200">No Orders Match These Filters</p>
+                <p class="text-xs text-slate-500 mt-1">Change the filters above or tap "Clear Filters" to see all orders.</p>
+            </div>
         </div>
     </section>
 </div>
@@ -300,6 +414,24 @@
                 <p class="text-[11px] text-slate-500">Pick from existing companies or type a new company name directly.</p>
             </div>
 
+            <!-- 1b. Vendor Location (optional) -->
+            <div class="space-y-1.5">
+                <label for="order_location" class="block text-xs font-bold uppercase tracking-wider text-cyan-400">
+                    Location <span class="text-slate-500 normal-case font-medium tracking-normal">(optional)</span>
+                </label>
+                <input
+                    type="text"
+                    name="location"
+                    id="order_location"
+                    list="locations_datalist"
+                    maxlength="255"
+                    autocomplete="off"
+                    placeholder="e.g. Nagpur, Site 4 - Chandrapur"
+                    class="w-full px-4 py-2.5 rounded-xl bg-slate-900 border border-slate-700 text-white placeholder-slate-500 text-sm focus:border-cyan-500 focus:ring-1 focus:ring-cyan-500 transition font-medium"
+                >
+                <p class="text-[11px] text-slate-500">Type the vendor / delivery location manually. Leave blank if not needed.</p>
+            </div>
+
             <!-- 2. Type of Core Box -->
             <div class="space-y-1.5">
                 <label for="box_name" class="block text-xs font-bold uppercase tracking-wider text-cyan-400">
@@ -346,7 +478,23 @@
                 <p class="text-[11px] text-slate-500">Total core boxes needed.</p>
             </div>
 
-            <!-- 4. Delivery Date -->
+            <!-- 4. Order Date -->
+            <div class="space-y-1.5">
+                <label for="order_date" class="block text-xs font-bold uppercase tracking-wider text-cyan-400">
+                    Order Date <span class="text-rose-400">*</span>
+                </label>
+                <input
+                    type="date"
+                    name="order_date"
+                    id="order_date"
+                    value="{{ default_order_date }}"
+                    required
+                    class="w-full px-4 py-2.5 rounded-xl bg-slate-900 border border-slate-700 text-white text-sm font-mono-code focus:border-cyan-500 focus:ring-1 focus:ring-cyan-500 transition"
+                >
+                <p class="text-[11px] text-slate-500">Date the order was received. Defaults to today.</p>
+            </div>
+
+            <!-- 5. Delivery Date -->
             <div class="space-y-1.5">
                 <label for="expected_delivery_date" class="block text-xs font-bold uppercase tracking-wider text-cyan-400">
                     Delivery Date <span class="text-rose-400">*</span>
@@ -447,7 +595,7 @@
                 </div>
                 <div>
                     <h3 class="text-base font-bold text-white tracking-tight">Edit Vendor Order</h3>
-                    <p class="text-xs text-slate-400 mt-0.5">Modify company, box type, quantity, or delivery date.</p>
+                    <p class="text-xs text-slate-400 mt-0.5">Modify company, location, box type, quantity, or dates.</p>
                 </div>
             </div>
             <button type="button" onclick="closeEditOrderModal()" class="text-slate-400 hover:text-white transition">
@@ -469,10 +617,27 @@
                     type="text"
                     name="company_name"
                     id="edit_company_name"
-                    list="companies_datalist"
+                    list="vendors_datalist"
                     required
                     autocomplete="off"
                     placeholder="e.g. Apex Electricals Pvt Ltd"
+                    class="w-full px-4 py-2.5 rounded-xl bg-slate-900 border border-slate-700 text-white placeholder-slate-500 text-sm focus:border-amber-500 focus:ring-1 focus:ring-amber-500 transition font-medium"
+                >
+            </div>
+
+            <!-- 1b. Vendor Location (optional) -->
+            <div class="space-y-1.5">
+                <label for="edit_location" class="block text-xs font-bold uppercase tracking-wider text-amber-400">
+                    Location <span class="text-slate-500 normal-case font-medium tracking-normal">(optional)</span>
+                </label>
+                <input
+                    type="text"
+                    name="location"
+                    id="edit_location"
+                    list="locations_datalist"
+                    maxlength="255"
+                    autocomplete="off"
+                    placeholder="e.g. Nagpur, Site 4 - Chandrapur"
                     class="w-full px-4 py-2.5 rounded-xl bg-slate-900 border border-slate-700 text-white placeholder-slate-500 text-sm focus:border-amber-500 focus:ring-1 focus:ring-amber-500 transition font-medium"
                 >
             </div>
@@ -523,7 +688,21 @@
                 <p class="text-[11px] text-slate-500">Total core boxes needed.</p>
             </div>
 
-            <!-- 4. Delivery Date -->
+            <!-- 4. Order Date -->
+            <div class="space-y-1.5">
+                <label for="edit_order_date" class="block text-xs font-bold uppercase tracking-wider text-amber-400">
+                    Order Date <span class="text-rose-400">*</span>
+                </label>
+                <input
+                    type="date"
+                    name="order_date"
+                    id="edit_order_date"
+                    required
+                    class="w-full px-4 py-2.5 rounded-xl bg-slate-900 border border-slate-700 text-white text-sm font-mono-code focus:border-amber-500 focus:ring-1 focus:ring-amber-500 transition"
+                >
+            </div>
+
+            <!-- 5. Delivery Date -->
             <div class="space-y-1.5">
                 <label for="edit_expected_delivery_date" class="block text-xs font-bold uppercase tracking-wider text-amber-400">
                     Delivery Date <span class="text-rose-400">*</span>
@@ -557,20 +736,72 @@
 </div>
 
 <script>
-    // Live Search Filter
-    document.getElementById('orderSearch')?.addEventListener('input', function(e) {
-        const query = e.target.value.toLowerCase().trim();
-        const rows = document.querySelectorAll('.order-row');
-        rows.forEach(row => {
-            const company = row.querySelector('.order-company')?.textContent.toLowerCase() || '';
-            const product = row.querySelector('.order-product')?.textContent.toLowerCase() || '';
-            const sku = row.querySelector('.order-sku')?.textContent.toLowerCase() || '';
-            if (company.includes(query) || product.includes(query) || sku.includes(query)) {
-                row.style.display = '';
-            } else {
-                row.style.display = 'none';
+    // Instant filtering: runs on every keystroke / selection, no button or page reload
+    const filterInputIds = ['orderSearch', 'filter_vendor', 'filter_location', 'filter_box', 'filter_order_from', 'filter_order_to', 'filter_status'];
+    const val = id => (document.getElementById(id)?.value || '').trim();
+
+    function applyOrderFilters() {
+        const search = val('orderSearch').toLowerCase();
+        const vendor = val('filter_vendor').toLowerCase();
+        const location = val('filter_location').toLowerCase();
+        const box = val('filter_box');
+        const orderFrom = val('filter_order_from');
+        const orderTo = val('filter_order_to');
+        const status = val('filter_status');
+
+        const matches = row => {
+            const d = row.dataset;
+            if (vendor && !d.company.includes(vendor)) return false;
+            if (location && !d.location.includes(location)) return false;
+            if (box && d.box !== box) return false;
+            if (orderFrom && d.orderDate < orderFrom) return false;
+            if (orderTo && d.orderDate > orderTo) return false;
+            if (status === 'due' && d.due !== '1') return false;
+            if (status === 'upcoming' && d.due !== '0') return false;
+            if (search) {
+                const sku = row.querySelector('.order-sku')?.textContent.toLowerCase() || '';
+                const haystack = `${d.company} ${d.location} ${d.box.toLowerCase()} ${sku}`;
+                if (!haystack.includes(search)) return false;
             }
+            return true;
+        };
+
+        let desktopVisible = 0, mobileVisible = 0;
+        document.querySelectorAll('#tableBody .order-row').forEach(row => {
+            const show = matches(row);
+            row.style.display = show ? '' : 'none';
+            if (show) desktopVisible++;
         });
+        document.querySelectorAll('#mobileCardsBody .order-row').forEach(row => {
+            const show = matches(row);
+            row.style.display = show ? '' : 'none';
+            if (show) mobileVisible++;
+        });
+
+        const totalRows = document.querySelectorAll('#tableBody .order-row').length;
+        document.getElementById('noMatchRow')?.classList.toggle('hidden', !(totalRows > 0 && desktopVisible === 0));
+        document.getElementById('noMatchCard')?.classList.toggle('hidden', !(totalRows > 0 && mobileVisible === 0));
+        const countEl = document.getElementById('visibleOrdersCount');
+        if (countEl) countEl.textContent = desktopVisible;
+
+        const anyActive = filterInputIds.some(id => val(id) !== '');
+        const clearBtn = document.getElementById('clearFiltersBtn');
+        if (clearBtn && clearBtn.tagName === 'BUTTON') clearBtn.classList.toggle('hidden', !anyActive);
+    }
+
+    function clearOrderFilters() {
+        filterInputIds.forEach(id => {
+            const el = document.getElementById(id);
+            if (el) el.value = '';
+        });
+        applyOrderFilters();
+    }
+
+    filterInputIds.forEach(id => {
+        const el = document.getElementById(id);
+        if (!el) return;
+        el.addEventListener('input', applyOrderFilters);
+        el.addEventListener('change', applyOrderFilters);
     });
 
     // Modal Control: Add Order
@@ -582,9 +813,11 @@
     }
 
     // Modal Control: Edit Order
-    function openEditOrderModal(orderId, companyName, boxName, quantity, deliveryDate) {
+    function openEditOrderModal(orderId, companyName, boxName, quantity, deliveryDate, orderDate, location) {
         document.getElementById('editOrderId').value = orderId;
         document.getElementById('edit_company_name').value = companyName;
+        document.getElementById('edit_location').value = location || '';
+        document.getElementById('edit_order_date').value = orderDate || '';
         const editBoxSelect = document.getElementById('edit_box_name');
         if (editBoxSelect) {
             if (boxName && !Array.from(editBoxSelect.options).some(o => o.value === boxName)) {

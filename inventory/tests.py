@@ -843,6 +843,115 @@ class EmployeeAndVendorOrderViewsTestCase(TestCase):
         self.assertEqual(del_res.status_code, 302)
         self.assertFalse(PurchaseOrder.objects.filter(pk=order.pk).exists())
 
+    def test_vendor_orders_order_date_and_optional_location(self):
+        """
+        Validates the manual Order Date and optional Location fields on add & edit.
+        """
+        import datetime
+        from django.urls import reverse
+        from transactions.models import PurchaseOrder
+
+        delivery = (self.today + datetime.timedelta(days=7)).isoformat()
+        past_order_date = (self.today - datetime.timedelta(days=4)).isoformat()
+
+        # 1. Add with explicit order date and location
+        self.client.post(reverse('vendor-order-list'), {
+            'action': 'add_order',
+            'company_name': 'Located Corp',
+            'location': '  Nagpur Site 4  ',
+            'box_name': 'Test GI Core Box',
+            'quantity': '5',
+            'order_date': past_order_date,
+            'expected_delivery_date': delivery,
+        })
+        order = PurchaseOrder.objects.get(vendor__company_name='Located Corp')
+        self.assertEqual(order.order_date.isoformat(), past_order_date)
+        self.assertEqual(order.location, 'Nagpur Site 4')
+
+        # 2. Add without location / order date: location blank, order date defaults to today
+        self.client.post(reverse('vendor-order-list'), {
+            'action': 'add_order',
+            'company_name': 'No Location Corp',
+            'box_name': 'Test GI Core Box',
+            'quantity': '3',
+            'expected_delivery_date': delivery,
+        })
+        plain = PurchaseOrder.objects.get(vendor__company_name='No Location Corp')
+        self.assertEqual(plain.location, '')
+        self.assertEqual(plain.order_date, self.today)
+
+        # 3. Edit: change order date and clear the location
+        new_order_date = (self.today - datetime.timedelta(days=1)).isoformat()
+        self.client.post(reverse('vendor-order-list'), {
+            'action': 'edit_order',
+            'order_id': order.pk,
+            'company_name': 'Located Corp',
+            'location': '',
+            'box_name': 'Test GI Core Box',
+            'quantity': '5',
+            'order_date': new_order_date,
+            'expected_delivery_date': delivery,
+        })
+        order.refresh_from_db()
+        self.assertEqual(order.order_date.isoformat(), new_order_date)
+        self.assertEqual(order.location, '')
+
+        # 4. List page shows the Order Date column
+        res = self.client.get(reverse('vendor-order-list'))
+        self.assertContains(res, 'Order Date')
+        self.assertContains(res, new_order_date)
+
+    def test_vendor_orders_filters(self):
+        """
+        Validates filtering vendor orders by company, location, box type,
+        order date range, and delivery status.
+        """
+        import datetime
+        from django.urls import reverse
+        from transactions.models import Contact, ContactType, PurchaseOrder
+
+        PurchaseOrder.objects.all().delete()  # start from a clean slate (setUp creates orders)
+        other_vendor = Contact.objects.create(type=ContactType.VENDOR, company_name='Zenith Mining')
+        overdue = PurchaseOrder.objects.create(
+            vendor=self.vendor, item=self.item, quantity=11, location='Nagpur',
+            order_date=self.today - datetime.timedelta(days=20),
+            expected_delivery_date=self.today - datetime.timedelta(days=2),
+        )
+        upcoming = PurchaseOrder.objects.create(
+            vendor=other_vendor, item=self.item, quantity=22, location='Raipur',
+            order_date=self.today - datetime.timedelta(days=2),
+            expected_delivery_date=self.today + datetime.timedelta(days=5),
+        )
+        url = reverse('vendor-order-list')
+
+        def ids(params):
+            res = self.client.get(url, params)
+            self.assertEqual(res.status_code, 200)
+            return {o.pk for o in res.context['purchase_orders']}
+
+        self.assertEqual(ids({}), {overdue.pk, upcoming.pk})
+        self.assertEqual(ids({'vendor': 'zenith'}), {upcoming.pk})
+        self.assertEqual(ids({'location': 'nagp'}), {overdue.pk})
+        self.assertEqual(ids({'box': self.item.name}), {overdue.pk, upcoming.pk})
+        self.assertEqual(ids({'box': 'Nonexistent Box'}), set())
+        self.assertEqual(ids({'status': 'due'}), {overdue.pk})
+        self.assertEqual(ids({'status': 'upcoming'}), {upcoming.pk})
+        self.assertEqual(
+            ids({'order_from': (self.today - datetime.timedelta(days=5)).isoformat()}),
+            {upcoming.pk},
+        )
+        self.assertEqual(
+            ids({'order_to': (self.today - datetime.timedelta(days=10)).isoformat()}),
+            {overdue.pk},
+        )
+        # Invalid dates and unknown status values are ignored
+        self.assertEqual(ids({'order_from': 'not-a-date', 'status': 'bogus'}), {overdue.pk, upcoming.pk})
+
+        # Empty result with filters shows the filter-specific message and Clear link
+        res = self.client.get(url, {'vendor': 'nobody-matches'})
+        self.assertContains(res, 'No Orders Match These Filters')
+        self.assertContains(res, 'Clear Filters')
+
     def test_add_inventory_view_get_and_post(self):
         """
         Validates AddInventoryView GET template and atomic stock inward POST.
@@ -1672,3 +1781,208 @@ class DailyCoreBoxFeatureTestCase(TestCase):
         }, follow=True)
         self.assertEqual(res_post.status_code, 200)
         self.assertTrue(DailyCoreBoxDispatch.objects.filter(company=self.company, box_type='HQ with Lid', quantity=35).exists())
+
+
+class DailyCoreBoxExtrasAndExportTestCase(TestCase):
+    """
+    Validates the optional Gate Pass No., Vehicle No., Location To and image attachment
+    on daily core box entries, the image view, and the Excel export.
+    """
+    # Minimal valid PNG header + padding (content is sniffed by magic bytes only)
+    PNG_BYTES = b'\x89PNG\r\n\x1a\n' + b'\x00\x00\x00\rIHDR' + b'\x00' * 32
+
+    def setUp(self):
+        from django.contrib.auth.models import User
+        from inventory.models import Company
+
+        self.user = User.objects.create_user(username='gatekeeper', password='SecretPassword123!')
+        self.client.force_login(self.user)
+        self.company = Company.objects.create(name='Khetan Drilling')
+
+    def _png(self, name='gatepass.png'):
+        from django.core.files.uploadedfile import SimpleUploadedFile
+        return SimpleUploadedFile(name, self.PNG_BYTES, content_type='image/png')
+
+    def test_list_add_entry_with_all_optional_fields(self):
+        from django.urls import reverse
+        from inventory.models import DailyCoreBoxDispatch
+
+        res = self.client.post(reverse('daily-core-box-list'), {
+            'action': 'add_entry',
+            'company_name': 'Khetan Drilling',
+            'box_type': 'NQ with Lid',
+            'quantity': '12',
+            'dispatch_date': '2026-11-01',
+            'gate_pass_number': ' GP-77 ',
+            'vehicle_number': 'mh40 ab 1234',
+            'location_to': 'Chandrapur Site 2',
+            'attachment': self._png(),
+        })
+        self.assertEqual(res.status_code, 302)
+        d = DailyCoreBoxDispatch.objects.get(company=self.company)
+        self.assertEqual(d.gate_pass_number, 'GP-77')
+        self.assertEqual(d.vehicle_number, 'MH40 AB 1234')
+        self.assertEqual(d.location_to, 'Chandrapur Site 2')
+        self.assertTrue(d.has_attachment)
+        self.assertEqual(d.attachment_content_type, 'image/png')
+        self.assertEqual(bytes(d.attachment_data), self.PNG_BYTES)
+
+        # Image is served (login required) with the sniffed content type
+        img = self.client.get(reverse('daily-core-box-attachment', kwargs={'pk': d.pk}))
+        self.assertEqual(img.status_code, 200)
+        self.assertEqual(img['Content-Type'], 'image/png')
+        self.assertEqual(img.content, self.PNG_BYTES)
+
+        self.client.logout()
+        anon = self.client.get(reverse('daily-core-box-attachment', kwargs={'pk': d.pk}))
+        self.assertEqual(anon.status_code, 302)
+
+    def test_optional_fields_can_be_omitted(self):
+        from django.urls import reverse
+        from inventory.models import DailyCoreBoxDispatch
+
+        self.client.post(reverse('daily-core-box-detail', kwargs={'pk': self.company.pk}), {
+            'action': 'add_entry',
+            'box_type': 'BQ without Lid',
+            'quantity': '5',
+        })
+        d = DailyCoreBoxDispatch.objects.get(company=self.company)
+        self.assertEqual((d.gate_pass_number, d.vehicle_number, d.location_to), ('', '', ''))
+        self.assertFalse(d.has_attachment)
+        res = self.client.get(reverse('daily-core-box-attachment', kwargs={'pk': d.pk}))
+        self.assertEqual(res.status_code, 404)
+
+    def test_non_image_upload_is_rejected(self):
+        from django.core.files.uploadedfile import SimpleUploadedFile
+        from django.urls import reverse
+        from inventory.models import DailyCoreBoxDispatch
+
+        fake = SimpleUploadedFile('evil.png', b'<svg onload=alert(1)></svg>', content_type='image/png')
+        res = self.client.post(reverse('daily-core-box-detail', kwargs={'pk': self.company.pk}), {
+            'action': 'add_entry',
+            'box_type': 'BQ without Lid',
+            'quantity': '5',
+            'attachment': fake,
+        }, follow=True)
+        self.assertContains(res, 'Attachment must be an image')
+        self.assertFalse(DailyCoreBoxDispatch.objects.exists())
+
+    def test_oversized_image_is_rejected(self):
+        from django.core.files.uploadedfile import SimpleUploadedFile
+        from django.urls import reverse
+        from inventory.models import DailyCoreBoxDispatch
+
+        big = SimpleUploadedFile('big.png', self.PNG_BYTES + b'\x00' * (5 * 1024 * 1024), content_type='image/png')
+        res = self.client.post(reverse('daily-core-box-list'), {
+            'action': 'add_entry',
+            'company_name': 'Khetan Drilling',
+            'box_type': 'BQ without Lid',
+            'quantity': '5',
+            'attachment': big,
+        }, follow=True)
+        self.assertContains(res, 'smaller than 5 MB')
+        self.assertFalse(DailyCoreBoxDispatch.objects.exists())
+
+    def test_edit_updates_fields_keeps_and_removes_image(self):
+        from django.urls import reverse
+        from inventory.models import DailyCoreBoxDispatch
+
+        url = reverse('daily-core-box-detail', kwargs={'pk': self.company.pk})
+        self.client.post(url, {
+            'action': 'add_entry', 'box_type': 'HQ with Lid', 'quantity': '3',
+            'gate_pass_number': 'GP-1', 'attachment': self._png(),
+        })
+        d = DailyCoreBoxDispatch.objects.get(company=self.company)
+        base = {'action': 'edit_entry', 'entry_id': d.pk, 'box_type': 'HQ with Lid', 'quantity': '4',
+                'dispatch_date': '2026-11-02'}
+
+        # Edit text fields without a new file: image is kept
+        self.client.post(url, {**base, 'gate_pass_number': 'GP-2', 'vehicle_number': 'cg04 x 9',
+                               'location_to': 'Raipur'})
+        d.refresh_from_db()
+        self.assertEqual((d.gate_pass_number, d.vehicle_number, d.location_to), ('GP-2', 'CG04 X 9', 'Raipur'))
+        self.assertTrue(d.has_attachment)
+
+        # Clear text fields and remove the image
+        self.client.post(url, {**base, 'gate_pass_number': '', 'vehicle_number': '', 'location_to': '',
+                               'remove_attachment': '1'})
+        d.refresh_from_db()
+        self.assertEqual((d.gate_pass_number, d.vehicle_number, d.location_to), ('', '', ''))
+        self.assertFalse(d.has_attachment)
+        self.assertIsNone(d.attachment_data)
+
+    def test_detail_and_list_pages_show_new_fields(self):
+        from django.urls import reverse
+        from inventory.models import DailyCoreBoxDispatch
+
+        d = DailyCoreBoxDispatch.objects.create(
+            company=self.company, box_type='NQ with Lid', quantity=9,
+            gate_pass_number='GP-555', vehicle_number='MH31 Z 1', location_to='Nagpur Yard',
+            attachment_data=self.PNG_BYTES, attachment_content_type='image/png', attachment_name='x.png',
+        )
+        res = self.client.get(reverse('daily-core-box-detail', kwargs={'pk': self.company.pk}))
+        self.assertContains(res, 'GP-555')
+        self.assertContains(res, 'MH31 Z 1')
+        self.assertContains(res, 'Nagpur Yard')
+        self.assertContains(res, reverse('daily-core-box-attachment', kwargs={'pk': d.pk}))
+        self.assertContains(res, 'enctype="multipart/form-data"')
+        self.assertContains(res, reverse('daily-core-box-export', kwargs={'pk': self.company.pk}))
+        self.assertContains(res, 'Export Excel')
+
+        list_res = self.client.get(reverse('daily-core-box-list'))
+        self.assertContains(list_res, 'name="gate_pass_number"')
+        self.assertContains(list_res, 'name="vehicle_number"')
+        self.assertContains(list_res, 'name="location_to"')
+        self.assertContains(list_res, 'name="attachment"')
+        # Export lives inside each company's page, not on the global list
+        self.assertNotContains(list_res, 'Export Excel')
+
+    def test_excel_export_per_company(self):
+        import io
+        from openpyxl import load_workbook
+        from django.urls import reverse
+        from inventory.models import Company, DailyCoreBoxDispatch
+
+        other = Company.objects.create(name='Apex Mining')
+        mine = DailyCoreBoxDispatch.objects.create(
+            company=self.company, box_type='NQ with Lid', quantity=10, dispatch_date=datetime.date(2026, 11, 1),
+            gate_pass_number='GP-9', vehicle_number='MH40 A 1', location_to='Site 1',
+            attachment_data=self.PNG_BYTES, attachment_content_type='image/png', attachment_name='a.png',
+        )
+        DailyCoreBoxDispatch.objects.create(
+            company=self.company, box_type='HQ with Lid', quantity=4, dispatch_date=datetime.date(2026, 11, 3),
+        )
+        DailyCoreBoxDispatch.objects.create(
+            company=other, box_type='HQ with Lid', quantity=7, dispatch_date=datetime.date(2026, 11, 2),
+        )
+        url = reverse('daily-core-box-export', kwargs={'pk': self.company.pk})
+
+        res = self.client.get(url)
+        self.assertEqual(res.status_code, 200)
+        self.assertEqual(res['Content-Type'], 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
+        self.assertIn('attachment; filename="daily_core_box_Khetan_Drilling_', res['Content-Disposition'])
+        wb = load_workbook(io.BytesIO(res.content))
+        self.assertEqual(wb.sheetnames, ['Dispatches', 'Summary'])
+        ws = wb['Dispatches']
+        header = [c.value for c in ws[1]]
+        self.assertEqual(header[:10], ['S.No', 'Date', 'Company', 'Core Box Type', 'SKU', 'Quantity',
+                                       'Gate Pass No.', 'Vehicle No.', 'Location To', 'Image'])
+
+        # Only this company's entries are exported
+        data_rows = [r for r in ws.iter_rows(min_row=2, values_only=True) if r and isinstance(r[0], int)]
+        self.assertEqual(len(data_rows), 2)
+        self.assertEqual({r[2] for r in data_rows}, {'Khetan Drilling'})
+        nq = next(r for r in data_rows if r[3] == 'NQ with Lid')
+        self.assertEqual(nq[5:10], (10, 'GP-9', 'MH40 A 1', 'Site 1', 'View Image'))
+        image_cell = next(c for c in ws['J'] if c.value == 'View Image')
+        self.assertTrue(image_cell.hyperlink.target.endswith(
+            reverse('daily-core-box-attachment', kwargs={'pk': mine.pk})))
+        total_row = next(r for r in ws.iter_rows(min_row=2, values_only=True) if r and r[3] == 'TOTAL')
+        self.assertEqual(total_row[5], 14)
+
+        # Unknown company -> 404
+        self.assertEqual(self.client.get(reverse('daily-core-box-export', kwargs={'pk': 99999})).status_code, 404)
+
+        # Login required
+        self.client.logout()
+        self.assertEqual(self.client.get(url).status_code, 302)

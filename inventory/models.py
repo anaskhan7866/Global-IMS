@@ -377,8 +377,39 @@ class DailyCoreBoxDispatch(models.Model):
         db_index=True,
         help_text=_("Date when core boxes were taken.")
     )
+    gate_pass_number = models.CharField(default='', db_default='',
+        max_length=100,
+        blank=True,
+        db_index=True,
+        help_text=_("Optional gate pass number issued for this dispatch.")
+    )
+    vehicle_number = models.CharField(default='', db_default='',
+        max_length=50,
+        blank=True,
+        db_index=True,
+        help_text=_("Optional vehicle registration number that carried the boxes.")
+    )
+    location_to = models.CharField(default='', db_default='',
+        max_length=255,
+        blank=True,
+        help_text=_("Optional destination (location the boxes were sent to).")
+    )
+    # Optional image attachment (e.g. gate pass photo). Stored in the database rather than on disk
+    # because the hosting platform's filesystem is wiped on every redeploy/restart.
+    attachment_data = models.BinaryField(
+        null=True,
+        blank=True,
+        editable=False,
+        help_text=_("Raw bytes of the attached image.")
+    )
+    attachment_content_type = models.CharField(default='', db_default='', max_length=100, blank=True, editable=False)
+    attachment_name = models.CharField(default='', db_default='', max_length=255, blank=True, editable=False)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
+
+    @property
+    def has_attachment(self) -> bool:
+        return bool(self.attachment_content_type)
 
     class Meta:
         ordering = ['-dispatch_date', '-id']

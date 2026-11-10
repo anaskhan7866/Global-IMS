@@ -84,7 +84,7 @@
             </div>
         </div>
 
-        <form method="post" action="{% url 'daily-core-box-list' %}"
+        <form method="post" action="{% url 'daily-core-box-list' %}" enctype="multipart/form-data"
             class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
             {% csrf_token %}
             <input type="hidden" name="action" value="add_entry">
@@ -149,18 +149,23 @@
                     class="w-full px-3.5 py-2.5 rounded-xl bg-slate-900 border border-slate-800 text-white placeholder-slate-500 text-sm font-mono-code focus:border-cyan-500 focus:ring-1 focus:ring-cyan-500 transition">
             </div>
 
-            <!-- 4. Date & Save Button -->
-            <div class="flex flex-col sm:flex-row lg:flex-col justify-end gap-2">
-                <div>
-                    <label for="entry_date"
-                        class="block text-xs font-semibold uppercase tracking-wider text-slate-400 mb-1.5">
-                        Date
-                    </label>
-                    <input type="date" name="dispatch_date" id="entry_date" value="{{ today|date:'Y-m-d' }}"
-                        class="w-full px-3 py-2 rounded-xl bg-slate-900 border border-slate-800 text-white text-xs font-mono-code focus:border-cyan-500 focus:ring-1 focus:ring-cyan-500 transition">
-                </div>
+            <!-- 4. Date -->
+            <div>
+                <label for="entry_date"
+                    class="block text-xs font-semibold uppercase tracking-wider text-slate-400 mb-1.5">
+                    Date
+                </label>
+                <input type="date" name="dispatch_date" id="entry_date" value="{{ today|date:'Y-m-d' }}"
+                    class="w-full px-3.5 py-2.5 rounded-xl bg-slate-900 border border-slate-800 text-white text-sm font-mono-code focus:border-cyan-500 focus:ring-1 focus:ring-cyan-500 transition">
+            </div>
+
+            <!-- 5-8. Optional: Gate Pass No., Vehicle No., Location To, Image -->
+            {% include 'inventory/partials/dispatch_extra_fields.html' with prefix='entry' %}
+
+            <!-- Save Button -->
+            <div class="sm:col-span-2 lg:col-span-4 flex justify-end pt-1">
                 <button type="submit"
-                    class="w-full mt-auto inline-flex items-center justify-center space-x-2 px-4 py-2.5 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white text-sm font-bold shadow-lg shadow-emerald-900/40 hover:shadow-emerald-900/60 transition focus:outline-none focus:ring-2 focus:ring-emerald-400">
+                    class="w-full sm:w-auto min-w-[180px] inline-flex items-center justify-center space-x-2 px-6 py-2.5 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white text-sm font-bold shadow-lg shadow-emerald-900/40 hover:shadow-emerald-900/60 transition focus:outline-none focus:ring-2 focus:ring-emerald-400">
                     <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" />
                     </svg>

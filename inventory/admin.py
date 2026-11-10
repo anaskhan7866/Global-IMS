@@ -194,6 +194,10 @@ class DailyCoreBoxDispatchAdmin(admin.ModelAdmin):
         'company',
         'box_type',
         'quantity',
+        'gate_pass_number',
+        'vehicle_number',
+        'location_to',
+        'image_link',
         'created_at',
     )
     list_filter = (
@@ -203,8 +207,23 @@ class DailyCoreBoxDispatchAdmin(admin.ModelAdmin):
     search_fields = (
         'company__name',
         'box_type',
+        'gate_pass_number',
+        'vehicle_number',
+        'location_to',
     )
     autocomplete_fields = ['company', 'item']
     date_hierarchy = 'dispatch_date'
-    readonly_fields = ('created_at', 'updated_at')
+    readonly_fields = ('image_link', 'created_at', 'updated_at')
+
+    def get_queryset(self, request):
+        return super().get_queryset(request).defer('attachment_data')
+
+    @admin.display(description='Image')
+    def image_link(self, obj):
+        from django.urls import reverse
+        from django.utils.html import format_html
+        if not obj.pk or not obj.has_attachment:
+            return '-'
+        url = reverse('daily-core-box-attachment', kwargs={'pk': obj.pk})
+        return format_html('<a href="{}" target="_blank" rel="noopener">View image</a>', url)
 

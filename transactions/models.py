@@ -223,9 +223,15 @@ class PurchaseOrder(models.Model):
         help_text=_("Total units ordered.")
     )
     order_date = models.DateField(
-        auto_now_add=True,
+        default=timezone.localdate,
         db_index=True,
-        help_text=_("Date when the purchase order was generated.")
+        help_text=_("Date when the order was placed (defaults to today, editable).")
+    )
+    location = models.CharField(default='', db_default='',
+        max_length=255,
+        blank=True,
+        db_index=True,
+        help_text=_("Optional vendor / delivery location entered manually (e.g. city, site, warehouse).")
     )
     expected_delivery_date = models.DateField(
         help_text=_("Agreed delivery date from the supplier.")

@@ -2,7 +2,7 @@ import datetime
 import re
 from decimal import Decimal
 from django.db import transaction, IntegrityError
-from django.db.models import Count, Sum, Q, Value, ProtectedError, Max
+from django.db.models import Count, Sum, Q, Value, ProtectedError, Max, Min
 from django.db.models.functions import Coalesce
 from django.shortcuts import render, redirect, get_object_or_404
 from django.urls import reverse
@@ -551,16 +551,80 @@ class VendorOrderListView(LoginRequiredMixin, ListView):
     context_object_name = 'purchase_orders'
     template_name = 'inventory/vendor_orders.html'
 
+    @staticmethod
+    def _parse_date(raw):
+        """Parse an ISO (YYYY-MM-DD) date string, returning None if blank or invalid."""
+        if not raw:
+            return None
+        try:
+            return datetime.date.fromisoformat(str(raw).strip())
+        except (ValueError, TypeError):
+            return None
+
+    def get_filters(self):
+        """Read the active filter values from the query string."""
+        request = getattr(self, 'request', None)
+        params = request.GET if request is not None else {}
+        status = (params.get('status') or '').strip().lower()
+        return {
+            'vendor': (params.get('vendor') or '').strip(),
+            'location': (params.get('location') or '').strip(),
+            'box': (params.get('box') or '').strip(),
+            'order_from': self._parse_date(params.get('order_from')),
+            'order_to': self._parse_date(params.get('order_to')),
+            'status': status if status in ('due', 'upcoming') else '',
+        }
+
     def get_queryset(self):
-        return PurchaseOrder.objects.select_related('vendor', 'item').all().order_by('expected_delivery_date', '-id')
+        qs = PurchaseOrder.objects.select_related('vendor', 'item').all()
+        f = self.get_filters()
+        today = timezone.localdate()
+
+        if f['vendor']:
+            qs = qs.filter(vendor__company_name__icontains=f['vendor'])
+        if f['location']:
+            qs = qs.filter(location__icontains=f['location'])
+        if f['box']:
+            qs = qs.filter(item__name=f['box'])
+        if f['order_from']:
+            qs = qs.filter(order_date__gte=f['order_from'])
+        if f['order_to']:
+            qs = qs.filter(order_date__lte=f['order_to'])
+        if f['status'] == 'due':
+            qs = qs.filter(expected_delivery_date__lt=today)
+        elif f['status'] == 'upcoming':
+            qs = qs.filter(expected_delivery_date__gte=today)
+
+        return qs.order_by('expected_delivery_date', '-id')
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
         today = timezone.localdate()
-        orders = list(self.get_queryset())
+        orders = list(context['purchase_orders'])
 
         context['today'] = today
         context['total_orders_count'] = len(orders)
+
+        # Active filters (for re-populating the filter bar)
+        filters = self.get_filters()
+        context['filters'] = {
+            **filters,
+            'order_from': filters['order_from'].isoformat() if filters['order_from'] else '',
+            'order_to': filters['order_to'].isoformat() if filters['order_to'] else '',
+        }
+        context['filters_active'] = any(filters.values())
+        context['all_orders_count'] = PurchaseOrder.objects.count()
+
+        # Distinct values for filter suggestions
+        context['order_locations'] = (
+            PurchaseOrder.objects.exclude(location='')
+            .order_by('location').values_list('location', flat=True).distinct()
+        )
+        context['order_box_types'] = (
+            PurchaseOrder.objects.order_by('item__name')
+            .values_list('item__name', flat=True).distinct()
+        )
+        context['default_order_date'] = today.isoformat()
 
         # Suppliers / Companies for auto-completion datalist
         context['vendors'] = Contact.objects.filter(is_active=True).order_by('company_name')
@@ -586,6 +650,8 @@ class VendorOrderListView(LoginRequiredMixin, ListView):
             raw_quantity = request.POST.get('quantity')
             raw_weight = request.POST.get('weight')
             raw_delivery_date = request.POST.get('expected_delivery_date') or request.POST.get('delivery_date')
+            order_date = self._parse_date(request.POST.get('order_date')) or timezone.localdate()
+            location = (request.POST.get('location') or '').strip()[:255]
 
             # 1. Resolve or Create Vendor / Company
             vendor = None
@@ -642,6 +708,8 @@ class VendorOrderListView(LoginRequiredMixin, ListView):
                 vendor=vendor,
                 item=item,
                 quantity=quantity,
+                order_date=order_date,
+                location=location,
                 expected_delivery_date=expected_date,
                 status=PurchaseOrderStatus.PENDING
             )
@@ -649,7 +717,8 @@ class VendorOrderListView(LoginRequiredMixin, ListView):
             messages.success(
                 request,
                 f"Order registered: '{vendor.company_name}' requested {quantity} boxes of '{item.name}' "
-                f"(Delivery Date: {order.expected_delivery_date.strftime('%b %d, %Y')})."
+                f"(Order Date: {order.order_date.strftime('%b %d, %Y')}, "
+                f"Delivery Date: {order.expected_delivery_date.strftime('%b %d, %Y')})."
             )
             return redirect('vendor-order-list')
 
@@ -718,6 +787,13 @@ class VendorOrderListView(LoginRequiredMixin, ListView):
                     order.expected_delivery_date = datetime.date.fromisoformat(raw_delivery_date.strip())
                 except (ValueError, TypeError):
                     pass
+
+            # 5. Order Date & Location (location is optional and may be cleared)
+            new_order_date = self._parse_date(request.POST.get('order_date'))
+            if new_order_date:
+                order.order_date = new_order_date
+            if 'location' in request.POST:
+                order.location = (request.POST.get('location') or '').strip()[:255]
 
             order.save()
             messages.success(
@@ -1208,6 +1284,195 @@ class AddInventoryView(LoginRequiredMixin, View):
         return redirect('add-inventory')
 
 
+# ---------------------------------------------------------------------------
+# Daily Core Box: optional gate pass / vehicle / destination / image helpers
+# ---------------------------------------------------------------------------
+MAX_DISPATCH_ATTACHMENT_BYTES = 5 * 1024 * 1024  # 5 MB
+
+
+def _sniff_image_content_type(data: bytes):
+    """Identify an image by its magic bytes (never trust the client-supplied type)."""
+    if data.startswith(b'\xff\xd8\xff'):
+        return 'image/jpeg'
+    if data.startswith(b'\x89PNG\r\n\x1a\n'):
+        return 'image/png'
+    if data[:6] in (b'GIF87a', b'GIF89a'):
+        return 'image/gif'
+    if data[:4] == b'RIFF' and data[8:12] == b'WEBP':
+        return 'image/webp'
+    if data[4:8] == b'ftyp' and data[8:12] in (b'heic', b'heix', b'hevc', b'heim', b'heis', b'mif1', b'msf1'):
+        return 'image/heic'
+    return None
+
+
+def read_dispatch_extras(request):
+    """
+    Read the optional gate pass / vehicle / location-to fields and image upload.
+    Returns (fields_dict, attachment_or_None, error_message_or_None).
+    attachment is a tuple (bytes, content_type, filename).
+    """
+    fields = {
+        'gate_pass_number': (request.POST.get('gate_pass_number') or '').strip()[:100],
+        'vehicle_number': (request.POST.get('vehicle_number') or '').strip().upper()[:50],
+        'location_to': (request.POST.get('location_to') or '').strip()[:255],
+    }
+
+    upload = request.FILES.get('attachment')
+    if not upload:
+        return fields, None, None
+
+    if upload.size > MAX_DISPATCH_ATTACHMENT_BYTES:
+        return fields, None, "Image is too large. Please attach an image smaller than 5 MB."
+
+    data = upload.read()
+    content_type = _sniff_image_content_type(data)
+    if not content_type:
+        return fields, None, "Attachment must be an image (JPG, PNG, GIF, WEBP or HEIC)."
+
+    filename = (upload.name or 'image').rsplit('/', 1)[-1].rsplit('\\', 1)[-1][:255]
+    return fields, (data, content_type, filename), None
+
+
+def apply_dispatch_attachment(dispatch, attachment):
+    """Store an attachment tuple on a dispatch (does not save)."""
+    data, content_type, filename = attachment
+    dispatch.attachment_data = data
+    dispatch.attachment_content_type = content_type
+    dispatch.attachment_name = filename
+
+
+def clear_dispatch_attachment(dispatch):
+    dispatch.attachment_data = None
+    dispatch.attachment_content_type = ''
+    dispatch.attachment_name = ''
+
+
+class DailyCoreBoxAttachmentView(LoginRequiredMixin, View):
+    """Serve the image attached to a daily core box dispatch (login required)."""
+
+    def get(self, request, pk, *args, **kwargs):
+        from django.http import Http404, HttpResponse
+
+        dispatch = get_object_or_404(DailyCoreBoxDispatch, pk=pk)
+        if not dispatch.has_attachment or dispatch.attachment_data is None:
+            raise Http404("No image attached to this entry.")
+
+        response = HttpResponse(bytes(dispatch.attachment_data), content_type=dispatch.attachment_content_type)
+        disposition = 'attachment' if request.GET.get('download') else 'inline'
+        safe_name = re.sub(r'[^A-Za-z0-9._-]+', '_', dispatch.attachment_name or f'dispatch_{dispatch.pk}')
+        response['Content-Disposition'] = f'{disposition}; filename="{safe_name}"'
+        response['X-Content-Type-Options'] = 'nosniff'
+        response['Cache-Control'] = 'private, max-age=3600'
+        return response
+
+
+class DailyCoreBoxExportView(LoginRequiredMixin, View):
+    """Export one company's daily core box dispatches to an Excel (.xlsx) workbook."""
+
+    def get(self, request, pk, *args, **kwargs):
+        from django.http import HttpResponse
+        from openpyxl import Workbook
+        from openpyxl.styles import Alignment, Font, PatternFill
+        from openpyxl.utils import get_column_letter
+
+        company = get_object_or_404(Company, pk=pk)
+        dispatches = (
+            DailyCoreBoxDispatch.objects.filter(company=company)
+            .select_related('company', 'item')
+            .defer('attachment_data')
+            .order_by('-dispatch_date', '-id')
+        )
+
+        wb = Workbook()
+        header_font = Font(bold=True, color='FFFFFF')
+        header_fill = PatternFill('solid', fgColor='0E7490')
+        bold = Font(bold=True)
+
+        def style_header(ws, headers):
+            ws.append(headers)
+            for cell in ws[1]:
+                cell.font = header_font
+                cell.fill = header_fill
+                cell.alignment = Alignment(vertical='center')
+            ws.freeze_panes = 'A2'
+
+        def autosize(ws, widths):
+            for idx, width in enumerate(widths, start=1):
+                ws.column_dimensions[get_column_letter(idx)].width = width
+
+        # Sheet 1: every dispatch entry
+        ws = wb.active
+        ws.title = 'Dispatches'
+        headers = [
+            'S.No', 'Date', 'Company', 'Core Box Type', 'SKU', 'Quantity',
+            'Gate Pass No.', 'Vehicle No.', 'Location To', 'Image', 'Recorded At',
+        ]
+        style_header(ws, headers)
+
+        total_qty = 0
+        for idx, d in enumerate(dispatches, start=1):
+            image_url = (
+                request.build_absolute_uri(reverse('daily-core-box-attachment', kwargs={'pk': d.pk}))
+                if d.has_attachment else ''
+            )
+            ws.append([
+                idx,
+                d.dispatch_date,
+                d.company.name,
+                d.box_type,
+                d.item.sku if d.item else '',
+                d.quantity,
+                d.gate_pass_number,
+                d.vehicle_number,
+                d.location_to,
+                'View Image' if image_url else '',
+                timezone.localtime(d.created_at).replace(tzinfo=None) if d.created_at else None,
+            ])
+            row = ws.max_row
+            ws.cell(row=row, column=2).number_format = 'DD-MM-YYYY'
+            ws.cell(row=row, column=11).number_format = 'DD-MM-YYYY HH:MM'
+            if image_url:
+                link_cell = ws.cell(row=row, column=10)
+                link_cell.hyperlink = image_url
+                link_cell.font = Font(color='0563C1', underline='single')
+            total_qty += d.quantity
+
+        ws.append([])
+        ws.append(['', '', '', 'TOTAL', '', total_qty])
+        for cell in ws[ws.max_row]:
+            cell.font = bold
+        autosize(ws, [7, 12, 28, 22, 16, 10, 16, 14, 26, 12, 17])
+
+        # Sheet 2: per-company / per-box-type summary
+        summary = wb.create_sheet('Summary')
+        style_header(summary, ['Company', 'Core Box Type', 'Total Quantity', 'Entries', 'First Date', 'Last Date'])
+        rows = (
+            dispatches.order_by()
+            .values('company__name', 'box_type')
+            .annotate(
+                total=Sum('quantity'), entries=Count('id'),
+                first=Min('dispatch_date'), last=Max('dispatch_date'),
+            )
+            .order_by('company__name', 'box_type')
+        )
+        for r in rows:
+            summary.append([r['company__name'], r['box_type'], r['total'], r['entries'], r['first'], r['last']])
+            summary.cell(row=summary.max_row, column=5).number_format = 'DD-MM-YYYY'
+            summary.cell(row=summary.max_row, column=6).number_format = 'DD-MM-YYYY'
+        autosize(summary, [28, 22, 15, 10, 12, 12])
+
+        today_str = timezone.localdate().strftime('%Y-%m-%d')
+        slug = re.sub(r'[^A-Za-z0-9]+', '_', company.name).strip('_') or f'company_{company.pk}'
+        filename = f'daily_core_box_{slug}_{today_str}.xlsx'
+
+        response = HttpResponse(
+            content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+        )
+        response['Content-Disposition'] = f'attachment; filename="{filename}"'
+        wb.save(response)
+        return response
+
+
 class DailyCoreBoxListView(LoginRequiredMixin, View):
     """
     Main portal for companies taking core boxes daily.
@@ -1283,6 +1548,12 @@ class DailyCoreBoxListView(LoginRequiredMixin, View):
             raw_quantity = request.POST.get('quantity')
             raw_date = request.POST.get('dispatch_date')
 
+            # Optional gate pass / vehicle / location-to / image (validated before anything is created)
+            extras, attachment, extras_error = read_dispatch_extras(request)
+            if extras_error:
+                messages.error(request, extras_error)
+                return redirect('daily-core-box-list')
+
             # 1. Resolve Company
             company = None
             if company_id:
@@ -1323,13 +1594,17 @@ class DailyCoreBoxListView(LoginRequiredMixin, View):
             if not matched_item:
                 matched_item = Item.objects.filter(sku__iexact=box_type, is_active=True).first()
 
-            DailyCoreBoxDispatch.objects.create(
+            dispatch = DailyCoreBoxDispatch(
                 company=company,
                 box_type=box_type,
                 item=matched_item,
                 quantity=quantity,
-                dispatch_date=dispatch_date
+                dispatch_date=dispatch_date,
+                **extras,
             )
+            if attachment:
+                apply_dispatch_attachment(dispatch, attachment)
+            dispatch.save()
 
             messages.success(
                 request,
@@ -1364,8 +1639,11 @@ class DailyCoreBoxDetailView(LoginRequiredMixin, View):
     def get(self, request, pk, *args, **kwargs):
         company = get_object_or_404(Company, pk=pk)
 
-        # Date-wise entries ordered by latest first
-        dispatches = company.dispatches.select_related('item').all().order_by('-dispatch_date', '-id')
+        # Date-wise entries ordered by latest first (image bytes are not loaded here)
+        dispatches = (
+            company.dispatches.select_related('item').defer('attachment_data')
+            .order_by('-dispatch_date', '-id')
+        )
 
         # Total core boxes taken (for the top card)
         total_core_boxes = dispatches.aggregate(total=Sum('quantity'))['total'] or 0
@@ -1409,6 +1687,11 @@ class DailyCoreBoxDetailView(LoginRequiredMixin, View):
                 messages.error(request, "Please enter or select the Core Box Type.")
                 return redirect('daily-core-box-detail', pk=company.pk)
 
+            extras, attachment, extras_error = read_dispatch_extras(request)
+            if extras_error:
+                messages.error(request, extras_error)
+                return redirect('daily-core-box-detail', pk=company.pk)
+
             try:
                 quantity = int(raw_quantity)
                 if quantity <= 0:
@@ -1428,13 +1711,17 @@ class DailyCoreBoxDetailView(LoginRequiredMixin, View):
             if not matched_item:
                 matched_item = Item.objects.filter(sku__iexact=box_type, is_active=True).first()
 
-            DailyCoreBoxDispatch.objects.create(
+            dispatch = DailyCoreBoxDispatch(
                 company=company,
                 box_type=box_type,
                 item=matched_item,
                 quantity=quantity,
-                dispatch_date=dispatch_date
+                dispatch_date=dispatch_date,
+                **extras,
             )
+            if attachment:
+                apply_dispatch_attachment(dispatch, attachment)
+            dispatch.save()
 
             messages.success(
                 request,
@@ -1455,6 +1742,11 @@ class DailyCoreBoxDetailView(LoginRequiredMixin, View):
 
             if not box_type:
                 messages.error(request, "Core box type cannot be empty.")
+                return redirect('daily-core-box-detail', pk=company.pk)
+
+            extras, attachment, extras_error = read_dispatch_extras(request)
+            if extras_error:
+                messages.error(request, extras_error)
                 return redirect('daily-core-box-detail', pk=company.pk)
 
             try:
@@ -1480,6 +1772,15 @@ class DailyCoreBoxDetailView(LoginRequiredMixin, View):
             dispatch.quantity = quantity
             dispatch.dispatch_date = dispatch_date
             dispatch.item = matched_item
+            # Optional text fields: only touched when the form sends them (blank clears them)
+            for field, value in extras.items():
+                if field in request.POST:
+                    setattr(dispatch, field, value)
+            # Image: replace with a new upload, or remove when requested; otherwise keep existing
+            if attachment:
+                apply_dispatch_attachment(dispatch, attachment)
+            elif request.POST.get('remove_attachment'):
+                clear_dispatch_attachment(dispatch)
             dispatch.save()
 
             messages.success(request, f"Updated entry for {dispatch_date.strftime('%d %b %Y')}.")

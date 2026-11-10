@@ -1,0 +1,49 @@
+{% comment %}
+Optional dispatch fields: Gate Pass No., Vehicle No., Location To, Image.
+Params:
+  prefix - unique id prefix for the inputs (required)
+  bg     - Tailwind background class for inputs (default bg-slate-900)
+  edit   - when true, renders the "current image" link + "remove image" checkbox (filled in by JS)
+The enclosing <form> must use enctype="multipart/form-data".
+{% endcomment %}
+<div>
+    <label for="{{ prefix }}_gate_pass" class="block text-xs font-semibold uppercase tracking-wider text-slate-400 mb-1.5">
+        Gate Pass No. <span class="text-slate-500 normal-case tracking-normal font-medium">(optional)</span>
+    </label>
+    <input type="text" name="gate_pass_number" id="{{ prefix }}_gate_pass" maxlength="100" placeholder="e.g. GP-1042" autocomplete="off"
+        class="min-h-[44px] w-full px-3.5 py-2.5 rounded-xl {{ bg|default:'bg-slate-900' }} border border-slate-800 text-white placeholder-slate-500 text-sm font-mono-code focus:border-cyan-500 focus:ring-1 focus:ring-cyan-500 transition">
+</div>
+
+<div>
+    <label for="{{ prefix }}_vehicle" class="block text-xs font-semibold uppercase tracking-wider text-slate-400 mb-1.5">
+        Vehicle No. <span class="text-slate-500 normal-case tracking-normal font-medium">(optional)</span>
+    </label>
+    <input type="text" name="vehicle_number" id="{{ prefix }}_vehicle" maxlength="50" placeholder="e.g. MH40 AB 1234" autocomplete="off"
+        class="min-h-[44px] w-full px-3.5 py-2.5 rounded-xl {{ bg|default:'bg-slate-900' }} border border-slate-800 text-white placeholder-slate-500 text-sm font-mono-code uppercase focus:border-cyan-500 focus:ring-1 focus:ring-cyan-500 transition">
+</div>
+
+<div>
+    <label for="{{ prefix }}_location_to" class="block text-xs font-semibold uppercase tracking-wider text-slate-400 mb-1.5">
+        Location To <span class="text-slate-500 normal-case tracking-normal font-medium">(optional)</span>
+    </label>
+    <input type="text" name="location_to" id="{{ prefix }}_location_to" maxlength="255" placeholder="e.g. Chandrapur Site 2" autocomplete="off"
+        class="min-h-[44px] w-full px-3.5 py-2.5 rounded-xl {{ bg|default:'bg-slate-900' }} border border-slate-800 text-white placeholder-slate-500 text-sm focus:border-cyan-500 focus:ring-1 focus:ring-cyan-500 transition">
+</div>
+
+<div>
+    <label for="{{ prefix }}_attachment" class="block text-xs font-semibold uppercase tracking-wider text-slate-400 mb-1.5">
+        {% if edit %}Replace Image{% else %}Attach Image{% endif %} <span class="text-slate-500 normal-case tracking-normal font-medium">(optional)</span>
+    </label>
+    <input type="file" name="attachment" id="{{ prefix }}_attachment" accept="image/*"
+        class="w-full text-xs text-slate-300 file:mr-3 file:px-3 file:py-2 file:rounded-lg file:border-0 file:bg-slate-800 file:text-slate-200 file:text-xs file:font-semibold hover:file:bg-slate-700 file:cursor-pointer rounded-xl {{ bg|default:'bg-slate-900' }} border border-slate-800 p-1.5">
+    <p class="text-[11px] text-slate-500 mt-1">JPG / PNG / WEBP / HEIC, max 5 MB.</p>
+    {% if edit %}
+    <div id="{{ prefix }}_current_image" class="hidden mt-2 flex items-center justify-between gap-3 text-xs">
+        <a id="{{ prefix }}_current_image_link" href="#" target="_blank" rel="noopener" class="text-cyan-400 hover:text-cyan-300 font-semibold underline">View current image</a>
+        <label class="inline-flex items-center gap-1.5 text-rose-300 cursor-pointer">
+            <input type="checkbox" name="remove_attachment" value="1" id="{{ prefix }}_remove_attachment" class="rounded border-slate-700 bg-slate-950 text-rose-500 focus:ring-rose-500">
+            Remove image
+        </label>
+    </div>
+    {% endif %}
+</div>

@@ -6,6 +6,8 @@ from .views import (
     AddInventoryView,
     DailyCoreBoxListView,
     DailyCoreBoxDetailView,
+    DailyCoreBoxAttachmentView,
+    DailyCoreBoxExportView,
 )
 
 urlpatterns = [
@@ -26,4 +28,6 @@ urlpatterns = [
     # Daily Core Box Dispatches (Company Daily Tracking)
     path('daily-core-box/', DailyCoreBoxListView.as_view(), name='daily-core-box-list'),
     path('daily-core-box/company/<int:pk>/', DailyCoreBoxDetailView.as_view(), name='daily-core-box-detail'),
+    path('daily-core-box/company/<int:pk>/export/', DailyCoreBoxExportView.as_view(), name='daily-core-box-export'),
+    path('daily-core-box/entry/<int:pk>/image/', DailyCoreBoxAttachmentView.as_view(), name='daily-core-box-attachment'),
 ]

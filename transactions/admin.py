@@ -144,6 +144,7 @@ class PurchaseOrderAdmin(admin.ModelAdmin):
     list_display = (
         'id',
         'vendor',
+        'location',
         'item',
         'quantity',
         'order_date',
@@ -157,12 +158,12 @@ class PurchaseOrderAdmin(admin.ModelAdmin):
     )
     search_fields = (
         'vendor__company_name',
+        'location',
         'item__sku',
         'item__name',
     )
     autocomplete_fields = ['vendor', 'item']
     date_hierarchy = 'order_date'
-    readonly_fields = ('order_date',)
 
     @admin.display(description=_('Status'), ordering='status')
     def status_badge(self, obj: PurchaseOrder) -> str:
