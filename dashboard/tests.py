@@ -98,6 +98,21 @@ class FinancialDashboardServiceTestCase(TestCase):
         self.assertEqual(metrics['gross_profit'], Decimal('900.00'))
         self.assertEqual(metrics['total_inventory_value'], Decimal('2400.00'))
 
+        # The chart trend uses the same real ledger data: 6 months, sale lands in the current month
+        from django.utils import timezone
+        trend = FinancialDashboardService.get_monthly_trend(months=6)
+        self.assertEqual(len(trend['labels']), 6)
+        self.assertEqual(trend['labels'][-1], timezone.localdate().strftime('%b %Y'))
+        self.assertEqual(trend['revenue'], [0.0, 0.0, 0.0, 0.0, 0.0, 1500.0])
+        self.assertEqual(trend['cogs'], [0.0, 0.0, 0.0, 0.0, 0.0, 600.0])
+
+    def test_monthly_trend_spans_year_boundary_and_is_zero_when_empty(self):
+        import datetime
+        trend = FinancialDashboardService.get_monthly_trend(months=6, today=datetime.date(2026, 2, 15))
+        self.assertEqual(trend['labels'], ['Sep 2025', 'Oct 2025', 'Nov 2025', 'Dec 2025', 'Jan 2026', 'Feb 2026'])
+        self.assertEqual(trend['revenue'], [0.0] * 6)
+        self.assertEqual(trend['cogs'], [0.0] * 6)
+
     def test_date_range_filtering(self):
         """
         Verifies that start_date and end_date accurately constrain the aggregated sales ledger records.
@@ -203,6 +218,13 @@ class DashboardHomeViewTestCase(TestCase):
         content = response.content.decode('utf-8')
         self.assertIn('Global-IMS', content)
         self.assertIn('salesChart', content)
+        # Chart is fed by real server data, not hardcoded sample numbers
+        self.assertIn('sales-trend-data', content)
+        self.assertNotIn('[12500, 15800', content)
+        self.assertEqual(len(context['sales_trend']['labels']), 6)
+        # Chart.js is pinned to an exact version with an integrity hash
+        self.assertIn('chart.js@4.4.9/dist/chart.umd.js', content)
+        self.assertIn('integrity="sha384-', content)
         self.assertIn('RM-CRITICAL-BOLT', content)
         self.assertIn('Precision Bolt M4', content)
 

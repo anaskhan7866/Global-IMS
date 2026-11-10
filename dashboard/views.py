@@ -26,10 +26,13 @@ class DashboardHomeView(LoginRequiredMixin, TemplateView):
         )
 
         # Query items with current stock strictly below 10 units
-        low_stock_alerts = (
+        low_stock_alerts = list(
             Item.objects.filter(current_stock__lt=Decimal('10.0000'))
             .order_by('current_stock', 'name')
         )
+
+        # Real trailing 6-month revenue / COGS trend for the chart
+        sales_trend = FinancialDashboardService.get_monthly_trend(months=6, today=today)
 
         context.update({
             'financial_metrics': financial_metrics,
@@ -38,7 +41,8 @@ class DashboardHomeView(LoginRequiredMixin, TemplateView):
             'gross_profit': financial_metrics['gross_profit'],
             'total_inventory_value': financial_metrics['total_inventory_value'],
             'low_stock_alerts': low_stock_alerts,
-            'low_stock_count': low_stock_alerts.count(),
+            'low_stock_count': len(low_stock_alerts),
+            'sales_trend': sales_trend,
             'current_month_name': today.strftime('%B %Y'),
             'today': today,
         })

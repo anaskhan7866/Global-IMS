@@ -1,6 +1,6 @@
 import datetime
 import re
-from decimal import Decimal
+from decimal import Decimal, InvalidOperation
 from django.db import transaction, IntegrityError
 from django.db.models import Count, Sum, Q, Value, ProtectedError, Max, Min
 from django.db.models.functions import Coalesce
@@ -16,19 +16,80 @@ from inventory.models import Employee, ProductionLog, Item, ItemType, Company, D
 from transactions.models import PurchaseOrder, Contact, ContactType, InventoryLedger, TransactionType, PurchaseOrderStatus
 
 
+# ---------------------------------------------------------------------------
+# Safe parsing of user-supplied form values
+# ---------------------------------------------------------------------------
+# Upper bounds keep values inside what the database columns can store, so bad input
+# produces a friendly validation message instead of a server error.
+MAX_QUANTITY = 10_000_000
+MAX_DECIMAL = Decimal('99999999')
+
+
+def _to_decimal(raw) -> Decimal:
+    """
+    Parse a finite decimal number. Raises ValueError for anything invalid (including
+    'abc', NaN, Infinity and absurdly large values), so callers only need to catch ValueError.
+    """
+    try:
+        value = Decimal(str(raw).strip())
+    except (InvalidOperation, ValueError, TypeError):
+        raise ValueError("not a valid number") from None
+    if not value.is_finite() or abs(value) > MAX_DECIMAL:
+        raise ValueError("number out of range")
+    return value
+
+
+def _to_quantity(raw) -> int:
+    """Parse a whole-number quantity between 1 and MAX_QUANTITY. Raises ValueError otherwise."""
+    try:
+        value = int(str(raw).strip())
+    except (ValueError, TypeError):
+        raise ValueError("not a whole number") from None
+    if not 0 < value <= MAX_QUANTITY:
+        raise ValueError("quantity out of range")
+    return value
+
+
+def _to_pk(raw):
+    """Parse a database id from form input. Returns None for blank or non-numeric values."""
+    try:
+        value = int(str(raw).strip())
+    except (ValueError, TypeError):
+        return None
+    return value if 0 < value < 2 ** 63 else None
+
+
+def _clean_text(raw, max_length: int) -> str:
+    """Trim whitespace and clip to the column length."""
+    return (raw or '').strip()[:max_length]
+
+
+def get_loggable_items():
+    """
+    Active items offered when logging production: finished goods, or every active item when
+    no finished goods exist yet. Evaluated once and returned as a list.
+    """
+    items = list(Item.objects.filter(is_active=True).order_by('name'))
+    finished = [item for item in items if item.type == ItemType.FINISHED_GOOD]
+    return finished or items
+
+
 def get_or_resolve_production_item(item_id=None, item_name=None, weight=None):
     """Resolve an item from the catalog or auto-create a finished good if newly named."""
+    item_id = _to_pk(item_id)
     if item_id:
         found = Item.objects.filter(pk=item_id).first()
         if found:
             return found
 
     if item_name and str(item_name).strip():
-        clean_name = str(item_name).strip()
+        clean_name = str(item_name).strip()[:255]
         parsed_weight = None
         if weight is not None and str(weight).strip() != '':
             try:
-                parsed_weight = Decimal(str(weight).strip())
+                parsed_weight = _to_decimal(weight)
+                if parsed_weight < Decimal('0'):
+                    parsed_weight = None
             except (ValueError, TypeError):
                 pass
 
@@ -151,12 +212,10 @@ class EmployeeListView(LoginRequiredMixin, ListView):
         context['today_str'] = today.strftime('%A, %b %d, %Y')
         context['current_month_name'] = today.strftime('%B %Y')
 
-        # Catalog finished goods for box logging
-        finished_goods = Item.objects.filter(type=ItemType.FINISHED_GOOD, is_active=True).order_by('name')
-        if not finished_goods.exists():
-            finished_goods = Item.objects.filter(is_active=True).order_by('name')
+        # Catalog finished goods for box logging (single query)
+        finished_goods = get_loggable_items()
         context['finished_goods'] = finished_goods
-        context['default_item'] = finished_goods.first() if finished_goods.exists() else None
+        context['default_item'] = finished_goods[0] if finished_goods else None
 
         employees = context.get('employees', [])
         context['total_today_boxes'] = sum((getattr(e, 'today_boxes', 0) or 0) for e in employees)
@@ -167,8 +226,8 @@ class EmployeeListView(LoginRequiredMixin, ListView):
 
         # 1. Add New Employee
         if action == 'add_employee':
-            first_name = request.POST.get('first_name', '').strip()
-            last_name = request.POST.get('last_name', '').strip()
+            first_name = _clean_text(request.POST.get('first_name'), 100)
+            last_name = _clean_text(request.POST.get('last_name'), 100)
             is_active_val = request.POST.get('is_active') in ['true', 'on', '1']
 
             if not first_name or not last_name:
@@ -185,9 +244,9 @@ class EmployeeListView(LoginRequiredMixin, ListView):
             initial_boxes_raw = request.POST.get('initial_boxes', '').strip()
             if initial_boxes_raw:
                 try:
-                    initial_qty = int(initial_boxes_raw)
+                    initial_qty = _to_quantity(initial_boxes_raw)
                     if initial_qty > 0:
-                        item = get_or_resolve_production_item(request.POST.get('item_id'))
+                        item = get_or_resolve_production_item(_to_pk(request.POST.get('item_id')))
                         ProductionLog.objects.create(
                             employee=emp,
                             item=item,
@@ -206,16 +265,16 @@ class EmployeeListView(LoginRequiredMixin, ListView):
 
         # 2. Log End-of-Day Output for a Single Employee
         elif action == 'log_production':
-            employee_id = request.POST.get('employee_id')
+            employee_id = _to_pk(request.POST.get('employee_id'))
             raw_quantity = request.POST.get('quantity')
             raw_weight = request.POST.get('weight')
-            item_id = request.POST.get('item_id')
+            item_id = _to_pk(request.POST.get('item_id'))
             box_name = (request.POST.get('box_name') or request.POST.get('name') or request.POST.get('item_name') or '').strip()
 
             emp = get_object_or_404(Employee, pk=employee_id)
 
             try:
-                quantity = int(raw_quantity)
+                quantity = _to_quantity(raw_quantity)
                 if quantity <= 0:
                     raise ValueError
             except (ValueError, TypeError):
@@ -225,7 +284,7 @@ class EmployeeListView(LoginRequiredMixin, ListView):
             item = get_or_resolve_production_item(item_id=item_id, item_name=box_name, weight=raw_weight)
             if raw_weight and item.weight == Decimal('0.000'):
                 try:
-                    w_val = Decimal(str(raw_weight).strip())
+                    w_val = _to_decimal(raw_weight)
                     if w_val > Decimal('0'):
                         item.weight = w_val
                         item.save(update_fields=['weight', 'updated_at'])
@@ -255,7 +314,7 @@ class EmployeeListView(LoginRequiredMixin, ListView):
 
         # 3. Bulk End-of-Day Production Sheet (Multiple Employees at Once)
         elif action == 'bulk_log_production':
-            item_id = request.POST.get('item_id')
+            item_id = _to_pk(request.POST.get('item_id'))
             item = get_or_resolve_production_item(item_id)
             logged_count = 0
             total_boxes_saved = 0
@@ -264,7 +323,7 @@ class EmployeeListView(LoginRequiredMixin, ListView):
                 if key.startswith('boxes_') and val.strip():
                     try:
                         emp_id = int(key.split('_')[1])
-                        qty = int(val.strip())
+                        qty = _to_quantity(val)
                         if qty > 0:
                             emp = Employee.objects.filter(pk=emp_id, is_active=True).first()
                             if emp:
@@ -289,7 +348,7 @@ class EmployeeListView(LoginRequiredMixin, ListView):
             return redirect('employee-list')
 
         elif action in ('deactivate', 'delete'):
-            employee_id = request.POST.get('employee_id')
+            employee_id = _to_pk(request.POST.get('employee_id'))
             emp = get_object_or_404(Employee, pk=employee_id)
             emp_name = emp.full_name
             try:
@@ -302,7 +361,7 @@ class EmployeeListView(LoginRequiredMixin, ListView):
             return redirect('employee-list')
 
         elif action == 'delete_date':
-            employee_id = request.POST.get('employee_id')
+            employee_id = _to_pk(request.POST.get('employee_id'))
             emp = get_object_or_404(Employee, pk=employee_id)
             raw_date = request.POST.get('production_date') or request.POST.get('date')
             if not raw_date:
@@ -380,6 +439,8 @@ class EmployeeDetailView(LoginRequiredMixin, DetailView):
         raw_year = self.kwargs.get('year') or request_get.get('year', today.year)
         try:
             year = int(raw_year)
+            if not 2000 <= year <= 2100:
+                year = today.year
         except (ValueError, TypeError):
             year = today.year
 
@@ -429,14 +490,13 @@ class EmployeeDetailView(LoginRequiredMixin, DetailView):
             rec['single_item'] = rec['items'][0] if rec['is_single_type'] else None
             daily_groups.append(rec)
 
-        # Finished goods catalog for output logging
-        finished_goods = Item.objects.filter(type=ItemType.FINISHED_GOOD, is_active=True).order_by('name')
-        if not finished_goods.exists():
-            finished_goods = Item.objects.filter(is_active=True).order_by('name')
+        # Finished goods catalog for output logging (single query)
+        finished_goods = get_loggable_items()
 
-        # Summary calculations for KPI cards
-        total_units = sum((entry.get('quantity__sum') or 0) for entry in daily_breakdown) if daily_breakdown else 0
-        active_days = len(daily_breakdown)
+        # Summary calculations for KPI cards, derived from the rows already loaded above
+        # (previously a second aggregate query over the same month)
+        active_days = len(daily_groups)
+        total_units = sum(group['total_quantity'] for group in daily_groups)
         daily_average = round(total_units / active_days, 1) if active_days > 0 else 0.0
 
         month_date = datetime.date(year, month, 1)
@@ -451,7 +511,7 @@ class EmployeeDetailView(LoginRequiredMixin, DetailView):
         context['active_days'] = active_days
         context['daily_average'] = daily_average
         context['finished_goods'] = finished_goods
-        context['default_item'] = finished_goods.first() if finished_goods.exists() else None
+        context['default_item'] = finished_goods[0] if finished_goods else None
         context['employee'] = employee
         context['today'] = today
         return context
@@ -463,12 +523,12 @@ class EmployeeDetailView(LoginRequiredMixin, DetailView):
         if action == 'log_production':
             raw_quantity = request.POST.get('quantity')
             raw_weight = request.POST.get('weight')
-            item_id = request.POST.get('item_id')
+            item_id = _to_pk(request.POST.get('item_id'))
             box_name = (request.POST.get('box_name') or request.POST.get('name') or request.POST.get('item_name') or '').strip()
             raw_date = request.POST.get('production_date')
 
             try:
-                quantity = int(raw_quantity)
+                quantity = _to_quantity(raw_quantity)
                 if quantity <= 0:
                     raise ValueError
             except (ValueError, TypeError):
@@ -478,7 +538,7 @@ class EmployeeDetailView(LoginRequiredMixin, DetailView):
             item = get_or_resolve_production_item(item_id=item_id, item_name=box_name, weight=raw_weight)
             if raw_weight and item.weight == Decimal('0.000'):
                 try:
-                    w_val = Decimal(str(raw_weight).strip())
+                    w_val = _to_decimal(raw_weight)
                     if w_val > Decimal('0'):
                         item.weight = w_val
                         item.save(update_fields=['weight', 'updated_at'])
@@ -535,14 +595,14 @@ class EmployeeDetailView(LoginRequiredMixin, DetailView):
                 messages.info(request, f"No daily production logs found for {target_date.strftime('%b %d, %Y')}.")
 
             redirect_month = self.kwargs.get('month') or target_date.month
-            year = request.POST.get('year') or request.GET.get('year')
+            year = _to_pk(request.POST.get('year') or request.GET.get('year'))
             url = reverse('employee-detail', kwargs={'pk': self.object.pk, 'month': redirect_month})
-            if year:
+            if year and 2000 <= year <= 2100:
                 url = f"{url}?year={year}"
             return redirect(url)
 
         messages.warning(request, "Unrecognized action.")
-        return redirect('employee-detail', pk=self.object.pk, month=self.kwargs.get('month', timezone.now().month))
+        return redirect('employee-detail', pk=self.object.pk, month=self.kwargs.get('month', timezone.localdate().month))
 
 
 class VendorOrderListView(LoginRequiredMixin, ListView):
@@ -643,9 +703,9 @@ class VendorOrderListView(LoginRequiredMixin, ListView):
         # Action 1: Add New Company / Vendor Order
         # -------------------------------------------------------------
         if action == 'add_order':
-            vendor_id = request.POST.get('vendor_id')
-            company_name = (request.POST.get('company_name') or request.POST.get('vendor_name') or '').strip()
-            item_id = request.POST.get('item_id')
+            vendor_id = _to_pk(request.POST.get('vendor_id'))
+            company_name = _clean_text(request.POST.get('company_name') or request.POST.get('vendor_name'), 255)
+            item_id = _to_pk(request.POST.get('item_id'))
             box_name = (request.POST.get('box_name') or request.POST.get('item_name') or request.POST.get('name') or '').strip()
             raw_quantity = request.POST.get('quantity')
             raw_weight = request.POST.get('weight')
@@ -676,7 +736,7 @@ class VendorOrderListView(LoginRequiredMixin, ListView):
                 return redirect('vendor-order-list')
 
             try:
-                quantity = int(raw_quantity)
+                quantity = _to_quantity(raw_quantity)
                 if quantity <= 0:
                     raise ValueError
             except (ValueError, TypeError):
@@ -687,7 +747,7 @@ class VendorOrderListView(LoginRequiredMixin, ListView):
             item = get_or_resolve_production_item(item_id=item_id, item_name=box_name, weight=raw_weight)
             if raw_weight and item.weight == Decimal('0.000'):
                 try:
-                    w_val = Decimal(str(raw_weight).strip())
+                    w_val = _to_decimal(raw_weight)
                     if w_val > Decimal('0'):
                         item.weight = w_val
                         item.save(update_fields=['weight', 'updated_at'])
@@ -726,8 +786,8 @@ class VendorOrderListView(LoginRequiredMixin, ListView):
         # Action 2: Edit Existing Vendor Order
         # -------------------------------------------------------------
         elif action == 'edit_order':
-            order_id = request.POST.get('order_id')
-            company_name = (request.POST.get('company_name') or request.POST.get('vendor_name') or '').strip()
+            order_id = _to_pk(request.POST.get('order_id'))
+            company_name = _clean_text(request.POST.get('company_name') or request.POST.get('vendor_name'), 255)
             box_name = (request.POST.get('box_name') or request.POST.get('item_name') or request.POST.get('name') or '').strip()
             raw_quantity = request.POST.get('quantity')
             raw_weight = request.POST.get('weight')
@@ -752,7 +812,7 @@ class VendorOrderListView(LoginRequiredMixin, ListView):
             # 2. Resolve Quantity
             if raw_quantity:
                 try:
-                    quantity = int(raw_quantity)
+                    quantity = _to_quantity(raw_quantity)
                     if quantity <= 0:
                         raise ValueError
                     order.quantity = quantity
@@ -765,7 +825,7 @@ class VendorOrderListView(LoginRequiredMixin, ListView):
                 item = get_or_resolve_production_item(item_name=box_name, weight=raw_weight)
                 if raw_weight and item.weight == Decimal('0.000'):
                     try:
-                        w_val = Decimal(str(raw_weight).strip())
+                        w_val = _to_decimal(raw_weight)
                         if w_val > Decimal('0'):
                             item.weight = w_val
                             item.save(update_fields=['weight', 'updated_at'])
@@ -774,7 +834,7 @@ class VendorOrderListView(LoginRequiredMixin, ListView):
                 order.item = item
             elif raw_weight:
                 try:
-                    w_val = Decimal(str(raw_weight).strip())
+                    w_val = _to_decimal(raw_weight)
                     if w_val > Decimal('0') and order.item.weight != w_val:
                         order.item.weight = w_val
                         order.item.save(update_fields=['weight', 'updated_at'])
@@ -798,7 +858,7 @@ class VendorOrderListView(LoginRequiredMixin, ListView):
             order.save()
             messages.success(
                 request,
-                f"Order updated: '{order.vendor.company_name}' &bull; {order.quantity} boxes of "
+                f"Order updated: '{order.vendor.company_name}' - {order.quantity} boxes of "
                 f"'{order.item.name}'."
             )
             return redirect('vendor-order-list')
@@ -807,7 +867,7 @@ class VendorOrderListView(LoginRequiredMixin, ListView):
         # Action 3: Remove Line from Vendor Orders (Delivered or Cleared)
         # -------------------------------------------------------------
         elif action in ['remove_order', 'clear_order', 'delete_order', 'deliver_order']:
-            order_id = request.POST.get('order_id')
+            order_id = _to_pk(request.POST.get('order_id'))
             order = get_object_or_404(PurchaseOrder, pk=order_id)
             order_num = order.id
             company_title = order.vendor.company_name
@@ -823,7 +883,7 @@ class VendorOrderListView(LoginRequiredMixin, ListView):
 
         # Graceful fallback for add_vendor if invoked programmatically
         elif action == 'add_vendor':
-            company_name = request.POST.get('company_name', '').strip()
+            company_name = _clean_text(request.POST.get('company_name'), 255)
             if company_name:
                 Contact.objects.get_or_create(
                     type=ContactType.VENDOR,
@@ -842,11 +902,11 @@ class AddInventoryView(LoginRequiredMixin, View):
     template_name = 'inventory/add_inventory.html'
 
     def get(self, request, *args, **kwargs):
-        items = Item.objects.filter(is_active=True).order_by('name', 'weight')
+        items = list(Item.objects.filter(is_active=True).order_by('name', 'weight'))
         vendors = Contact.objects.filter(type=ContactType.VENDOR, is_active=True).order_by('company_name')
 
         # Summary calculations for KPI badges (no total weight calculation)
-        total_items_count = items.count()
+        total_items_count = len(items)
         total_units = sum((item.current_stock or 0) for item in items)
         low_stock_count = sum(1 for item in items if item.current_stock < 10)
 
@@ -865,8 +925,8 @@ class AddInventoryView(LoginRequiredMixin, View):
         # Action: Edit / Modify Product Details (Name, Quantity, Weight)
         # -------------------------------------------------------------
         if action == 'edit_product':
-            item_id = request.POST.get('item_id')
-            new_name = (request.POST.get('name') or request.POST.get('product_name') or '').strip()
+            item_id = _to_pk(request.POST.get('item_id'))
+            new_name = _clean_text(request.POST.get('name') or request.POST.get('product_name'), 255)
             raw_quantity = request.POST.get('quantity')
             raw_weight = request.POST.get('weight')
 
@@ -887,7 +947,7 @@ class AddInventoryView(LoginRequiredMixin, View):
                 return redirect('add-inventory')
 
             try:
-                new_quantity = Decimal(str(raw_quantity).strip())
+                new_quantity = _to_decimal(raw_quantity)
                 if new_quantity < Decimal('0'):
                     raise ValueError
             except (ValueError, TypeError):
@@ -897,7 +957,7 @@ class AddInventoryView(LoginRequiredMixin, View):
             new_weight = None
             if raw_weight is not None and str(raw_weight).strip() != '':
                 try:
-                    new_weight = Decimal(str(raw_weight).strip())
+                    new_weight = _to_decimal(raw_weight)
                     if new_weight < Decimal('0'):
                         raise ValueError
                 except (ValueError, TypeError):
@@ -930,7 +990,7 @@ class AddInventoryView(LoginRequiredMixin, View):
                         locked_item.delete()
                     except (ProtectedError, IntegrityError):
                         locked_item.is_active = False
-                        locked_item.save(update_fields=['is_active', 'current_stock', 'name', 'updated_at'])
+                        locked_item.save(update_fields=['is_active', 'current_stock', 'name', 'weight', 'updated_at'])
 
                     messages.success(
                         request,
@@ -978,8 +1038,8 @@ class AddInventoryView(LoginRequiredMixin, View):
         # Action: Remove / Delete Complete Product (if stock is zero)
         # -------------------------------------------------------------
         if action in ['delete_product', 'remove_zero_stock']:
-            item_id = request.POST.get('item_id')
-            product_name = (request.POST.get('name') or request.POST.get('product_name') or '').strip()
+            item_id = _to_pk(request.POST.get('item_id'))
+            product_name = _clean_text(request.POST.get('name') or request.POST.get('product_name'), 255)
 
             target_item = None
             if item_id:
@@ -1027,8 +1087,8 @@ class AddInventoryView(LoginRequiredMixin, View):
         # Action: Remove / Deduct Stock from Product
         # -------------------------------------------------------------
         if action == 'remove_stock':
-            product_name = (request.POST.get('name') or request.POST.get('product_name') or '').strip()
-            item_id = request.POST.get('item_id')
+            product_name = _clean_text(request.POST.get('name') or request.POST.get('product_name'), 255)
+            item_id = _to_pk(request.POST.get('item_id'))
             raw_quantity = request.POST.get('quantity')
             raw_weight = request.POST.get('weight')
             reason = request.POST.get('reason', '').strip() or request.POST.get('narration', '').strip()
@@ -1040,7 +1100,7 @@ class AddInventoryView(LoginRequiredMixin, View):
                 weight_val = None
                 if raw_weight:
                     try:
-                        weight_val = Decimal(str(raw_weight).strip())
+                        weight_val = _to_decimal(raw_weight)
                     except (ValueError, TypeError):
                         pass
                 if weight_val is not None:
@@ -1063,7 +1123,7 @@ class AddInventoryView(LoginRequiredMixin, View):
                 return redirect('add-inventory')
 
             try:
-                quantity = Decimal(str(raw_quantity).strip())
+                quantity = _to_decimal(raw_quantity)
                 if quantity <= Decimal('0'):
                     raise ValueError
             except (ValueError, TypeError):
@@ -1121,17 +1181,17 @@ class AddInventoryView(LoginRequiredMixin, View):
         # Action: Add Inventory Stock (Default)
         # -------------------------------------------------------------
         # 1. Name of the product
-        product_name = (request.POST.get('name') or request.POST.get('product_name') or '').strip()
+        product_name = _clean_text(request.POST.get('name') or request.POST.get('product_name'), 255)
         # 2. Quantity
         raw_quantity = request.POST.get('quantity')
         # 3. Weight of the product (core box) - unit weight of one core box
         raw_weight = request.POST.get('weight')
 
         # Optional auxiliary inputs (graceful fallback/backward compatibility)
-        item_id = request.POST.get('item_id')
+        item_id = _to_pk(request.POST.get('item_id'))
         raw_unit_cost = request.POST.get('unit_cost', '0.00')
-        vendor_id = request.POST.get('vendor_id')
-        reference_id = request.POST.get('reference_id', '').strip()
+        vendor_id = _to_pk(request.POST.get('vendor_id'))
+        reference_id = _clean_text(request.POST.get('reference_id'), 100)
         narration = request.POST.get('narration', '').strip()
 
         # If product_name wasn't supplied directly but item_id was, resolve item
@@ -1151,7 +1211,7 @@ class AddInventoryView(LoginRequiredMixin, View):
             messages.error(request, "Please enter the Quantity.")
             return redirect('add-inventory')
         try:
-            quantity = Decimal(str(raw_quantity).strip())
+            quantity = _to_decimal(raw_quantity)
             if quantity <= Decimal('0'):
                 raise ValueError
         except (ValueError, TypeError):
@@ -1162,7 +1222,7 @@ class AddInventoryView(LoginRequiredMixin, View):
         weight = None
         if raw_weight is not None and str(raw_weight).strip() != '':
             try:
-                weight = Decimal(str(raw_weight).strip())
+                weight = _to_decimal(raw_weight)
                 if weight < Decimal('0'):
                     raise ValueError
             except (ValueError, TypeError):
@@ -1171,7 +1231,7 @@ class AddInventoryView(LoginRequiredMixin, View):
 
         # Optional unit cost
         try:
-            unit_cost = Decimal(str(raw_unit_cost).strip()) if raw_unit_cost else Decimal('0.0000')
+            unit_cost = _to_decimal(raw_unit_cost) if raw_unit_cost else Decimal('0.0000')
             if unit_cost < Decimal('0'):
                 unit_cost = Decimal('0.0000')
         except (ValueError, TypeError):
@@ -1362,8 +1422,20 @@ class DailyCoreBoxAttachmentView(LoginRequiredMixin, View):
         safe_name = re.sub(r'[^A-Za-z0-9._-]+', '_', dispatch.attachment_name or f'dispatch_{dispatch.pk}')
         response['Content-Disposition'] = f'{disposition}; filename="{safe_name}"'
         response['X-Content-Type-Options'] = 'nosniff'
+        response['Content-Security-Policy'] = "default-src 'none'; img-src 'self' data:; style-src 'unsafe-inline'; sandbox"
         response['Cache-Control'] = 'private, max-age=3600'
         return response
+
+
+def _excel_safe(value):
+    """
+    Stop user-entered text from being interpreted as a formula when the workbook is opened
+    (spreadsheet formula injection). Text starting with = + - @ (or tab / CR) is prefixed
+    with an apostrophe, which Excel displays as plain text.
+    """
+    if isinstance(value, str) and value[:1] in ('=', '+', '-', '@', chr(9), chr(13)):
+        return "'" + value
+    return value
 
 
 class DailyCoreBoxExportView(LoginRequiredMixin, View):
@@ -1418,13 +1490,13 @@ class DailyCoreBoxExportView(LoginRequiredMixin, View):
             ws.append([
                 idx,
                 d.dispatch_date,
-                d.company.name,
-                d.box_type,
-                d.item.sku if d.item else '',
+                _excel_safe(d.company.name),
+                _excel_safe(d.box_type),
+                _excel_safe(d.item.sku if d.item else ''),
                 d.quantity,
-                d.gate_pass_number,
-                d.vehicle_number,
-                d.location_to,
+                _excel_safe(d.gate_pass_number),
+                _excel_safe(d.vehicle_number),
+                _excel_safe(d.location_to),
                 'View Image' if image_url else '',
                 timezone.localtime(d.created_at).replace(tzinfo=None) if d.created_at else None,
             ])
@@ -1456,7 +1528,7 @@ class DailyCoreBoxExportView(LoginRequiredMixin, View):
             .order_by('company__name', 'box_type')
         )
         for r in rows:
-            summary.append([r['company__name'], r['box_type'], r['total'], r['entries'], r['first'], r['last']])
+            summary.append([_excel_safe(r['company__name']), _excel_safe(r['box_type']), r['total'], r['entries'], r['first'], r['last']])
             summary.cell(row=summary.max_row, column=5).number_format = 'DD-MM-YYYY'
             summary.cell(row=summary.max_row, column=6).number_format = 'DD-MM-YYYY'
         autosize(summary, [28, 22, 15, 10, 12, 12])
@@ -1488,15 +1560,19 @@ class DailyCoreBoxListView(LoginRequiredMixin, View):
                     Company.objects.get_or_create(name=contact.company_name.strip())
 
         # Query active companies annotated with total core boxes taken and last dispatch date
-        companies = Company.objects.filter(is_active=True).annotate(
+        companies = list(Company.objects.filter(is_active=True).annotate(
             total_boxes=Coalesce(Sum('dispatches__quantity'), Value(0)),
             last_dispatch_date=Max('dispatches__dispatch_date'),
             dispatch_count=Count('dispatches')
-        ).order_by('name')
+        ).order_by('name'))
 
         today = timezone.localdate()
-        total_all_core_boxes = DailyCoreBoxDispatch.objects.aggregate(total=Sum('quantity'))['total'] or 0
-        today_core_boxes = DailyCoreBoxDispatch.objects.filter(dispatch_date=today).aggregate(total=Sum('quantity'))['total'] or 0
+        totals = DailyCoreBoxDispatch.objects.aggregate(
+            total=Sum('quantity'),
+            today=Sum('quantity', filter=Q(dispatch_date=today)),
+        )
+        total_all_core_boxes = totals['total'] or 0
+        today_core_boxes = totals['today'] or 0
 
         # Suggested core box items from catalog
         box_items = Item.objects.filter(is_active=True).order_by('name')
@@ -1505,7 +1581,7 @@ class DailyCoreBoxListView(LoginRequiredMixin, View):
             'companies': companies,
             'total_all_core_boxes': total_all_core_boxes,
             'today_core_boxes': today_core_boxes,
-            'total_companies_count': companies.count(),
+            'total_companies_count': len(companies),
             'today': today,
             'box_items': box_items,
         }
@@ -1518,7 +1594,7 @@ class DailyCoreBoxListView(LoginRequiredMixin, View):
         # Action 1: Add Company Name
         # -------------------------------------------------------------
         if action == 'add_company':
-            company_name = (request.POST.get('company_name') or '').strip()
+            company_name = _clean_text(request.POST.get('company_name'), 255)
             if not company_name:
                 messages.error(request, "Company name cannot be empty.")
                 return redirect('daily-core-box-list')
@@ -1542,9 +1618,9 @@ class DailyCoreBoxListView(LoginRequiredMixin, View):
         # Action 2: Record Daily Core Box (Company, Box Type, Quantity, Save)
         # -------------------------------------------------------------
         if action == 'add_entry':
-            company_id = request.POST.get('company_id')
-            company_name = (request.POST.get('company_name') or '').strip()
-            box_type = (request.POST.get('box_type') or request.POST.get('core_box_type') or '').strip()
+            company_id = _to_pk(request.POST.get('company_id'))
+            company_name = _clean_text(request.POST.get('company_name'), 255)
+            box_type = _clean_text(request.POST.get('box_type') or request.POST.get('core_box_type'), 255)
             raw_quantity = request.POST.get('quantity')
             raw_date = request.POST.get('dispatch_date')
 
@@ -1574,7 +1650,7 @@ class DailyCoreBoxListView(LoginRequiredMixin, View):
 
             # 3. Resolve Quantity
             try:
-                quantity = int(raw_quantity)
+                quantity = _to_quantity(raw_quantity)
                 if quantity <= 0:
                     raise ValueError
             except (ValueError, TypeError):
@@ -1616,7 +1692,7 @@ class DailyCoreBoxListView(LoginRequiredMixin, View):
         # Action 3: Delete Company
         # -------------------------------------------------------------
         if action == 'delete_company':
-            company_id = request.POST.get('company_id')
+            company_id = _to_pk(request.POST.get('company_id'))
             if company_id:
                 comp = Company.objects.filter(pk=company_id).first()
                 if comp:
@@ -1640,22 +1716,22 @@ class DailyCoreBoxDetailView(LoginRequiredMixin, View):
         company = get_object_or_404(Company, pk=pk)
 
         # Date-wise entries ordered by latest first (image bytes are not loaded here)
-        dispatches = (
+        dispatches = list(
             company.dispatches.select_related('item').defer('attachment_data')
             .order_by('-dispatch_date', '-id')
         )
 
-        # Total core boxes taken (for the top card)
-        total_core_boxes = dispatches.aggregate(total=Sum('quantity'))['total'] or 0
-
-        # Unique dispatch days
-        total_days = dispatches.values('dispatch_date').distinct().count()
+        # Totals for the top cards, computed from the rows already loaded
+        total_core_boxes = sum(d.quantity for d in dispatches)
+        total_days = len({d.dispatch_date for d in dispatches})
 
         # Breakdown by core box type
-        box_breakdown = dispatches.values('box_type').annotate(
-            total_qty=Sum('quantity'),
-            entries_count=Count('id')
-        ).order_by('-total_qty')
+        breakdown = {}
+        for d in dispatches:
+            row = breakdown.setdefault(d.box_type, {'box_type': d.box_type, 'total_qty': 0, 'entries_count': 0})
+            row['total_qty'] += d.quantity
+            row['entries_count'] += 1
+        box_breakdown = sorted(breakdown.values(), key=lambda r: -r['total_qty'])
 
         # Available catalog items for autocomplete
         box_items = Item.objects.filter(is_active=True).order_by('name')
@@ -1679,7 +1755,7 @@ class DailyCoreBoxDetailView(LoginRequiredMixin, View):
         # Action 1: Add Entry Directly for this Company
         # -------------------------------------------------------------
         if action == 'add_entry':
-            box_type = (request.POST.get('box_type') or request.POST.get('core_box_type') or '').strip()
+            box_type = _clean_text(request.POST.get('box_type') or request.POST.get('core_box_type'), 255)
             raw_quantity = request.POST.get('quantity')
             raw_date = request.POST.get('dispatch_date')
 
@@ -1693,7 +1769,7 @@ class DailyCoreBoxDetailView(LoginRequiredMixin, View):
                 return redirect('daily-core-box-detail', pk=company.pk)
 
             try:
-                quantity = int(raw_quantity)
+                quantity = _to_quantity(raw_quantity)
                 if quantity <= 0:
                     raise ValueError
             except (ValueError, TypeError):
@@ -1733,8 +1809,8 @@ class DailyCoreBoxDetailView(LoginRequiredMixin, View):
         # Action 2: Edit Existing Dispatch Entry
         # -------------------------------------------------------------
         if action == 'edit_entry':
-            entry_id = request.POST.get('entry_id')
-            box_type = (request.POST.get('box_type') or '').strip()
+            entry_id = _to_pk(request.POST.get('entry_id'))
+            box_type = _clean_text(request.POST.get('box_type'), 255)
             raw_quantity = request.POST.get('quantity')
             raw_date = request.POST.get('dispatch_date')
 
@@ -1750,7 +1826,7 @@ class DailyCoreBoxDetailView(LoginRequiredMixin, View):
                 return redirect('daily-core-box-detail', pk=company.pk)
 
             try:
-                quantity = int(raw_quantity)
+                quantity = _to_quantity(raw_quantity)
                 if quantity <= 0:
                     raise ValueError
             except (ValueError, TypeError):
@@ -1790,7 +1866,7 @@ class DailyCoreBoxDetailView(LoginRequiredMixin, View):
         # Action 3: Delete Entry
         # -------------------------------------------------------------
         if action == 'delete_entry':
-            entry_id = request.POST.get('entry_id')
+            entry_id = _to_pk(request.POST.get('entry_id'))
             dispatch = get_object_or_404(DailyCoreBoxDispatch, pk=entry_id, company=company)
             dispatch.delete()
             messages.success(request, "Dispatch entry successfully removed.")
@@ -1800,7 +1876,7 @@ class DailyCoreBoxDetailView(LoginRequiredMixin, View):
         # Action 4: Edit Company Name
         # -------------------------------------------------------------
         if action == 'edit_company':
-            new_name = (request.POST.get('company_name') or '').strip()
+            new_name = _clean_text(request.POST.get('company_name'), 255)
             if not new_name:
                 messages.error(request, "Company name cannot be empty.")
                 return redirect('daily-core-box-detail', pk=company.pk)

@@ -80,18 +80,26 @@ def ensure_tables():
             except Exception:
                 pass
 
-    # Ensure superuser admin is created/updated
-    print("Configuring superuser admin...")
-    superuser_password = os.environ.get('DJANGO_SUPERUSER_PASSWORD', 'azsxd12345')
+    # Configure the 'admin' superuser ONLY from the DJANGO_SUPERUSER_PASSWORD environment
+    # variable. There is deliberately no built-in default password, and the password is
+    # never written to the logs.
+    superuser_password = os.environ.get('DJANGO_SUPERUSER_PASSWORD', '').strip()
     User = get_user_model()
-    admin_user, created = User.objects.get_or_create(username='admin')
-    admin_user.set_password(superuser_password)
-    admin_user.is_superuser = True
-    admin_user.is_staff = True
-    admin_user.is_active = True
-    admin_user.email = ''
-    admin_user.save()
-    print(f"Superuser 'admin' successfully {'created' if created else 'updated'} with password '{superuser_password}'.")
+    if superuser_password:
+        admin_user, created = User.objects.get_or_create(username='admin')
+        admin_user.set_password(superuser_password)
+        admin_user.is_superuser = True
+        admin_user.is_staff = True
+        admin_user.is_active = True
+        admin_user.save()
+        print(f"Superuser 'admin' {'created' if created else 'updated'} from DJANGO_SUPERUSER_PASSWORD.")
+    elif not User.objects.filter(is_superuser=True, is_active=True).exists():
+        print(
+            "WARNING: no superuser exists and DJANGO_SUPERUSER_PASSWORD is not set. "
+            "Set it in the environment, or run: python manage.py createsuperuser"
+        )
+    else:
+        print("Superuser configuration unchanged (DJANGO_SUPERUSER_PASSWORD not set).")
 
 if __name__ == '__main__':
     ensure_tables()

@@ -310,7 +310,7 @@
                                 </button>
                                 <button
                                     type="button"
-                                    onclick="openRemoveStockModal('{{ item.id }}', '{{ item.name|escapejs }}', '{{ item.current_stock|floatformat:0 }}', '{{ item.unit_of_measure }}')"
+                                    onclick="openRemoveStockModal('{{ item.id }}', '{{ item.name|escapejs }}', '{{ item.current_stock|floatformat:0 }}', '{{ item.unit_of_measure|escapejs }}')"
                                     class="inline-flex items-center space-x-1 px-2.5 py-1.5 rounded-lg bg-slate-900 hover:bg-rose-950 text-slate-300 hover:text-rose-300 border border-slate-800 hover:border-rose-700 text-xs font-medium transition"
                                     title="Remove stock from this specific core box"
                                 >
@@ -321,7 +321,7 @@
                                 <!-- Stock is zero: action to remove that stock from inventory completely -->
                                 <button
                                     type="button"
-                                    onclick="openDeleteProductModal('{{ item.id }}', '{{ item.name|escapejs }}', '{{ item.sku }}')"
+                                    onclick="openDeleteProductModal('{{ item.id }}', '{{ item.name|escapejs }}', '{{ item.sku|escapejs }}')"
                                     class="inline-flex items-center space-x-1.5 px-3 py-1.5 rounded-lg bg-rose-950/80 hover:bg-rose-900 text-rose-300 hover:text-white border border-rose-800 hover:border-rose-700 text-xs font-bold transition shadow-sm hover:shadow-rose-950/50"
                                     title="Stock is zero: Remove this stock from inventory completely"
                                 >
@@ -392,7 +392,7 @@
                         </button>
                         <button
                             type="button"
-                            onclick="openRemoveStockModal('{{ item.id }}', '{{ item.name|escapejs }}', '{{ item.current_stock|floatformat:0 }}', '{{ item.unit_of_measure }}')"
+                            onclick="openRemoveStockModal('{{ item.id }}', '{{ item.name|escapejs }}', '{{ item.current_stock|floatformat:0 }}', '{{ item.unit_of_measure|escapejs }}')"
                             class="inline-flex items-center justify-center space-x-1 px-2.5 py-2.5 min-h-[44px] rounded-xl bg-slate-900 hover:bg-rose-950 text-rose-300 border border-slate-800 hover:border-rose-700 text-xs font-semibold transition active:bg-rose-900"
                             title="Remove"
                         >
@@ -403,7 +403,7 @@
                     {% else %}
                     <button
                         type="button"
-                        onclick="openDeleteProductModal('{{ item.id }}', '{{ item.name|escapejs }}', '{{ item.sku }}')"
+                        onclick="openDeleteProductModal('{{ item.id }}', '{{ item.name|escapejs }}', '{{ item.sku|escapejs }}')"
                         class="w-full inline-flex items-center justify-center space-x-2 px-3 py-2.5 min-h-[44px] rounded-xl bg-rose-950/80 hover:bg-rose-900 text-rose-300 hover:text-white border border-rose-800 text-xs font-bold transition shadow-sm active:bg-rose-800"
                     >
                         <svg class="w-4 h-4 text-rose-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg>
@@ -665,8 +665,15 @@
 
     let currentMode = 'add'; // 'add' or 'remove'
 
+    // Escape text before it is placed into HTML (prevents script injection via product names)
+    function escapeHtml(text) {
+        return String(text).replace(/[&<>"']/g, ch => (
+            { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[ch]
+        ));
+    }
+
     function updateCalculations() {
-        const valName = productNameInput.value.trim();
+        const valName = escapeHtml(productNameInput.value.trim());
         const qty = parseFloat(quantityInput.value) || 0;
 
         calcQuantity.textContent = qty > 0 ? `${qty.toFixed(0)} units` : '0 units';

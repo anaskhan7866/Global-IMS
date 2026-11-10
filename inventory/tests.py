@@ -1986,3 +1986,193 @@ class DailyCoreBoxExtrasAndExportTestCase(TestCase):
         # Login required
         self.client.logout()
         self.assertEqual(self.client.get(url).status_code, 302)
+
+    def test_excel_export_neutralises_formula_injection(self):
+        """Text beginning with = + - @ must be exported as plain text, never as a live formula."""
+        import io
+        from openpyxl import load_workbook
+        from django.urls import reverse
+        from inventory.models import Company, DailyCoreBoxDispatch
+
+        evil = Company.objects.create(name='=HYPERLINK("http://evil.example","x")')
+        DailyCoreBoxDispatch.objects.create(
+            company=evil, box_type='+SUM(1,1)', quantity=1,
+            gate_pass_number='@cmd', vehicle_number='-2+3', location_to='=1+1',
+        )
+        res = self.client.get(reverse('daily-core-box-export', kwargs={'pk': evil.pk}))
+        self.assertEqual(res.status_code, 200)
+        wb = load_workbook(io.BytesIO(res.content))
+        for ws in wb.worksheets:
+            for row in ws.iter_rows():
+                for cell in row:
+                    self.assertNotEqual(cell.data_type, 'f', f"formula cell at {ws.title}!{cell.coordinate}")
+                    if isinstance(cell.value, str):
+                        self.assertNotIn(cell.value[:1], ('=', '+', '-', '@'), cell.coordinate)
+
+    def test_attachment_response_is_locked_down(self):
+        from django.urls import reverse
+        from inventory.models import DailyCoreBoxDispatch
+
+        d = DailyCoreBoxDispatch.objects.create(
+            company=self.company, box_type='NQ with Lid', quantity=1,
+            attachment_data=self.PNG_BYTES, attachment_content_type='image/png', attachment_name='a.png',
+        )
+        res = self.client.get(reverse('daily-core-box-attachment', kwargs={'pk': d.pk}))
+        self.assertEqual(res['X-Content-Type-Options'], 'nosniff')
+        self.assertIn("default-src 'none'", res['Content-Security-Policy'])
+        self.assertIn('sandbox', res['Content-Security-Policy'])
+
+
+class InputRobustnessTestCase(TestCase):
+    """
+    Malformed form input must produce a validation message / redirect / 404,
+    never an unhandled server error (HTTP 500).
+    """
+    BAD_NUMBERS = ['abc', 'NaN', 'Infinity', '-Infinity', '1e400', '99999999999999999999', '', ' ', '१२']
+
+    def setUp(self):
+        from django.contrib.auth.models import User
+        from inventory.models import Company, Employee, Item, ItemType
+
+        self.user = User.objects.create_user(username='robust', password='SecretPassword123!')
+        self.client.force_login(self.user)
+        self.item = Item.objects.create(
+            name='Robust Box', sku='FG-ROBUST', type=ItemType.FINISHED_GOOD,
+            unit_of_measure='pcs', current_stock=Decimal('5.0000'),
+        )
+        self.employee = Employee.objects.create(first_name='Ravi', last_name='Kumar')
+        self.company = Company.objects.create(name='Robust Co')
+
+    def test_add_inventory_rejects_bad_numbers_without_crashing(self):
+        from django.urls import reverse
+        from inventory.models import Item
+
+        url = reverse('add-inventory')
+        for bad in self.BAD_NUMBERS:
+            for payload in (
+                {'name': 'Robust Box', 'quantity': bad},
+                {'name': 'Robust Box', 'quantity': '1', 'weight': bad},
+                {'name': 'Robust Box', 'quantity': '1', 'unit_cost': bad},
+                {'action': 'remove_stock', 'item_id': self.item.pk, 'quantity': bad},
+                {'action': 'remove_stock', 'name': 'Robust Box', 'weight': bad, 'quantity': '1'},
+                {'action': 'edit_product', 'item_id': self.item.pk, 'name': 'Robust Box', 'quantity': bad},
+                {'action': 'edit_product', 'item_id': self.item.pk, 'name': 'Robust Box', 'quantity': '5', 'weight': bad},
+            ):
+                res = self.client.post(url, payload)
+                self.assertEqual(res.status_code, 302, f"{payload!r}")
+        # Stock is never corrupted into a non-finite value
+        for item in Item.objects.all():
+            self.assertTrue(item.current_stock.is_finite())
+            self.assertTrue(item.weight.is_finite())
+
+    def test_quantity_bounds_and_bad_weights_on_other_forms(self):
+        from django.urls import reverse
+        from inventory.models import DailyCoreBoxDispatch, ProductionLog
+        from transactions.models import PurchaseOrder
+
+        huge = '9' * 30
+        # ('१२' is excluded here: Devanagari digits are a legitimate whole number, 12)
+        invalid_quantities = [b for b in self.BAD_NUMBERS if b != '१२'] + [huge, '0', '-5', '1.5']
+        for bad in invalid_quantities:
+            res = self.client.post(reverse('employee-list'), {
+                'action': 'log_production', 'employee_id': self.employee.pk, 'quantity': bad})
+            self.assertEqual(res.status_code, 302, bad)
+            res = self.client.post(reverse('vendor-order-list'), {
+                'action': 'add_order', 'company_name': 'V Co', 'box_name': 'Robust Box', 'quantity': bad})
+            self.assertEqual(res.status_code, 302, bad)
+            res = self.client.post(reverse('daily-core-box-list'), {
+                'action': 'add_entry', 'company_name': 'Robust Co', 'box_type': 'X', 'quantity': bad})
+            self.assertEqual(res.status_code, 302, bad)
+        self.assertFalse(ProductionLog.objects.exists())
+        self.assertFalse(PurchaseOrder.objects.exists())
+        self.assertFalse(DailyCoreBoxDispatch.objects.exists())
+
+        # A valid quantity with an unparseable / negative weight still works (weight is ignored)
+        for bad_weight in ['abc', 'NaN', 'Infinity', '-3']:
+            res = self.client.post(reverse('employee-list'), {
+                'action': 'log_production', 'employee_id': self.employee.pk,
+                'box_name': 'Brand New Box', 'quantity': '2', 'weight': bad_weight})
+            self.assertEqual(res.status_code, 302, bad_weight)
+        self.assertEqual(ProductionLog.objects.count(), 4)
+
+    def test_non_numeric_ids_do_not_crash(self):
+        from django.urls import reverse
+
+        bad_ids = ['abc', '1; DROP TABLE x', '-1', '0', '9' * 40, '1.5', '']
+        for bad in bad_ids:
+            cases = [
+                (reverse('employee-list'), {'action': 'log_production', 'employee_id': bad, 'quantity': '1'}, (302, 404)),
+                (reverse('employee-list'), {'action': 'delete', 'employee_id': bad}, (404,)),
+                (reverse('employee-list'), {'action': 'bulk_log_production', 'item_id': bad, f'boxes_{bad}': '3'}, (302,)),
+                (reverse('vendor-order-list'), {'action': 'edit_order', 'order_id': bad, 'quantity': '1'}, (302,)),
+                (reverse('vendor-order-list'), {'action': 'remove_order', 'order_id': bad}, (404,)),
+                (reverse('vendor-order-list'), {'action': 'add_order', 'vendor_id': bad, 'item_id': bad,
+                                                'company_name': 'Z', 'box_name': 'Robust Box', 'quantity': '1'}, (302,)),
+                (reverse('add-inventory'), {'action': 'edit_product', 'item_id': bad, 'name': 'n', 'quantity': '1'}, (302,)),
+                (reverse('add-inventory'), {'action': 'delete_product', 'item_id': bad}, (302,)),
+                (reverse('add-inventory'), {'name': 'Robust Box', 'quantity': '1', 'item_id': bad, 'vendor_id': bad}, (302,)),
+                (reverse('daily-core-box-list'), {'action': 'delete_company', 'company_id': bad}, (302,)),
+                (reverse('daily-core-box-list'), {'action': 'add_entry', 'company_id': bad, 'company_name': 'Robust Co',
+                                                  'box_type': 'X', 'quantity': '1'}, (302,)),
+                (reverse('daily-core-box-detail', kwargs={'pk': self.company.pk}),
+                 {'action': 'edit_entry', 'entry_id': bad, 'box_type': 'X', 'quantity': '1'}, (404,)),
+                (reverse('daily-core-box-detail', kwargs={'pk': self.company.pk}),
+                 {'action': 'delete_entry', 'entry_id': bad}, (404,)),
+            ]
+            for url, payload, allowed in cases:
+                res = self.client.post(url, payload)
+                self.assertIn(res.status_code, allowed, f"{url} {payload!r}")
+
+    def test_employee_detail_handles_out_of_range_year_and_month(self):
+        from django.urls import reverse
+
+        url = reverse('employee-detail-default', kwargs={'pk': self.employee.pk})
+        for params in ({'year': '0'}, {'year': '99999'}, {'year': '-5'}, {'year': 'abc'},
+                       {'month': '13'}, {'month': '0'}, {'month': 'x', 'year': '10000'}):
+            self.assertEqual(self.client.get(url, params).status_code, 200, params)
+
+    def test_overlong_text_is_clipped_not_crashing(self):
+        from django.urls import reverse
+        from inventory.models import Company, Employee
+
+        long_text = 'A' * 600
+        self.assertEqual(self.client.post(reverse('daily-core-box-list'), {
+            'action': 'add_company', 'company_name': long_text}).status_code, 302)
+        self.assertTrue(Company.objects.filter(name='A' * 255).exists())
+        self.assertEqual(self.client.post(reverse('employee-list'), {
+            'action': 'add_employee', 'first_name': long_text, 'last_name': long_text}).status_code, 302)
+        self.assertTrue(Employee.objects.filter(first_name='A' * 100).exists())
+
+    def test_no_hardcoded_admin_account_is_created(self):
+        """A fresh database must not contain an automatically created 'admin' account."""
+        from django.contrib.auth import get_user_model
+        self.assertFalse(get_user_model().objects.filter(username='admin').exists())
+
+    def test_page_query_counts_stay_low(self):
+        """Guards the query optimisations: each page loads its data in a handful of queries."""
+        from django.urls import reverse
+        from inventory.models import DailyCoreBoxDispatch, Item, ItemType, ProductionLog
+
+        for i in range(15):
+            item = Item.objects.create(name=f'Box {i}', sku=f'FG-Q-{i}', type=ItemType.FINISHED_GOOD)
+            ProductionLog.objects.create(employee=self.employee, item=item, quantity=i + 1)
+            DailyCoreBoxDispatch.objects.create(company=self.company, box_type=f'Box {i}', quantity=i + 1, item=item)
+
+        # Budgets include 2 queries for session + user lookup.
+        budgets = {
+            reverse('add-inventory'): 4,
+            reverse('employee-list'): 4,
+            reverse('employee-detail-default', kwargs={'pk': self.employee.pk}): 5,
+            reverse('daily-core-box-list'): 6,
+            reverse('daily-core-box-detail', kwargs={'pk': self.company.pk}): 5,
+            reverse('vendor-order-list'): 8,
+        }
+        from django.db import connection
+        from django.test.utils import CaptureQueriesContext
+        for url, budget in budgets.items():
+            with self.subTest(url=url):
+                with CaptureQueriesContext(connection) as ctx:
+                    res = self.client.get(url)
+                self.assertEqual(res.status_code, 200)
+                self.assertLessEqual(len(ctx), budget, f"{url}: {len(ctx)} queries\n" + "\n".join(
+                    q['sql'][:110] for q in ctx.captured_queries))

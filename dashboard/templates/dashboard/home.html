@@ -243,6 +243,11 @@
 {% endblock %}
 
 {% block extra_scripts %}
+{{ sales_trend|json_script:"sales-trend-data" }}
+<!-- Chart.js: exact version + integrity hash, so a tampered or changed CDN file is refused -->
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.9/dist/chart.umd.js"
+    integrity="sha384-4W8gMhOYqk0FPg9sAMkb3g/P2fXtzbUyDUUgMlA1EEig8z/U/13EYUjErc1H382b"
+    crossorigin="anonymous"></script>
 <script>
     document.addEventListener('DOMContentLoaded', function () {
         const ctx = document.getElementById('salesChart').getContext('2d');
@@ -260,12 +265,11 @@
         marginGradient.addColorStop(0, 'rgba(16, 185, 129, 0.2)');
         marginGradient.addColorStop(1, 'rgba(16, 185, 129, 0.0)');
 
-        // Monthly labels (Trailing 6 Months)
-        const labels = ['May 2026', 'Jun 2026', 'Jul 2026', 'Aug 2026', 'Sep 2026', 'Oct 2026'];
-
-        // Baseline data
-        const revenueData = [12500, 15800, 14200, 19400, 17800, 22500];
-        const cogsData = [7200, 9100, 8400, 11200, 10100, 12400];
+        // Real trailing 6-month figures from the sales ledger (supplied by the server)
+        const salesTrend = JSON.parse(document.getElementById('sales-trend-data').textContent);
+        const labels = salesTrend.labels;
+        const revenueData = salesTrend.revenue;
+        const cogsData = salesTrend.cogs;
         const grossMarginData = revenueData.map((rev, idx) => rev - cogsData[idx]);
 
         new Chart(ctx, {
