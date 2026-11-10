@@ -18,7 +18,6 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 env = environ.Env(
     DEBUG=(bool, False),
     SECRET_KEY=(str, ""),
-    ALLOWED_HOSTS=(list, ["*"]),
     CONN_MAX_AGE=(int, 600),
 )
 
@@ -40,7 +39,13 @@ if not DEBUG and ('django-insecure' in SECRET_KEY or len(SECRET_KEY) < 32):
         "of at least 32 characters in the environment variables."
     )
 
-ALLOWED_HOSTS = env.list('ALLOWED_HOSTS', default=['*'])
+# Hosts this server may answer for. A wildcard ('*') would let an attacker send forged Host
+# headers (used in cache-poisoning / password-reset-link attacks), so the default is an
+# explicit list: local machine, Android emulator, and the Render deployment.
+ALLOWED_HOSTS = env.list(
+    'ALLOWED_HOSTS',
+    default=['localhost', '127.0.0.1', '[::1]', '10.0.2.2', '.onrender.com'],
+)
 
 CSRF_TRUSTED_ORIGINS = env.list(
     'CSRF_TRUSTED_ORIGINS',
@@ -117,9 +122,26 @@ ASGI_APPLICATION = 'core_erp.asgi.application'
 
 
 # Database Configuration
-# Single shared live database (Neon PostgreSQL) for every machine: the connection string
-# comes from DATABASE_URL in .env. There is intentionally no local SQLite fallback, so a
-# machine can never silently write data to a private local file.
+# Each machine keeps its own permanent database file on its own disk (SQLite).
+# The file lives OUTSIDE the project folder (which may be synced by OneDrive/iCloud, and
+# cloud sync can corrupt a database that is being written):
+#   Windows: %LOCALAPPDATA%\GlobalIMS\global_ims.sqlite3
+#   macOS:   ~/Library/Application Support/GlobalIMS/global_ims.sqlite3
+#   Linux:   ~/.local/share/GlobalIMS/global_ims.sqlite3
+# Override the location with SQLITE_PATH in .env. If DATABASE_URL is set (e.g. on a hosted
+# server), that database is used instead.
+def _default_sqlite_path() -> Path:
+    if sys.platform.startswith('win'):
+        base = Path(os.environ.get('LOCALAPPDATA') or (Path.home() / 'AppData' / 'Local'))
+    elif sys.platform == 'darwin':
+        base = Path.home() / 'Library' / 'Application Support'
+    else:
+        base = Path(os.environ.get('XDG_DATA_HOME') or (Path.home() / '.local' / 'share'))
+    return base / 'GlobalIMS' / 'global_ims.sqlite3'
+
+
+SQLITE_PATH = Path(env('SQLITE_PATH', default='') or _default_sqlite_path()).expanduser()
+
 db_url = env('DATABASE_URL', default=os.environ.get('DATABASE_URL', ''))
 if 'test' in sys.argv:
     # Automated tests always run on a throwaway in-memory database, never on live data.
@@ -137,10 +159,25 @@ elif db_url:
         DATABASES['default'].setdefault('OPTIONS', {})
         DATABASES['default']['OPTIONS'].setdefault('sslmode', 'require')
 else:
-    raise ValueError(
-        "CRITICAL: DATABASE_URL is missing or empty in .env. "
-        "Add the Neon connection string (DATABASE_URL=postgresql://...) to the .env file."
-    )
+    SQLITE_PATH.parent.mkdir(parents=True, exist_ok=True)
+    DATABASES = {
+        'default': {
+            'ENGINE': 'django.db.backends.sqlite3',
+            'NAME': SQLITE_PATH,
+            'OPTIONS': {
+                # Lock for writing at the start of each transaction (avoids "database is locked").
+                'transaction_mode': 'IMMEDIATE',
+                'timeout': 20,
+                # WAL journal + FULL sync: every saved change is written safely to disk,
+                # so a crash, power cut or browser refresh never loses committed data.
+                'init_command': (
+                    'PRAGMA journal_mode=WAL;'
+                    'PRAGMA synchronous=FULL;'
+                    'PRAGMA foreign_keys=ON;'
+                ),
+            },
+        }
+    }
 
 
 # Password Validation
@@ -178,8 +215,6 @@ STATICFILES_DIRS = [
 ]
 
 # Static Files Storage Configuration (WhiteNoise Compressed Manifest)
-STATICFILES_STORAGE = 'whitenoise.storage.CompressedManifestStaticFilesStorage'
-
 STORAGES = {
     'default': {
         'BACKEND': 'django.core.files.storage.FileSystemStorage',
@@ -205,7 +240,10 @@ LOGOUT_REDIRECT_URL = 'admin:login'
 # Session & CSRF Cookie Hardening for Mobile Shell
 SESSION_COOKIE_AGE = 60 * 60 * 24 * 30  # 30 days persistent login for shop-floor operators
 SESSION_EXPIRE_AT_BROWSER_CLOSE = False
-SESSION_SAVE_EVERY_REQUEST = True
+# Do not rewrite the session row on every single page load: it added a database write
+# (and a disk sync) to every request. Sessions still last SESSION_COOKIE_AGE from login.
+SESSION_SAVE_EVERY_REQUEST = False
+SESSION_COOKIE_HTTPONLY = True
 SESSION_COOKIE_SECURE = not DEBUG
 CSRF_COOKIE_SECURE = not DEBUG
 SESSION_COOKIE_SAMESITE = 'Lax'
@@ -216,13 +254,15 @@ CSRF_COOKIE_HTTPONLY = False
 SECURE_BROWSER_XSS_FILTER = True
 SECURE_CONTENT_TYPE_NOSNIFF = True
 X_FRAME_OPTIONS = 'DENY'
+SECURE_REFERRER_POLICY = 'same-origin'
 
-# Reverse proxy headers for Render / Cloud load balancers (ensures CSRF and Host headers match)
-USE_X_FORWARDED_HOST = True
-USE_X_FORWARDED_PORT = True
-SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
-
+# Reverse proxy headers for Render / Cloud load balancers (ensures CSRF and Host headers match).
+# Only trusted in production, where a real proxy sets them. On a local machine there is no
+# proxy, so honouring these headers would let any client spoof the host / "is HTTPS" state.
 if not DEBUG:
+    USE_X_FORWARDED_HOST = True
+    USE_X_FORWARDED_PORT = True
+    SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
     SECURE_SSL_REDIRECT = env.bool('SECURE_SSL_REDIRECT', default=True)
     SECURE_HSTS_SECONDS = env.int('SECURE_HSTS_SECONDS', default=31536000)
     SECURE_HSTS_INCLUDE_SUBDOMAINS = True
