@@ -117,10 +117,19 @@ ASGI_APPLICATION = 'core_erp.asgi.application'
 
 
 # Database Configuration
-# Parses the Neon connection string and enforces SSL for Render production deployment
-# Falls back to local SQLite if DATABASE_URL is not set (e.g. offline development)
+# Single shared live database (Neon PostgreSQL) for every machine: the connection string
+# comes from DATABASE_URL in .env. There is intentionally no local SQLite fallback, so a
+# machine can never silently write data to a private local file.
 db_url = env('DATABASE_URL', default=os.environ.get('DATABASE_URL', ''))
-if db_url:
+if 'test' in sys.argv:
+    # Automated tests always run on a throwaway in-memory database, never on live data.
+    DATABASES = {
+        'default': {
+            'ENGINE': 'django.db.backends.sqlite3',
+            'NAME': ':memory:',
+        }
+    }
+elif db_url:
     DATABASES = {
         'default': dj_database_url.parse(db_url, conn_max_age=600)
     }
@@ -128,20 +137,10 @@ if db_url:
         DATABASES['default'].setdefault('OPTIONS', {})
         DATABASES['default']['OPTIONS'].setdefault('sslmode', 'require')
 else:
-    DATABASES = {
-        'default': {
-            'ENGINE': 'django.db.backends.sqlite3',
-            'NAME': BASE_DIR / 'db.sqlite3',
-        }
-    }
-
-if 'test' in sys.argv:
-    DATABASES = {
-        'default': {
-            'ENGINE': 'django.db.backends.sqlite3',
-            'NAME': ':memory:',
-        }
-    }
+    raise ValueError(
+        "CRITICAL: DATABASE_URL is missing or empty in .env. "
+        "Add the Neon connection string (DATABASE_URL=postgresql://...) to the .env file."
+    )
 
 
 # Password Validation
