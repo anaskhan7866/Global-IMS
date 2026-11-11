@@ -73,12 +73,12 @@ class InventoryLedgerAdmin(admin.ModelAdmin):
     )
     search_fields = (
         'generic_reference_id',
-        'item__sku',
         'item__name',
         'contact__company_name',
         'narration',
     )
     autocomplete_fields = ['item', 'contact']
+    list_select_related = ('item', 'contact')
     date_hierarchy = 'timestamp'
     readonly_fields = ('created_at',)
 
@@ -159,10 +159,10 @@ class PurchaseOrderAdmin(admin.ModelAdmin):
     search_fields = (
         'vendor__company_name',
         'location',
-        'item__sku',
         'item__name',
     )
     autocomplete_fields = ['vendor', 'item']
+    list_select_related = ('vendor', 'item')
     date_hierarchy = 'order_date'
 
     @admin.display(description=_('Status'), ordering='status')

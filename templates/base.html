@@ -5,6 +5,22 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <meta name="color-scheme" content="dark light">
+    <script>
+        // Theme: the visitor's saved choice, otherwise the device setting. Runs before the page paints.
+        (function () {
+            var theme = 'dark';
+            try {
+                var saved = localStorage.getItem('theme');
+                if (saved === 'light' || saved === 'dark') {
+                    theme = saved;
+                } else if (window.matchMedia && window.matchMedia('(prefers-color-scheme: light)').matches) {
+                    theme = 'light';
+                }
+            } catch (e) { /* storage blocked: keep dark */ }
+            document.documentElement.setAttribute('data-theme', theme);
+        })();
+    </script>
     <title>{% block title %}Global-IMS | Manufacturing & Financial Operations{% endblock %}</title>
     <!-- Pre-built, minified stylesheet (npm run build:css). No runtime CSS compiler, no web fonts. -->
     <link rel="stylesheet" href="{% static 'css/app.css' %}">
@@ -94,6 +110,15 @@
                         <p class="text-[11px] text-slate-400 mt-1">Pessimistic Row Locks Active</p>
                     </div>
 
+                    <button type="button" data-theme-toggle onclick="toggleTheme()"
+                        class="w-full flex items-center justify-between px-3 py-2 text-xs font-medium rounded-md bg-slate-900 hover:bg-slate-800 text-slate-300 hover:text-white border border-slate-800 transition focus:outline-none focus:ring-2 focus:ring-cyan-500">
+                        <span class="flex items-center space-x-2">
+                            <svg class="theme-icon-sun w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z"/></svg><svg class="theme-icon-moon w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z"/></svg>
+                            <span class="theme-toggle-label">Light mode</span>
+                        </span>
+                        <span class="theme-switch" aria-hidden="true"><span class="theme-switch-knob"></span></span>
+                    </button>
+
                     <a href="/admin/"
                         class="flex items-center justify-between px-3 py-2 text-xs font-medium rounded-md bg-slate-900 hover:bg-slate-800 text-slate-300 hover:text-white border border-slate-800 transition">
                         <span class="flex items-center space-x-2">
@@ -137,6 +162,13 @@
                     <span class="h-2 w-2 rounded-full bg-emerald-500"></span>
                     <span class="font-mono-code font-bold">ACID</span>
                 </div>
+                <button
+                    type="button"
+                    data-theme-toggle
+                    onclick="toggleTheme()"
+                    class="h-11 w-11 flex items-center justify-center rounded-xl bg-slate-900 hover:bg-slate-800 text-slate-300 hover:text-white border border-slate-800 transition focus:outline-none focus:ring-2 focus:ring-cyan-500">
+                    <svg class="theme-icon-sun w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z"/></svg><svg class="theme-icon-moon w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z"/></svg>
+                </button>
                 <button
                     id="mobileMenuToggleBtn"
                     type="button"
@@ -288,6 +320,28 @@
 
     <!-- Mobile Drawer Toggle Script -->
     <script>
+        // Light / dark mode switch (choice is remembered on this device)
+        function currentTheme() {
+            return document.documentElement.getAttribute('data-theme') === 'light' ? 'light' : 'dark';
+        }
+        function syncThemeToggles() {
+            const isLight = currentTheme() === 'light';
+            document.querySelectorAll('[data-theme-toggle]').forEach(function (btn) {
+                const label = isLight ? 'Switch to dark mode' : 'Switch to light mode';
+                btn.setAttribute('aria-label', label);
+                btn.setAttribute('title', label);
+                btn.setAttribute('aria-pressed', isLight ? 'true' : 'false');
+            });
+        }
+        function toggleTheme() {
+            const next = currentTheme() === 'light' ? 'dark' : 'light';
+            document.documentElement.setAttribute('data-theme', next);
+            try { localStorage.setItem('theme', next); } catch (e) { /* private mode: not remembered */ }
+            syncThemeToggles();
+            document.dispatchEvent(new CustomEvent('themechange', { detail: { theme: next } }));
+        }
+        syncThemeToggles();
+
         function toggleMobileMenu() {
             const drawer = document.getElementById('mobileDrawer');
             const backdrop = document.getElementById('mobileDrawerBackdrop');

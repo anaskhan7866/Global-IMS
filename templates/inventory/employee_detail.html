@@ -177,9 +177,6 @@
                                 <div class="inline-flex items-center space-x-2 px-3 py-1.5 rounded-xl bg-cyan-950/70 border border-cyan-800 text-xs">
                                     <span class="font-mono-code font-extrabold text-cyan-300 text-sm">{{ row.single_item.quantity }}</span>
                                     <span class="text-white font-bold">&times; {{ row.single_item.name }}</span>
-                                    {% if row.single_item.sku %}
-                                    <span class="text-[10px] text-slate-400 font-mono-code font-bold ml-1">[{{ row.single_item.sku }}]</span>
-                                    {% endif %}
                                 </div>
                                 <span class="text-[11px] text-slate-500 font-mono-code block mt-0.5">Single box type</span>
                             </div>
@@ -194,9 +191,6 @@
                                     <div class="inline-flex items-center space-x-2 px-3 py-1.5 rounded-xl bg-slate-900 border border-slate-700/80 hover:border-slate-600 text-xs shadow-sm transition">
                                         <span class="font-mono-code font-extrabold text-emerald-400 text-sm">{{ item.quantity }}</span>
                                         <span class="text-white font-bold">&times; {{ item.name }}</span>
-                                        {% if item.sku %}
-                                        <span class="text-[10px] text-slate-500 font-mono-code">[{{ item.sku }}]</span>
-                                        {% endif %}
                                     </div>
                                     {% endfor %}
                                 </div>
@@ -291,9 +285,6 @@
                     <div class="flex items-center space-x-2 text-xs">
                         <span class="font-mono-code font-extrabold text-cyan-300 text-sm">{{ row.single_item.quantity }}&times;</span>
                         <span class="text-white font-bold">{{ row.single_item.name }}</span>
-                        {% if row.single_item.sku %}
-                        <span class="text-[10px] text-slate-400 font-mono-code">[{{ row.single_item.sku }}]</span>
-                        {% endif %}
                     </div>
                     {% else %}
                     <div class="flex flex-wrap gap-2">

@@ -192,7 +192,7 @@ class InventoryLedger(models.Model):
         sign = "+" if self.quantity_changed > 0 else ""
         return (
             f"[{self.timestamp.strftime('%Y-%m-%d %H:%M')}] "
-            f"{self.transaction_type} | {self.item.sku}: {sign}{self.quantity_changed} {self.item.unit_of_measure} "
+            f"{self.transaction_type} | {self.item.name}: {sign}{self.quantity_changed} {self.item.unit_of_measure} "
             f"(Ref: {self.generic_reference_id or 'N/A'})"
         )
 
@@ -267,4 +267,4 @@ class PurchaseOrder(models.Model):
         return self.status == PurchaseOrderStatus.PENDING and self.expected_delivery_date < timezone.localdate()
 
     def __str__(self) -> str:
-        return f"PO #{self.id or 'New'}: {self.vendor.company_name} - {self.quantity} x {self.item.sku} ({self.status})"
+        return f"PO #{self.id or 'New'}: {self.vendor.company_name} - {self.quantity} x {self.item.name} ({self.status})"

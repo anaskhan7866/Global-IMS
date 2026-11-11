@@ -54,6 +54,26 @@
     @apply font-mono;
   }
 
+  /* Theme switch: sun shows in dark mode (click for light), moon in light mode (click for dark) */
+  :root[data-theme="light"] .theme-icon-sun,
+  :root:not([data-theme="light"]) .theme-icon-moon {
+    display: none;
+  }
+
+  .theme-switch {
+    @apply relative inline-block w-8 h-[18px] rounded-full bg-slate-700 transition-colors;
+  }
+  .theme-switch-knob {
+    @apply absolute top-[2px] left-[2px] w-[14px] h-[14px] rounded-full bg-slate-300 shadow transition-transform;
+  }
+  :root[data-theme="light"] .theme-switch {
+    background-color: theme('colors.cyan.600');
+  }
+  :root[data-theme="light"] .theme-switch-knob {
+    transform: translateX(14px);
+    background-color: #fff;
+  }
+
   @media (max-width: 768px) {
     .mobile-bottom-safe {
       padding-bottom: max(5rem, calc(4.5rem + env(safe-area-inset-bottom, 0px)));

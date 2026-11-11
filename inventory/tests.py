@@ -32,7 +32,6 @@ class BillOfMaterialsRelationalIntegrityTestCase(TestCase):
         # 2. Create a Raw Material
         self.raw_material = Item.objects.create(
             type=ItemType.RAW_MATERIAL,
-            sku='RM-GI-SHEET-01',
             name='Galvanized Iron Sheet',
             description='0.8mm Hot-Dip Galvanized Iron Sheet 4x8 ft',
             unit_of_measure=UnitOfMeasure.PIECE,
@@ -43,7 +42,6 @@ class BillOfMaterialsRelationalIntegrityTestCase(TestCase):
         # 3. Create a Finished Good
         self.finished_good = Item.objects.create(
             type=ItemType.FINISHED_GOOD,
-            sku='FG-CORE-BOX-01',
             name='GI Core Box',
             description='Enclosed industrial electrical core box',
             unit_of_measure=UnitOfMeasure.PIECE,
@@ -84,7 +82,6 @@ class BillOfMaterialsRelationalIntegrityTestCase(TestCase):
         first_component = components.first()
         self.assertIsNotNone(first_component)
         self.assertEqual(first_component.raw_material, self.raw_material)
-        self.assertEqual(first_component.raw_material.sku, 'RM-GI-SHEET-01')
         self.assertEqual(first_component.raw_material.name, 'Galvanized Iron Sheet')
         self.assertEqual(first_component.quantity, Decimal('2.0000'))
         self.assertEqual(first_component.scrap_percentage, Decimal('1.00'))
@@ -163,7 +160,6 @@ class EmployeeAndVendorOrderViewsTestCase(TestCase):
 
         # Create Items
         self.item = Item.objects.create(
-            sku='FG-BOX-TEST-01',
             name='Test GI Core Box',
             type=ItemType.FINISHED_GOOD,
             unit_of_measure=UnitOfMeasure.PIECE,
@@ -298,7 +294,7 @@ class EmployeeAndVendorOrderViewsTestCase(TestCase):
         self.assertEqual(qs.count(), 2)
         first_po = qs.first()
         self.assertIsNotNone(first_po.vendor.company_name)
-        self.assertIsNotNone(first_po.item.sku)
+        self.assertIsNotNone(first_po.item.name)
         self.assertIsNotNone(first_po.quantity)
         self.assertIsNotNone(first_po.expected_delivery_date)
 
@@ -443,14 +439,12 @@ class EmployeeAndVendorOrderViewsTestCase(TestCase):
         # Create multiple distinct box types
         core_box = self.item  # Test GI Core Box
         polish_box = Item.objects.create(
-            sku='FG-POLISH-BOX',
             name='Polish Box',
             type=ItemType.FINISHED_GOOD,
             unit_of_measure=UnitOfMeasure.PIECE,
             weight=Decimal('2.100')
         )
         plastic_box = Item.objects.create(
-            sku='FG-PLASTIC-BOX',
             name='Plastic Box',
             type=ItemType.FINISHED_GOOD,
             unit_of_measure=UnitOfMeasure.PIECE,
@@ -545,12 +539,10 @@ class EmployeeAndVendorOrderViewsTestCase(TestCase):
         # Create two distinct items
         item_a = Item.objects.create(
             name="Alpha Box",
-            sku="FG-ALPHA",
             unit_of_measure="pcs"
         )
         item_b = Item.objects.create(
             name="Beta Box",
-            sku="FG-BETA",
             unit_of_measure="pcs"
         )
 
@@ -1131,7 +1123,7 @@ class EmployeeAndVendorOrderViewsTestCase(TestCase):
         self.assertEqual(new_item.current_stock, Decimal('40.0000'))
         self.assertEqual(new_item.weight, Decimal('6.250'))
         self.assertEqual(new_item.type, ItemType.FINISHED_GOOD)
-        self.assertTrue(new_item.sku.startswith('CB-'))
+        self.assertEqual(new_item.unit_of_measure, 'pcs')
         self.assertEqual(new_item.total_weight, Decimal('250.000'))  # 40 * 6.250
 
         # Verify ledger
@@ -1190,7 +1182,7 @@ class EmployeeAndVendorOrderViewsTestCase(TestCase):
 
         item2 = matching_items.get(weight=Decimal('5.200'))
         self.assertEqual(item2.current_stock, Decimal('25.0000'))
-        self.assertNotEqual(item1.sku, item2.sku)
+        self.assertNotEqual(item1.pk, item2.pk)
 
     def test_inventory_table_displays_weight_of_one_core_box_without_total_weight(self):
         """
@@ -1287,7 +1279,6 @@ class EmployeeAndVendorOrderViewsTestCase(TestCase):
 
         box1 = Item.objects.create(
             name='Precision Casting Box',
-            sku='FG-BOX-PC-01',
             type=ItemType.FINISHED_GOOD,
             unit_of_measure='pcs',
             current_stock=Decimal('20.0000'),
@@ -1295,7 +1286,6 @@ class EmployeeAndVendorOrderViewsTestCase(TestCase):
         )
         box2 = Item.objects.create(
             name='Precision Casting Box',
-            sku='FG-BOX-PC-02',
             type=ItemType.FINISHED_GOOD,
             unit_of_measure='pcs',
             current_stock=Decimal('30.0000'),
@@ -1329,7 +1319,6 @@ class EmployeeAndVendorOrderViewsTestCase(TestCase):
         from inventory.models import Item, ItemType, UnitOfMeasure
 
         zero_item = Item.objects.create(
-            sku='CB-ZERO-TEST',
             name='Zero Stock Core Box',
             type=ItemType.FINISHED_GOOD,
             unit_of_measure=UnitOfMeasure.PIECE,
@@ -1374,74 +1363,72 @@ class EmployeeAndVendorOrderViewsTestCase(TestCase):
         self.assertTrue(self.item.is_active)
         self.assertEqual(self.item.current_stock, Decimal('20.0000'))
 
-    def test_table_shows_delete_button_for_zero_stock_product(self):
+    def test_zero_stock_product_hidden_from_list_but_kept_in_dropdown(self):
         """
-        Validates that the table renders the Remove from Inventory action when product stock is 0,
-        and does not show Add or Edit buttons in that row.
+        A product at zero stock has no card / table row, but its name stays in the
+        Add Stock dropdown so it can be restocked straight away.
         """
         from django.urls import reverse
         from inventory.models import Item, ItemType, UnitOfMeasure
 
-        zero_item = Item.objects.create(
-            sku='CB-DISP-ZERO',
+        Item.objects.create(
             name='Empty Core Box',
             type=ItemType.FINISHED_GOOD,
             unit_of_measure=UnitOfMeasure.PIECE,
             current_stock=Decimal('0.0000'),
-            weight=Decimal('4.000'),
             is_active=True
         )
 
         response = self.client.get(reverse('add-inventory'))
         self.assertEqual(response.status_code, 200)
-        self.assertContains(response, 'Empty Core Box')
-        self.assertContains(response, 'openDeleteProductModal')
-        self.assertContains(response, 'Remove from Inventory')
+        self.assertContains(response, 'data-unit="pcs">Empty Core Box</option>', count=2)  # Add Stock + Edit dropdowns
+        self.assertNotContains(response, 'product-name">Empty Core Box')
+        self.assertNotContains(response, 'title="Empty Core Box"')
+        self.assertNotContains(response, 'openDeleteProductModal')
 
-    def test_remove_stock_reaching_zero_removes_product_completely(self):
+    def test_remove_stock_reaching_zero_keeps_product_for_restocking(self):
         """
-        Validates that removing stock to 0 completely removes the product from inventory.
+        Removing all stock keeps the product (active, stock 0): its row disappears, its name stays
+        in the dropdown, and adding stock with the same name brings the same product back.
         """
         from django.urls import reverse
         from inventory.models import Item, ItemType
 
-        active_box = Item.objects.create(
+        box = Item.objects.create(
             name='Depletable Box',
-            sku='FG-DEPLETE-01',
             type=ItemType.FINISHED_GOOD,
-            unit_of_measure='pcs',
             current_stock=Decimal('10.0000'),
-            weight=Decimal('2.500'),
             is_active=True
         )
 
         response = self.client.post(reverse('add-inventory'), {
-            'action': 'remove_stock',
-            'item_id': active_box.pk,
-            'quantity': '10'
+            'action': 'remove_stock', 'item_id': box.pk, 'quantity': '10'
         })
         self.assertEqual(response.status_code, 302)
+        box.refresh_from_db()
+        self.assertTrue(box.is_active)
+        self.assertEqual(box.current_stock, Decimal('0'))
 
-        # Product is completely removed from active inventory
-        self.assertFalse(Item.objects.filter(pk=active_box.pk, is_active=True).exists())
+        page = self.client.get(reverse('add-inventory'))
+        self.assertContains(page, 'Stock is now zero')
+        self.assertContains(page, 'data-unit="pcs">Depletable Box</option>')
+        self.assertNotContains(page, 'product-name">Depletable Box')
 
-        # Page confirms zero stock removal
-        get_res = self.client.get(reverse('add-inventory'))
-        self.assertContains(get_res, 'Stock reached zero and product has been completely removed from inventory')
-        self.assertNotContains(get_res, 'FG-DEPLETE-01')
+        # Restock with the exact same name from the Add Stock form
+        self.client.post(reverse('add-inventory'), {'action': 'add_stock', 'name': 'Depletable Box', 'quantity': '7'})
+        self.assertEqual(Item.objects.filter(name__iexact='Depletable Box').count(), 1)
+        box.refresh_from_db()
+        self.assertEqual(box.current_stock, Decimal('7'))
+        self.assertContains(self.client.get(reverse('add-inventory')), 'product-name">Depletable Box')
 
-    def test_edit_product_quantity_to_zero_removes_product_completely(self):
-        """
-        Validates that editing product quantity to 0 completely removes the product from inventory.
-        """
+    def test_edit_product_quantity_to_zero_keeps_product(self):
+        """Editing the quantity to 0 keeps the product (hidden from the list, kept in the dropdown)."""
         from django.urls import reverse
         from inventory.models import Item, ItemType
 
         edit_box = Item.objects.create(
             name='Zero Out Box',
-            sku='FG-ZERO-OUT-01',
             type=ItemType.FINISHED_GOOD,
-            unit_of_measure='pcs',
             current_stock=Decimal('5.0000'),
             weight=Decimal('3.000'),
             is_active=True
@@ -1455,8 +1442,10 @@ class EmployeeAndVendorOrderViewsTestCase(TestCase):
             'weight': '3.000'
         })
         self.assertEqual(response.status_code, 302)
-
-        self.assertFalse(Item.objects.filter(pk=edit_box.pk, is_active=True).exists())
+        edit_box.refresh_from_db()
+        self.assertTrue(edit_box.is_active)
+        self.assertEqual(edit_box.current_stock, Decimal('0'))
+        self.assertContains(self.client.get(reverse('add-inventory')), 'data-unit="pcs">Zero Out Box</option>')
 
     def test_edit_product_success(self):
         """
@@ -1549,7 +1538,6 @@ class EmployeeAndVendorOrderViewsTestCase(TestCase):
         # 2. Case: 2 Boxes in Inventory
         Item.objects.create(
             name='Precision Cast Box',
-            sku='FG-BOX-PREC',
             type=ItemType.FINISHED_GOOD,
             unit_of_measure='pcs',
             current_stock=Decimal('35.0000'),
@@ -1564,7 +1552,6 @@ class EmployeeAndVendorOrderViewsTestCase(TestCase):
         # 3. Case: 3 Boxes in Inventory
         Item.objects.create(
             name='Heavy Duty Core Box',
-            sku='FG-BOX-HEAVY',
             type=ItemType.FINISHED_GOOD,
             unit_of_measure='pcs',
             current_stock=Decimal('12.0000'),
@@ -1598,7 +1585,6 @@ class DailyCoreBoxFeatureTestCase(TestCase):
 
         self.item = Item.objects.create(
             name='GI Core Box Std',
-            sku='FG-BOX-STD',
             type=ItemType.FINISHED_GOOD,
             unit_of_measure='pcs',
             current_stock=Decimal('50.0000')
@@ -1965,20 +1951,20 @@ class DailyCoreBoxExtrasAndExportTestCase(TestCase):
         self.assertEqual(wb.sheetnames, ['Dispatches', 'Summary'])
         ws = wb['Dispatches']
         header = [c.value for c in ws[1]]
-        self.assertEqual(header[:10], ['S.No', 'Date', 'Company', 'Core Box Type', 'SKU', 'Quantity',
-                                       'Gate Pass No.', 'Vehicle No.', 'Location To', 'Image'])
+        self.assertEqual(header[:9], ['S.No', 'Date', 'Company', 'Core Box Type', 'Quantity',
+                                      'Gate Pass No.', 'Vehicle No.', 'Location To', 'Image'])
 
         # Only this company's entries are exported
         data_rows = [r for r in ws.iter_rows(min_row=2, values_only=True) if r and isinstance(r[0], int)]
         self.assertEqual(len(data_rows), 2)
         self.assertEqual({r[2] for r in data_rows}, {'Khetan Drilling'})
         nq = next(r for r in data_rows if r[3] == 'NQ with Lid')
-        self.assertEqual(nq[5:10], (10, 'GP-9', 'MH40 A 1', 'Site 1', 'View Image'))
-        image_cell = next(c for c in ws['J'] if c.value == 'View Image')
+        self.assertEqual(nq[4:9], (10, 'GP-9', 'MH40 A 1', 'Site 1', 'View Image'))
+        image_cell = next(c for c in ws['I'] if c.value == 'View Image')
         self.assertTrue(image_cell.hyperlink.target.endswith(
             reverse('daily-core-box-attachment', kwargs={'pk': mine.pk})))
         total_row = next(r for r in ws.iter_rows(min_row=2, values_only=True) if r and r[3] == 'TOTAL')
-        self.assertEqual(total_row[5], 14)
+        self.assertEqual(total_row[4], 14)
 
         # Unknown company -> 404
         self.assertEqual(self.client.get(reverse('daily-core-box-export', kwargs={'pk': 99999})).status_code, 404)
@@ -2037,7 +2023,7 @@ class InputRobustnessTestCase(TestCase):
         self.user = User.objects.create_user(username='robust', password='SecretPassword123!')
         self.client.force_login(self.user)
         self.item = Item.objects.create(
-            name='Robust Box', sku='FG-ROBUST', type=ItemType.FINISHED_GOOD,
+            name='Robust Box', type=ItemType.FINISHED_GOOD,
             unit_of_measure='pcs', current_stock=Decimal('5.0000'),
         )
         self.employee = Employee.objects.create(first_name='Ravi', last_name='Kumar')
@@ -2171,7 +2157,7 @@ class InputRobustnessTestCase(TestCase):
         from inventory.models import DailyCoreBoxDispatch, Item, ItemType, ProductionLog
 
         for i in range(15):
-            item = Item.objects.create(name=f'Box {i}', sku=f'FG-Q-{i}', type=ItemType.FINISHED_GOOD)
+            item = Item.objects.create(name=f'Box {i}', type=ItemType.FINISHED_GOOD)
             ProductionLog.objects.create(employee=self.employee, item=item, quantity=i + 1)
             DailyCoreBoxDispatch.objects.create(company=self.company, box_type=f'Box {i}', quantity=i + 1, item=item)
 
@@ -2193,3 +2179,178 @@ class InputRobustnessTestCase(TestCase):
                 self.assertEqual(res.status_code, 200)
                 self.assertLessEqual(len(ctx), budget, f"{url}: {len(ctx)} queries\n" + "\n".join(
                     q['sql'][:110] for q in ctx.captured_queries))
+
+
+class CreateProductFromInventoryTestCase(TestCase):
+    """
+    Products are created from the Inventory page (no admin panel needed):
+    Finished Good = name + quantity in pieces, Raw Material = name + quantity in tonnes.
+    """
+
+    def setUp(self):
+        from django.contrib.auth.models import User
+        from django.urls import reverse
+        self.url = reverse('add-inventory')
+        self.user = User.objects.create_user(username='creator', password='SecretPassword123!')
+        self.client.force_login(self.user)
+
+    def post(self, **data):
+        data.setdefault('action', 'add_product')
+        return self.client.post(self.url, data, follow=True)
+
+    def test_page_shows_simple_new_product_form(self):
+        res = self.client.get(self.url)
+        self.assertContains(res, 'id="newProductModal"')
+        self.assertContains(res, 'value="add_product"')
+        self.assertContains(res, 'value="Raw Material"')
+        self.assertContains(res, 'Quantity (pieces)')
+        html = res.content.decode()
+        for removed in ('name="sku"', 'name="weight"', 'name="unit_cost"', 'name="opening_stock"', 'name="description"'):
+            self.assertNotIn(removed, html)
+        self.assertNotIn('SKU', html)
+
+    def test_create_finished_good_in_pieces(self):
+        from transactions.models import InventoryLedger
+        res = self.post(type=ItemType.FINISHED_GOOD, name='PQ with Lid', quantity='50')
+        item = Item.objects.get(name='PQ with Lid')
+        self.assertEqual(item.type, ItemType.FINISHED_GOOD)
+        self.assertEqual(item.unit_of_measure, UnitOfMeasure.PIECE)
+        self.assertEqual(item.current_stock, Decimal('50'))
+        self.assertEqual(InventoryLedger.objects.get(item=item).quantity_changed, Decimal('50'))
+        self.assertContains(res, 'created with 50 pcs.')
+        page = self.client.get(self.url)
+        self.assertContains(page, 'data-unit="pcs">PQ with Lid</option>')
+
+    def test_create_raw_material_in_tonnes(self):
+        res = self.post(type=ItemType.RAW_MATERIAL, name='Silica Sand', quantity='2.5')
+        item = Item.objects.get(name='Silica Sand')
+        self.assertEqual(item.type, ItemType.RAW_MATERIAL)
+        self.assertEqual(item.unit_of_measure, UnitOfMeasure.TONNE)
+        self.assertEqual(item.current_stock, Decimal('2.5'))
+        self.assertEqual(item.unit_label, 'tonnes')
+        self.assertEqual(item.stock_display, '2.5')
+        self.assertContains(res, 'created with 2.5 tonnes.')
+        page = self.client.get(self.url)
+        self.assertContains(page, 'data-unit="tonnes">Silica Sand</option>')
+        self.assertContains(page, 'Raw Material (tonnes)')
+
+    def test_unit_cannot_be_overridden(self):
+        self.post(type=ItemType.RAW_MATERIAL, name='Clay', quantity='1', unit_of_measure='kg')
+        self.assertEqual(Item.objects.get(name='Clay').unit_of_measure, UnitOfMeasure.TONNE)
+
+    def test_blank_quantity_creates_product_without_ledger(self):
+        from transactions.models import InventoryLedger
+        self.post(type=ItemType.FINISHED_GOOD, name='Empty Box', quantity='')
+        item = Item.objects.get(name='Empty Box')
+        self.assertEqual(item.current_stock, Decimal('0'))
+        self.assertFalse(InventoryLedger.objects.filter(item=item).exists())
+
+    def test_same_name_same_type_is_rejected(self):
+        Item.objects.create(name='Tray', type=ItemType.FINISHED_GOOD, current_stock=Decimal('5'))
+        res = self.post(type=ItemType.FINISHED_GOOD, name='tray', quantity='3')
+        self.assertContains(res, 'already exists')
+        self.assertEqual(Item.objects.filter(name__iexact='tray').count(), 1)
+
+    def test_same_name_other_type_is_allowed(self):
+        Item.objects.create(name='Sand', type=ItemType.FINISHED_GOOD)
+        self.post(type=ItemType.RAW_MATERIAL, name='Sand', quantity='1')
+        self.assertEqual(Item.objects.filter(name='Sand').count(), 2)
+
+    def test_invalid_input_is_rejected_without_error(self):
+        cases = [
+            {'type': ItemType.FINISHED_GOOD, 'name': '', 'quantity': '5'},
+            {'type': ItemType.FINISHED_GOOD, 'name': 'X', 'quantity': '-1'},
+            {'type': ItemType.FINISHED_GOOD, 'name': 'X', 'quantity': 'abc'},
+            {'type': ItemType.FINISHED_GOOD, 'name': 'X', 'quantity': '2.5'},
+            {'type': ItemType.RAW_MATERIAL, 'name': 'X', 'quantity': '1e400'},
+            {'type': 'Spaceship', 'name': 'X', 'quantity': '1'},
+        ]
+        for data in cases:
+            with self.subTest(data=data):
+                res = self.post(**data)
+                self.assertEqual(res.status_code, 200)
+        self.assertFalse(Item.objects.exists())
+
+    def test_requires_login(self):
+        self.client.logout()
+        res = self.client.post(self.url, {'action': 'add_product', 'name': 'Nope', 'quantity': '1'})
+        self.assertEqual(res.status_code, 302)
+        self.assertFalse(Item.objects.exists())
+
+
+class UnitByTypeTestCase(TestCase):
+    """Finished goods are always pieces and raw material always tonnes."""
+
+    def test_unit_follows_type(self):
+        fg = Item.objects.create(name='Box', type=ItemType.FINISHED_GOOD, unit_of_measure='kg')
+        rm = Item.objects.create(name='Sand', type=ItemType.RAW_MATERIAL, unit_of_measure='pcs')
+        self.assertEqual(fg.unit_of_measure, 'pcs')
+        self.assertEqual(rm.unit_of_measure, 't')
+        rm.type = ItemType.FINISHED_GOOD
+        rm.save(update_fields=['type'])
+        rm.refresh_from_db()
+        self.assertEqual(rm.unit_of_measure, 'pcs')
+
+    def test_stock_display(self):
+        fg = Item(name='Box', type=ItemType.FINISHED_GOOD, current_stock=Decimal('12.0000'), unit_of_measure='pcs')
+        rm = Item(name='Sand', type=ItemType.RAW_MATERIAL, current_stock=Decimal('2.5000'), unit_of_measure='t')
+        self.assertEqual(fg.stock_display, '12')
+        self.assertEqual(rm.stock_display, '2.5')
+        self.assertEqual(str(rm), 'Sand (Raw Material)')
+
+
+class ZeroStockReuseTestCase(TestCase):
+    """The New Product form re-uses a product that is at zero stock instead of refusing the name."""
+
+    def setUp(self):
+        from django.contrib.auth.models import User
+        from django.urls import reverse
+        self.url = reverse('add-inventory')
+        self.client.force_login(User.objects.create_user(username='reuser', password='SecretPassword123!'))
+
+    def test_new_product_with_zero_stock_name_restocks_it(self):
+        from transactions.models import InventoryLedger
+        item = Item.objects.create(name='Silica Sand', type=ItemType.RAW_MATERIAL, current_stock=Decimal('0'))
+        res = self.client.post(self.url, {'action': 'add_product', 'type': ItemType.RAW_MATERIAL,
+                                          'name': 'silica sand', 'quantity': '1.75'}, follow=True)
+        self.assertContains(res, 'was at zero stock')
+        self.assertEqual(Item.objects.filter(name__iexact='silica sand').count(), 1)
+        item.refresh_from_db()
+        self.assertEqual(item.current_stock, Decimal('1.75'))
+        self.assertEqual(InventoryLedger.objects.get(item=item).generic_reference_id, 'RESTOCK')
+
+    def test_new_product_brings_back_previously_hidden_product(self):
+        item = Item.objects.create(name='Old Box', type=ItemType.FINISHED_GOOD,
+                                   current_stock=Decimal('0'), is_active=False)
+        self.client.post(self.url, {'action': 'add_product', 'type': ItemType.FINISHED_GOOD,
+                                    'name': 'Old Box', 'quantity': '4'})
+        item.refresh_from_db()
+        self.assertTrue(item.is_active)
+        self.assertEqual(item.current_stock, Decimal('4'))
+        self.assertEqual(Item.objects.filter(name='Old Box').count(), 1)
+
+    def test_new_product_with_in_stock_name_is_still_refused(self):
+        Item.objects.create(name='Tray', type=ItemType.FINISHED_GOOD, current_stock=Decimal('3'))
+        res = self.client.post(self.url, {'action': 'add_product', 'type': ItemType.FINISHED_GOOD,
+                                          'name': 'Tray', 'quantity': '2'}, follow=True)
+        self.assertContains(res, 'Use Add Stock')
+        self.assertEqual(Item.objects.get(name='Tray').current_stock, Decimal('3'))
+
+
+class ThemeToggleTestCase(TestCase):
+    """Every page has the light / dark mode switch and applies the saved theme before painting."""
+
+    def test_theme_switch_on_every_page(self):
+        from django.contrib.auth.models import User
+        from inventory.models import Company
+        self.client.force_login(User.objects.create_user(username='themer', password='SecretPassword123!'))
+        company = Company.objects.create(name='Theme Co')
+        for url in ['/', '/employees/', '/vendor-orders/', '/daily-core-box/',
+                    f'/daily-core-box/company/{company.pk}/', '/dashboard/']:
+            with self.subTest(url=url):
+                html = self.client.get(url).content.decode()
+                self.assertIn('data-theme-toggle', html)
+                self.assertIn('function toggleTheme()', html)
+                # The theme script runs in <head>, before the stylesheet, so there is no flash
+                head = html.split('</head>')[0]
+                self.assertLess(head.index("setAttribute('data-theme'"), head.index('css/app.css'))

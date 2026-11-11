@@ -37,7 +37,6 @@ class TransactionalIntegrityTestCase(TestCase):
         # 2. Raw Material: 'GI Sheet'
         self.gi_sheet = Item.objects.create(
             type=ItemType.RAW_MATERIAL,
-            sku='RM-GI-SHEET',
             name='GI Sheet',
             unit_of_measure=UnitOfMeasure.PIECE,
             current_stock=Decimal('0.0000'),
@@ -47,7 +46,6 @@ class TransactionalIntegrityTestCase(TestCase):
         # 3. Finished Good: 'GI Core Box'
         self.gi_box = Item.objects.create(
             type=ItemType.FINISHED_GOOD,
-            sku='FG-GI-BOX',
             name='GI Core Box',
             unit_of_measure=UnitOfMeasure.PIECE,
             current_stock=Decimal('0.0000'),

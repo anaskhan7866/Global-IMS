@@ -46,7 +46,6 @@ class FinancialDashboardServiceTestCase(TestCase):
         """
         Item.objects.create(
             type=ItemType.RAW_MATERIAL,
-            sku='RM-ALUM-01',
             name='Aluminum Ingot',
             unit_of_measure=UnitOfMeasure.KILOGRAM,
             current_stock=Decimal('100.0000'),
@@ -54,7 +53,6 @@ class FinancialDashboardServiceTestCase(TestCase):
         )
         Item.objects.create(
             type=ItemType.FINISHED_GOOD,
-            sku='FG-PANEL-01',
             name='Solar Mounting Panel',
             unit_of_measure=UnitOfMeasure.PIECE,
             current_stock=Decimal('20.0000'),
@@ -71,7 +69,6 @@ class FinancialDashboardServiceTestCase(TestCase):
         # 1. Create and stock a finished good
         panel = Item.objects.create(
             type=ItemType.FINISHED_GOOD,
-            sku='FG-PANEL-HD',
             name='Heavy-Duty Panel',
             unit_of_measure=UnitOfMeasure.PIECE,
             current_stock=Decimal('50.0000'),
@@ -119,7 +116,6 @@ class FinancialDashboardServiceTestCase(TestCase):
         """
         gear = Item.objects.create(
             type=ItemType.FINISHED_GOOD,
-            sku='FG-GEAR-01',
             name='Helical Gear',
             unit_of_measure=UnitOfMeasure.PIECE,
             current_stock=Decimal('100.0000'),
@@ -172,7 +168,6 @@ class DashboardHomeViewTestCase(TestCase):
         # Create an item with low stock (< 10)
         self.low_stock_item = Item.objects.create(
             type=ItemType.RAW_MATERIAL,
-            sku='RM-CRITICAL-BOLT',
             name='Precision Bolt M4',
             unit_of_measure=UnitOfMeasure.PIECE,
             current_stock=Decimal('4.0000'),
@@ -181,7 +176,6 @@ class DashboardHomeViewTestCase(TestCase):
         # Create an item with sufficient stock (>= 10)
         self.normal_stock_item = Item.objects.create(
             type=ItemType.FINISHED_GOOD,
-            sku='FG-BOX-STOCKED',
             name='Standard Junction Box',
             unit_of_measure=UnitOfMeasure.PIECE,
             current_stock=Decimal('50.0000'),
@@ -225,6 +219,5 @@ class DashboardHomeViewTestCase(TestCase):
         # Chart.js is pinned to an exact version with an integrity hash
         self.assertIn('chart.js@4.4.9/dist/chart.umd.js', content)
         self.assertIn('integrity="sha384-', content)
-        self.assertIn('RM-CRITICAL-BOLT', content)
         self.assertIn('Precision Bolt M4', content)
 

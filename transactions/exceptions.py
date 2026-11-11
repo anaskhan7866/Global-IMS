@@ -3,10 +3,10 @@ class InsufficientStockError(Exception):
     Raised when an operational transaction (sales dispatch, manufacturing order,
     or internal allocation) requests more quantity than physically available on hand.
     """
-    def __init__(self, message: str, item_sku: str = "", required_qty=None, available_qty=None):
+    def __init__(self, message: str, item_name: str = "", required_qty=None, available_qty=None):
         super().__init__(message)
         self.message = message
-        self.item_sku = item_sku
+        self.item_name = item_name
         self.required_qty = required_qty
         self.available_qty = available_qty
 

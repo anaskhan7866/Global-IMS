@@ -12,7 +12,10 @@ from django.utils import timezone
 from django.views import View
 from django.views.generic import ListView, DetailView
 
-from inventory.models import Employee, ProductionLog, Item, ItemType, Company, DailyCoreBoxDispatch
+from inventory.models import (
+    Employee, ProductionLog, Item, ItemType, Company, DailyCoreBoxDispatch,
+    default_unit_for, format_quantity, UNIT_LABELS,
+)
 from transactions.models import PurchaseOrder, Contact, ContactType, InventoryLedger, TransactionType, PurchaseOrderStatus
 
 
@@ -120,16 +123,8 @@ def get_or_resolve_production_item(item_id=None, item_name=None, weight=None):
             if found:
                 return found
 
-        # Auto-create finished good with generated unique SKU
-        clean_slug = re.sub(r'[^A-Za-z0-9]+', '-', clean_name).strip('-').upper()
-        base_sku = f"FG-{clean_slug[:12]}" if clean_slug else "FG-BOX"
-        sku = base_sku
-        counter = 1
-        while Item.objects.filter(sku=sku).exists():
-            sku = f"{base_sku}-{counter:02d}"
-            counter += 1
+        # Auto-create a finished good with this name
         return Item.objects.create(
-            sku=sku,
             name=clean_name,
             type=ItemType.FINISHED_GOOD,
             unit_of_measure='pcs',
@@ -148,7 +143,6 @@ def get_or_resolve_production_item(item_id=None, item_name=None, weight=None):
 
     # Fallback to creating standard finished good if catalog is empty
     return Item.objects.create(
-        sku='FG-CORE-BOX-01',
         name='GI Core Box',
         type=ItemType.FINISHED_GOOD,
         unit_of_measure='pcs',
@@ -447,14 +441,14 @@ class EmployeeDetailView(LoginRequiredMixin, DetailView):
         # Daily breakdown using values('production_date').annotate(Sum('quantity'))
         daily_breakdown = self.get_daily_breakdown(employee, month, year)
 
-        # Detailed breakdown including item name, SKU, and unit weight
+        # Detailed breakdown including item name and unit weight
         production_breakdown = (
             ProductionLog.objects.filter(
                 employee=employee,
                 production_date__year=year,
                 production_date__month=month
             )
-            .values('production_date', 'item__id', 'item__name', 'item__sku', 'item__unit_of_measure', 'item__weight')
+            .values('production_date', 'item__id', 'item__name', 'item__unit_of_measure', 'item__weight')
             .annotate(
                 quantity_produced=Sum('quantity'),
                 total_qty=Sum('quantity')
@@ -477,7 +471,6 @@ class EmployeeDetailView(LoginRequiredMixin, DetailView):
             daily_records[p_date]['items'].append({
                 'item_id': row.get('item__id'),
                 'name': row.get('item__name'),
-                'sku': row.get('item__sku'),
                 'weight': row.get('item__weight'),
                 'quantity': qty,
                 'unit_of_measure': row.get('item__unit_of_measure') or 'Units',
@@ -902,7 +895,10 @@ class AddInventoryView(LoginRequiredMixin, View):
     template_name = 'inventory/add_inventory.html'
 
     def get(self, request, *args, **kwargs):
-        items = list(Item.objects.filter(is_active=True).order_by('name', 'weight'))
+        all_items = list(Item.objects.filter(is_active=True).order_by('name', 'weight'))
+        # A product whose stock reaches zero keeps its name in the dropdowns (so stock can be
+        # added again straight away) but its card and table row are hidden.
+        items = [item for item in all_items if item.current_stock > 0]
         vendors = Contact.objects.filter(type=ContactType.VENDOR, is_active=True).order_by('company_name')
 
         # Summary calculations for KPI badges (no total weight calculation)
@@ -916,10 +912,18 @@ class AddInventoryView(LoginRequiredMixin, View):
             'total_units': total_units,
             'low_stock_count': low_stock_count,
             'vendors': vendors,
+            'finished_items': [i for i in all_items if i.type == ItemType.FINISHED_GOOD],
+            'raw_items': [i for i in all_items if i.type == ItemType.RAW_MATERIAL],
         })
 
     def post(self, request, *args, **kwargs):
         action = request.POST.get('action', 'add_stock')
+
+        # -------------------------------------------------------------
+        # Action: Create a brand-new product (no need to use the admin panel)
+        # -------------------------------------------------------------
+        if action == 'add_product':
+            return self._create_product(request)
 
         # -------------------------------------------------------------
         # Action: Edit / Modify Product Details (Name, Quantity, Weight)
@@ -970,41 +974,13 @@ class AddInventoryView(LoginRequiredMixin, View):
 
                 stock_diff = new_quantity - old_stock
 
-                if new_quantity == Decimal('0'):
-                    if stock_diff != Decimal('0'):
-                        InventoryLedger.objects.create(
-                            item=locked_item,
-                            quantity_changed=stock_diff,
-                            transaction_type=TransactionType.OUT,
-                            generic_reference_id='EDIT-CORRECTION',
-                            unit_cost=locked_item.moving_average_cost,
-                            total_cost=(abs(stock_diff) * locked_item.moving_average_cost).quantize(Decimal('0.01')),
-                            narration="Quantity updated to 0. Stock completely removed from inventory."
-                        )
-
-                    locked_item.current_stock = Decimal('0')
-                    locked_item.name = new_name
-                    if new_weight is not None:
-                        locked_item.weight = new_weight
-                    try:
-                        locked_item.delete()
-                    except (ProtectedError, IntegrityError):
-                        locked_item.is_active = False
-                        locked_item.save(update_fields=['is_active', 'current_stock', 'name', 'weight', 'updated_at'])
-
-                    messages.success(
-                        request,
-                        f"Product '{locked_item.name}' stock was set to zero and has been completely removed from inventory."
-                    )
-                    return redirect('add-inventory')
-
                 update_fields = ['name', 'current_stock', 'updated_at']
                 locked_item.name = new_name
                 if new_weight is not None:
                     locked_item.weight = new_weight
                     update_fields.append('weight')
                 locked_item.current_stock = new_quantity
-                if not locked_item.is_active and new_quantity > Decimal('0'):
+                if not locked_item.is_active:
                     locked_item.is_active = True
                     update_fields.append('is_active')
 
@@ -1064,7 +1040,6 @@ class AddInventoryView(LoginRequiredMixin, View):
                     return redirect('add-inventory')
 
                 item_name = locked_item.name
-                item_sku = locked_item.sku
                 item_weight = locked_item.weight
 
                 # Remove completely from inventory: delete or deactivate
@@ -1077,7 +1052,7 @@ class AddInventoryView(LoginRequiredMixin, View):
 
                 messages.success(
                     request,
-                    f"Product '{item_name}' (SKU: {item_sku}) "
+                    f"Product '{item_name}' "
                     f"has been completely removed from inventory."
                 )
 
@@ -1156,23 +1131,19 @@ class AddInventoryView(LoginRequiredMixin, View):
 
                 if locked_item.current_stock <= Decimal('0'):
                     locked_item.current_stock = Decimal('0')
-                    try:
-                        locked_item.delete()
-                    except (ProtectedError, IntegrityError):
-                        locked_item.is_active = False
-                        locked_item.save(update_fields=['is_active', 'current_stock', 'updated_at'])
-
+                    locked_item.save(update_fields=['current_stock', 'updated_at'])
                     messages.success(
                         request,
-                        f"Successfully removed -{quantity} units from '{locked_item.name}'. "
-                        f"Stock reached zero and product has been completely removed from inventory."
+                        f"Removed {format_quantity(quantity, locked_item.unit_of_measure)} {locked_item.unit_label} "
+                        f"from '{locked_item.name}'. Stock is now zero - it is hidden from the list but stays in "
+                        f"the product dropdown, so you can add stock to it again anytime."
                     )
                 else:
                     locked_item.save(update_fields=['current_stock', 'updated_at'])
                     messages.success(
                         request,
-                        f"Successfully removed -{quantity} units from '{locked_item.name}'. "
-                        f"Remaining Stock: {locked_item.current_stock} {locked_item.unit_of_measure}."
+                        f"Removed {format_quantity(quantity, locked_item.unit_of_measure)} {locked_item.unit_label} "
+                        f"from '{locked_item.name}'. Remaining stock: {locked_item.stock_display} {locked_item.unit_label}."
                     )
 
             return redirect('add-inventory')
@@ -1304,16 +1275,7 @@ class AddInventoryView(LoginRequiredMixin, View):
             else:
                 # Same core box with different weight, or new core box product:
                 # Stored separately as a distinct item!
-                clean_slug = re.sub(r'[^A-Za-z0-9]+', '-', product_name).strip('-').upper()
-                base_sku = f"CB-{clean_slug[:12]}" if clean_slug else "CB-PROD"
-                sku = base_sku
-                counter = 1
-                while Item.objects.filter(sku=sku).exists():
-                    sku = f"{base_sku}-{counter:02d}"
-                    counter += 1
-
                 new_item = Item.objects.create(
-                    sku=sku,
                     name=product_name,
                     type=ItemType.FINISHED_GOOD,
                     unit_of_measure='pcs',
@@ -1338,11 +1300,104 @@ class AddInventoryView(LoginRequiredMixin, View):
 
                 messages.success(
                     request,
-                    f"Created product '{new_item.name}' (SKU: {new_item.sku}) with {quantity} units."
+                    f"Created product '{new_item.name}' with {format_quantity(quantity, new_item.unit_of_measure)} {new_item.unit_label}."
                 )
 
         return redirect('add-inventory')
 
+
+    def _create_product(self, request):
+        """
+        Create a new product from the 'New Product' form.
+        Finished Good: name + quantity in pieces.  Raw Material: name + quantity in tonnes.
+        """
+        item_type = request.POST.get('type') or ItemType.FINISHED_GOOD
+        if item_type not in ItemType.values:
+            messages.error(request, "Please choose Finished Good or Raw Material.")
+            return redirect('add-inventory')
+
+        is_raw = item_type == ItemType.RAW_MATERIAL
+        noun = 'material' if is_raw else 'product'
+        unit = default_unit_for(item_type)
+        unit_label = UNIT_LABELS[unit]
+
+        name = _clean_text(request.POST.get('name'), 255)
+        if not name:
+            messages.error(request, f"Please enter the name of the {noun}.")
+            return redirect('add-inventory')
+
+        raw_quantity = request.POST.get('quantity')
+        try:
+            quantity = _to_decimal(raw_quantity if str(raw_quantity or '').strip() else '0')
+            if quantity < 0:
+                raise ValueError
+        except (ValueError, TypeError):
+            messages.error(request, f"Please enter a valid quantity in {unit_label}.")
+            return redirect('add-inventory')
+        if not is_raw and quantity != quantity.to_integral_value():
+            messages.error(request, "Quantity of a finished good must be a whole number of pieces.")
+            return redirect('add-inventory')
+        quantity = quantity.quantize(Decimal('0.001'))
+
+        with transaction.atomic():
+            existing = (
+                Item.objects.select_for_update()
+                .filter(name__iexact=name, type=item_type)
+                .order_by('-is_active', '-current_stock')
+                .first()
+            )
+            if existing and existing.is_active and existing.current_stock > 0:
+                messages.error(
+                    request,
+                    f"'{existing.name}' already exists as a {existing.get_type_display()} with "
+                    f"{existing.stock_display} {existing.unit_label}. Use Add Stock to increase its quantity."
+                )
+                return redirect('add-inventory')
+
+            if existing:
+                # Same product at zero stock: bring it back with the new quantity instead of a duplicate.
+                existing.current_stock = quantity
+                existing.is_active = True
+                existing.save(update_fields=['current_stock', 'is_active', 'updated_at'])
+                if quantity > 0:
+                    InventoryLedger.objects.create(
+                        item=existing,
+                        quantity_changed=quantity,
+                        transaction_type=TransactionType.IN,
+                        generic_reference_id='RESTOCK',
+                        unit_cost=existing.moving_average_cost,
+                        total_cost=(quantity * existing.moving_average_cost).quantize(Decimal('0.01')),
+                        narration=f"Restocked {format_quantity(quantity, unit)} {unit_label} of '{existing.name}'.",
+                    )
+                messages.success(
+                    request,
+                    f"'{existing.name}' was at zero stock - added {format_quantity(quantity, unit)} {unit_label}."
+                )
+                return redirect('add-inventory')
+
+            item = Item.objects.create(
+                name=name,
+                type=item_type,
+                unit_of_measure=unit,
+                current_stock=quantity,
+            )
+
+            if quantity > 0:
+                InventoryLedger.objects.create(
+                    item=item,
+                    quantity_changed=quantity,
+                    transaction_type=TransactionType.IN,
+                    generic_reference_id='OPENING-STOCK',
+                    unit_cost=Decimal('0'),
+                    total_cost=Decimal('0'),
+                    narration=f"Opening stock of {format_quantity(quantity, unit)} {unit_label} for new {noun} '{name}'.",
+                )
+
+        messages.success(
+            request,
+            f"{item.get_type_display()} '{item.name}' created with {format_quantity(quantity, unit)} {unit_label}."
+        )
+        return redirect('add-inventory')
 
 # ---------------------------------------------------------------------------
 # Daily Core Box: optional gate pass / vehicle / destination / image helpers
@@ -1476,7 +1531,7 @@ class DailyCoreBoxExportView(LoginRequiredMixin, View):
         ws = wb.active
         ws.title = 'Dispatches'
         headers = [
-            'S.No', 'Date', 'Company', 'Core Box Type', 'SKU', 'Quantity',
+            'S.No', 'Date', 'Company', 'Core Box Type', 'Quantity',
             'Gate Pass No.', 'Vehicle No.', 'Location To', 'Image', 'Recorded At',
         ]
         style_header(ws, headers)
@@ -1492,7 +1547,6 @@ class DailyCoreBoxExportView(LoginRequiredMixin, View):
                 d.dispatch_date,
                 _excel_safe(d.company.name),
                 _excel_safe(d.box_type),
-                _excel_safe(d.item.sku if d.item else ''),
                 d.quantity,
                 _excel_safe(d.gate_pass_number),
                 _excel_safe(d.vehicle_number),
@@ -1502,18 +1556,18 @@ class DailyCoreBoxExportView(LoginRequiredMixin, View):
             ])
             row = ws.max_row
             ws.cell(row=row, column=2).number_format = 'DD-MM-YYYY'
-            ws.cell(row=row, column=11).number_format = 'DD-MM-YYYY HH:MM'
+            ws.cell(row=row, column=10).number_format = 'DD-MM-YYYY HH:MM'
             if image_url:
-                link_cell = ws.cell(row=row, column=10)
+                link_cell = ws.cell(row=row, column=9)
                 link_cell.hyperlink = image_url
                 link_cell.font = Font(color='0563C1', underline='single')
             total_qty += d.quantity
 
         ws.append([])
-        ws.append(['', '', '', 'TOTAL', '', total_qty])
+        ws.append(['', '', '', 'TOTAL', total_qty])
         for cell in ws[ws.max_row]:
             cell.font = bold
-        autosize(ws, [7, 12, 28, 22, 16, 10, 16, 14, 26, 12, 17])
+        autosize(ws, [7, 12, 28, 22, 10, 16, 14, 26, 12, 17])
 
         # Sheet 2: per-company / per-box-type summary
         summary = wb.create_sheet('Summary')
@@ -1667,8 +1721,6 @@ class DailyCoreBoxListView(LoginRequiredMixin, View):
 
             # 5. Link with catalog Item if matching
             matched_item = Item.objects.filter(name__iexact=box_type, is_active=True).first()
-            if not matched_item:
-                matched_item = Item.objects.filter(sku__iexact=box_type, is_active=True).first()
 
             dispatch = DailyCoreBoxDispatch(
                 company=company,
@@ -1784,8 +1836,6 @@ class DailyCoreBoxDetailView(LoginRequiredMixin, View):
                     pass
 
             matched_item = Item.objects.filter(name__iexact=box_type, is_active=True).first()
-            if not matched_item:
-                matched_item = Item.objects.filter(sku__iexact=box_type, is_active=True).first()
 
             dispatch = DailyCoreBoxDispatch(
                 company=company,
@@ -1841,8 +1891,6 @@ class DailyCoreBoxDetailView(LoginRequiredMixin, View):
                     pass
 
             matched_item = Item.objects.filter(name__iexact=box_type, is_active=True).first()
-            if not matched_item:
-                matched_item = Item.objects.filter(sku__iexact=box_type, is_active=True).first()
 
             dispatch.box_type = box_type
             dispatch.quantity = quantity

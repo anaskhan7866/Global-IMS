@@ -18,8 +18,19 @@
             </div>
         </div>
 
+        <div class="flex flex-wrap items-center gap-3 self-start md:self-auto">
+        <button
+            type="button"
+            id="newProductBtn"
+            onclick="openNewProductModal()"
+            class="px-4 py-2.5 rounded-xl text-xs font-bold flex items-center space-x-1.5 bg-emerald-600 hover:bg-emerald-500 text-white shadow transition focus:outline-none focus:ring-2 focus:ring-emerald-400"
+        >
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>
+            <span>New Product</span>
+        </button>
+
         <!-- Mode Toggle (Add vs Remove) -->
-        <div class="inline-flex rounded-xl p-1 bg-slate-900 border border-slate-800 self-start md:self-auto">
+        <div class="inline-flex rounded-xl p-1 bg-slate-900 border border-slate-800">
             <button
                 type="button"
                 id="tabBtnAdd"
@@ -39,17 +50,18 @@
                 <span>Remove Stock</span>
             </button>
         </div>
+        </div>
     </div>
 
     <!-- Box Total Stock Cards: Shows individual total stock for each type of box in inventory -->
     <div class="space-y-3">
         <div class="flex items-center justify-between">
             <div>
-                <h2 class="text-xs font-bold uppercase tracking-wider text-slate-400">Total Stock by Box Type</h2>
-                <p class="text-xs text-slate-500 mt-0.5">Live stock balance on hand for each registered core box.</p>
+                <h2 class="text-xs font-bold uppercase tracking-wider text-slate-400">Total Stock by Product</h2>
+                <p class="text-xs text-slate-500 mt-0.5">Finished goods in pieces, raw material in tonnes.</p>
             </div>
             <span class="inline-flex items-center space-x-1.5 px-3 py-1 rounded-lg bg-slate-900 border border-slate-800 text-xs font-mono-code text-cyan-400 font-semibold">
-                <span>{{ items|length }} Box Type{{ items|length|pluralize }}</span>
+                <span>{{ items|length }} Product{{ items|length|pluralize }}</span>
             </span>
         </div>
 
@@ -65,9 +77,7 @@
                             </h3>
                         </div>
                         <div class="flex flex-wrap items-center gap-1.5 mt-1.5">
-                            <span class="text-[11px] font-mono-code text-slate-500">
-                                {{ item.sku }}
-                            </span>
+                            {% if item.type == 'Raw Material' %}<span class="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-semibold bg-blue-950 text-blue-300 border border-blue-800 product-type">Raw Material</span>{% else %}<span class="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-semibold bg-emerald-950 text-emerald-300 border border-emerald-800 product-type">Finished Good</span>{% endif %}
                         </div>
                     </div>
                     <div class="w-10 h-10 rounded-xl {% if item.current_stock == 0 %}bg-rose-950/60 border border-rose-800/60 text-rose-400{% elif item.current_stock < 10 %}bg-amber-950/60 border border-amber-800/60 text-amber-400{% else %}bg-cyan-950/60 border border-cyan-800/60 text-cyan-400{% endif %} flex items-center justify-center flex-shrink-0">
@@ -82,9 +92,9 @@
                         <span class="text-[11px] uppercase tracking-wider text-slate-400 font-semibold block">Total Stock</span>
                         <div class="flex items-baseline space-x-1.5 mt-0.5">
                             <span class="text-3xl font-extrabold font-mono-code {% if item.current_stock == 0 %}text-rose-400{% elif item.current_stock < 10 %}text-amber-400{% else %}text-emerald-400{% endif %}">
-                                {{ item.current_stock|floatformat:0 }}
+                                {{ item.stock_display }}
                             </span>
-                            <span class="text-xs text-slate-400 font-medium">Boxes</span>
+                            <span class="text-xs text-slate-400 font-medium">{{ item.unit_label }}</span>
                         </div>
                     </div>
                     {% if item.current_stock == 0 %}
@@ -104,7 +114,7 @@
             </div>
             {% empty %}
             <div class="col-span-full p-8 rounded-2xl bg-slate-950 border border-slate-800 text-center text-slate-400">
-                <p class="text-sm font-semibold text-slate-300">No Core Boxes in Inventory</p>
+                <p class="text-sm font-semibold text-slate-300">No Products in Stock</p>
                 <p class="text-xs text-slate-500 mt-1">Use the form below to register and add stock for your first core box.</p>
             </div>
             {% endfor %}
@@ -149,15 +159,24 @@
                             class="w-full px-4 py-3 rounded-xl bg-slate-900 border border-slate-700 text-white text-sm focus:border-cyan-500 focus:ring-2 focus:ring-cyan-500/20 transition font-medium appearance-none pr-10 cursor-pointer"
                         >
                             <option value="" disabled selected>-- Select Product Name --</option>
-                            <option value="BQ without Lid">BQ without Lid</option>
-                            <option value="NQ with Lid">NQ with Lid</option>
-                            <option value="HQ with Lid">HQ with Lid</option>
-                            <option value="Trunk (Peti)">Trunk (Peti)</option>
-                            {% for item in items %}
+                            <optgroup label="Finished Goods (pieces)">
+                            <option value="BQ without Lid" data-unit="pcs">BQ without Lid</option>
+                            <option value="NQ with Lid" data-unit="pcs">NQ with Lid</option>
+                            <option value="HQ with Lid" data-unit="pcs">HQ with Lid</option>
+                            <option value="Trunk (Peti)" data-unit="pcs">Trunk (Peti)</option>
+                            {% for item in finished_items %}
                             {% if item.name != "BQ without Lid" and item.name != "NQ with Lid" and item.name != "HQ with Lid" and item.name != "Trunk (Peti)" %}
-                            <option value="{{ item.name }}">{{ item.name }} [{{ item.sku }}]</option>
+                            <option value="{{ item.name }}" data-unit="pcs">{{ item.name }}</option>
                             {% endif %}
                             {% endfor %}
+                            </optgroup>
+                            {% if raw_items %}
+                            <optgroup label="Raw Material (tonnes)">
+                            {% for item in raw_items %}
+                            <option value="{{ item.name }}" data-unit="tonnes">{{ item.name }}</option>
+                            {% endfor %}
+                            </optgroup>
+                            {% endif %}
                         </select>
                         <div class="pointer-events-none absolute inset-y-0 right-0 flex items-center px-3.5 text-slate-400">
                             <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/></svg>
@@ -175,15 +194,15 @@
                     <div class="relative">
                         <input
                             type="number"
-                            step="1"
-                            min="1"
+                            step="any"
+                            min="0.001"
                             name="quantity"
                             id="quantity"
                             required
                             placeholder="e.g. 50"
                             class="w-full px-4 py-3 rounded-xl bg-slate-900 border border-slate-700 text-white placeholder-slate-500 text-sm font-mono-code focus:border-cyan-500 focus:ring-2 focus:ring-cyan-500/20 transition"
                         >
-                        <span class="absolute right-3.5 top-3 text-xs text-slate-400 font-mono-code font-bold pointer-events-none">units</span>
+                        <span id="qtyUnitBadge" class="absolute right-3.5 top-3 text-xs text-slate-400 font-mono-code font-bold pointer-events-none">pcs</span>
                     </div>
                     <p id="quantityHint" class="text-[11px] text-slate-400">Number of core boxes / units to add into inventory.</p>
                 </div>
@@ -249,7 +268,7 @@
                 <input
                     type="text"
                     id="tableSearch"
-                    placeholder="Search product name or SKU..."
+                    placeholder="Search product or material..."
                     class="w-full pl-9 pr-4 py-2 rounded-xl bg-slate-900 border border-slate-800 text-white placeholder-slate-500 text-xs focus:border-cyan-500 focus:ring-1 focus:ring-cyan-500 transition"
                 >
                 <svg class="w-4 h-4 text-slate-500 absolute left-3 top-2.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -275,21 +294,20 @@
                         <!-- 1. Name of the product -->
                         <td class="whitespace-nowrap py-4 pl-6 pr-3">
                             <div class="font-bold text-white text-sm product-name">{{ item.name }}</div>
-                            <span class="text-[11px] font-mono-code font-bold text-cyan-400 block product-sku">{{ item.sku }}</span>
+                            <div class="mt-1">{% if item.type == 'Raw Material' %}<span class="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-semibold bg-blue-950 text-blue-300 border border-blue-800 product-type">Raw Material</span>{% else %}<span class="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-semibold bg-emerald-950 text-emerald-300 border border-emerald-800 product-type">Finished Good</span>{% endif %}</div>
                         </td>
 
                         <!-- 2. Quantity -->
                         <td class="whitespace-nowrap px-3 py-4 font-mono-code">
                             <span class="text-base font-extrabold {% if item.current_stock == 0 %}text-rose-400{% elif item.current_stock < 10 %}text-amber-400{% else %}text-emerald-400{% endif %}">
-                                {{ item.current_stock|floatformat:0 }}
+                                {{ item.stock_display }}
                             </span>
-                            <span class="text-xs text-slate-400 ml-1">{{ item.unit_of_measure }}</span>
+                            <span class="text-xs text-slate-400 ml-1">{{ item.unit_label }}</span>
                         </td>
 
                         <!-- 3. Action -->
                         <td class="whitespace-nowrap py-4 pl-3 pr-6 text-right">
                             <div class="flex items-center justify-end space-x-2">
-                                {% if item.current_stock > 0 %}
                                 <button
                                     type="button"
                                     onclick="fillQuickAdd('{{ item.name|escapejs }}')"
@@ -301,7 +319,7 @@
                                 </button>
                                 <button
                                     type="button"
-                                    onclick="openEditProductModal('{{ item.id }}', '{{ item.name|escapejs }}', '{{ item.current_stock|floatformat:0 }}')"
+                                    onclick="openEditProductModal('{{ item.id }}', '{{ item.name|escapejs }}', '{{ item.stock_display }}', '{{ item.unit_label|escapejs }}')"
                                     class="inline-flex items-center space-x-1 px-2.5 py-1.5 rounded-lg bg-slate-900 hover:bg-amber-950 text-slate-300 hover:text-amber-300 border border-slate-800 hover:border-amber-700 text-xs font-medium transition"
                                     title="Modify product details if entered incorrectly"
                                 >
@@ -310,25 +328,13 @@
                                 </button>
                                 <button
                                     type="button"
-                                    onclick="openRemoveStockModal('{{ item.id }}', '{{ item.name|escapejs }}', '{{ item.current_stock|floatformat:0 }}', '{{ item.unit_of_measure|escapejs }}')"
+                                    onclick="openRemoveStockModal('{{ item.id }}', '{{ item.name|escapejs }}', '{{ item.stock_display }}', '{{ item.unit_label|escapejs }}')"
                                     class="inline-flex items-center space-x-1 px-2.5 py-1.5 rounded-lg bg-slate-900 hover:bg-rose-950 text-slate-300 hover:text-rose-300 border border-slate-800 hover:border-rose-700 text-xs font-medium transition"
                                     title="Remove stock from this specific core box"
                                 >
                                     <svg class="w-3.5 h-3.5 text-rose-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 12H4"/></svg>
                                     <span>Remove</span>
                                 </button>
-                                {% else %}
-                                <!-- Stock is zero: action to remove that stock from inventory completely -->
-                                <button
-                                    type="button"
-                                    onclick="openDeleteProductModal('{{ item.id }}', '{{ item.name|escapejs }}', '{{ item.sku|escapejs }}')"
-                                    class="inline-flex items-center space-x-1.5 px-3 py-1.5 rounded-lg bg-rose-950/80 hover:bg-rose-900 text-rose-300 hover:text-white border border-rose-800 hover:border-rose-700 text-xs font-bold transition shadow-sm hover:shadow-rose-950/50"
-                                    title="Stock is zero: Remove this stock from inventory completely"
-                                >
-                                    <svg class="w-3.5 h-3.5 text-rose-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg>
-                                    <span>Remove from Inventory</span>
-                                </button>
-                                {% endif %}
                             </div>
                         </td>
                     </tr>
@@ -355,22 +361,21 @@
                             <span class="inline-block w-2.5 h-2.5 rounded-full flex-shrink-0 {% if item.current_stock == 0 %}bg-rose-400{% elif item.current_stock < 10 %}bg-amber-400{% else %}bg-emerald-400{% endif %}"></span>
                             <h3 class="text-base font-bold text-white product-name truncate">{{ item.name }}</h3>
                         </div>
-                        <span class="text-[11px] font-mono-code font-bold text-cyan-400 block product-sku mt-1">{{ item.sku }}</span>
+                        <div class="mt-1">{% if item.type == 'Raw Material' %}<span class="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-semibold bg-blue-950 text-blue-300 border border-blue-800 product-type">Raw Material</span>{% else %}<span class="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-semibold bg-emerald-950 text-emerald-300 border border-emerald-800 product-type">Finished Good</span>{% endif %}</div>
                     </div>
                     <div class="text-right flex-shrink-0">
                         <span class="text-[10px] uppercase tracking-wider text-slate-400 block font-semibold">Stock</span>
                         <div class="flex items-baseline justify-end space-x-1">
                             <span class="text-lg font-extrabold font-mono-code {% if item.current_stock == 0 %}text-rose-400{% elif item.current_stock < 10 %}text-amber-400{% else %}text-emerald-400{% endif %}">
-                                {{ item.current_stock|floatformat:0 }}
+                                {{ item.stock_display }}
                             </span>
-                            <span class="text-[11px] text-slate-400">{{ item.unit_of_measure }}</span>
+                            <span class="text-[11px] text-slate-400">{{ item.unit_label }}</span>
                         </div>
                     </div>
                 </div>
 
                 <!-- 44px minimum touch target action buttons -->
                 <div class="pt-1">
-                    {% if item.current_stock > 0 %}
                     <div class="grid grid-cols-3 gap-2">
                         <button
                             type="button"
@@ -383,7 +388,7 @@
                         </button>
                         <button
                             type="button"
-                            onclick="openEditProductModal('{{ item.id }}', '{{ item.name|escapejs }}', '{{ item.current_stock|floatformat:0 }}')"
+                            onclick="openEditProductModal('{{ item.id }}', '{{ item.name|escapejs }}', '{{ item.stock_display }}', '{{ item.unit_label|escapejs }}')"
                             class="inline-flex items-center justify-center space-x-1 px-2.5 py-2.5 min-h-[44px] rounded-xl bg-slate-900 hover:bg-amber-950 text-amber-300 border border-slate-800 hover:border-amber-700 text-xs font-semibold transition active:bg-amber-900"
                             title="Edit"
                         >
@@ -392,7 +397,7 @@
                         </button>
                         <button
                             type="button"
-                            onclick="openRemoveStockModal('{{ item.id }}', '{{ item.name|escapejs }}', '{{ item.current_stock|floatformat:0 }}', '{{ item.unit_of_measure|escapejs }}')"
+                            onclick="openRemoveStockModal('{{ item.id }}', '{{ item.name|escapejs }}', '{{ item.stock_display }}', '{{ item.unit_label|escapejs }}')"
                             class="inline-flex items-center justify-center space-x-1 px-2.5 py-2.5 min-h-[44px] rounded-xl bg-slate-900 hover:bg-rose-950 text-rose-300 border border-slate-800 hover:border-rose-700 text-xs font-semibold transition active:bg-rose-900"
                             title="Remove"
                         >
@@ -400,25 +405,83 @@
                             <span>Remove</span>
                         </button>
                     </div>
-                    {% else %}
-                    <button
-                        type="button"
-                        onclick="openDeleteProductModal('{{ item.id }}', '{{ item.name|escapejs }}', '{{ item.sku|escapejs }}')"
-                        class="w-full inline-flex items-center justify-center space-x-2 px-3 py-2.5 min-h-[44px] rounded-xl bg-rose-950/80 hover:bg-rose-900 text-rose-300 hover:text-white border border-rose-800 text-xs font-bold transition shadow-sm active:bg-rose-800"
-                    >
-                        <svg class="w-4 h-4 text-rose-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg>
-                        <span>Remove from Inventory</span>
-                    </button>
-                    {% endif %}
                 </div>
             </div>
             {% empty %}
             <div class="py-12 text-center text-slate-400 p-4">
-                <p class="text-sm font-semibold text-slate-300">No Core Boxes in Inventory</p>
+                <p class="text-sm font-semibold text-slate-300">No Products in Stock</p>
                 <p class="text-xs text-slate-500 mt-1">Add your first core box above.</p>
             </div>
             {% endfor %}
         </div>
+    </div>
+</div>
+
+<!-- Modal: Create New Product -->
+<div id="newProductModal" class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 hidden" role="dialog" aria-modal="true" aria-labelledby="newProductTitle">
+    <div class="w-full max-w-lg max-h-[90vh] overflow-y-auto rounded-2xl bg-slate-950 border border-slate-800 shadow-2xl">
+        <div class="px-6 py-4 border-b border-slate-800 flex items-center justify-between">
+            <div class="flex items-center space-x-3">
+                <div class="w-8 h-8 rounded-lg bg-emerald-500/20 text-emerald-400 flex items-center justify-center">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>
+                </div>
+                <div>
+                    <h3 id="newProductTitle" class="text-base font-bold text-white tracking-tight">Create New Product</h3>
+                    <p class="text-[11px] text-slate-400">Finished goods in pieces, raw material in tonnes.</p>
+                </div>
+            </div>
+            <button type="button" onclick="closeNewProductModal()" class="text-slate-400 hover:text-white" aria-label="Close">
+                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+            </button>
+        </div>
+
+        <form method="post" action="{% url 'add-inventory' %}" id="newProductForm" class="p-6 space-y-4">
+            {% csrf_token %}
+            <input type="hidden" name="action" value="add_product">
+
+            <!-- Type: Finished Good (pieces) or Raw Material (tonnes) -->
+            <fieldset class="space-y-1.5">
+                <legend class="block text-xs font-bold uppercase tracking-wider text-emerald-400 mb-1.5">Type <span class="text-rose-400">*</span></legend>
+                <div class="grid grid-cols-2 gap-2">
+                    <label class="np-type-option flex flex-col items-center justify-center p-3 rounded-xl border cursor-pointer text-center border-emerald-500 bg-emerald-950/40">
+                        <input type="radio" name="type" value="Finished Good" class="sr-only" checked>
+                        <span class="text-sm font-bold text-white">Finished Good</span>
+                        <span class="text-[11px] text-slate-400">Counted in pieces</span>
+                    </label>
+                    <label class="np-type-option flex flex-col items-center justify-center p-3 rounded-xl border cursor-pointer text-center border-slate-700 bg-slate-900">
+                        <input type="radio" name="type" value="Raw Material" class="sr-only">
+                        <span class="text-sm font-bold text-white">Raw Material</span>
+                        <span class="text-[11px] text-slate-400">Counted in tonnes</span>
+                    </label>
+                </div>
+            </fieldset>
+
+            <div class="space-y-1.5">
+                <label for="npName" id="npNameLabel" class="block text-xs font-bold uppercase tracking-wider text-emerald-400">Name of the Product <span class="text-rose-400">*</span></label>
+                <input type="text" name="name" id="npName" required maxlength="255" autocomplete="off"
+                       placeholder="e.g. PQ with Lid"
+                       class="w-full px-4 py-2.5 rounded-xl bg-slate-900 border border-slate-700 text-white text-sm focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20">
+            </div>
+
+            <div class="space-y-1.5">
+                <label for="npQuantity" id="npQuantityLabel" class="block text-xs font-bold uppercase tracking-wider text-emerald-400">Quantity (pieces) <span class="text-rose-400">*</span></label>
+                <div class="relative">
+                    <input type="number" name="quantity" id="npQuantity" required min="0" step="1" inputmode="numeric" placeholder="e.g. 50"
+                           class="w-full px-4 py-2.5 pr-20 rounded-xl bg-slate-900 border border-slate-700 text-white text-sm font-mono-code focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20">
+                    <span id="npUnitBadge" class="absolute right-3.5 top-2.5 text-xs text-slate-400 font-mono-code font-bold pointer-events-none">pcs</span>
+                </div>
+            </div>
+
+            <div class="flex items-center justify-end space-x-3 pt-2 border-t border-slate-800">
+                <button type="button" onclick="closeNewProductModal()"
+                        class="px-4 py-2.5 rounded-xl bg-slate-900 hover:bg-slate-800 border border-slate-700 text-slate-300 text-sm font-semibold">Cancel</button>
+                <button type="submit"
+                        class="inline-flex items-center space-x-2 px-6 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-sm font-bold shadow focus:outline-none focus:ring-2 focus:ring-emerald-400">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>
+                    <span>Create Product</span>
+                </button>
+            </div>
+        </form>
     </div>
 </div>
 
@@ -467,8 +530,8 @@
                         type="number"
                         name="quantity"
                         id="modalQuantity"
-                        min="1"
-                        step="1"
+                        min="0.001"
+                        step="any"
                         required
                         placeholder="e.g. 10"
                         class="w-full px-4 py-2.5 rounded-xl bg-slate-900 border border-slate-700 text-white font-mono-code text-sm focus:border-rose-500 focus:ring-2 focus:ring-rose-500/20 transition"
@@ -495,61 +558,6 @@
                     <span>Confirm Remove Stock</span>
                 </button>
             </div>
-        </form>
-    </div>
-</div>
-
-<!-- Modal: Remove Stock from Inventory Completely (when stock is zero) -->
-<div id="deleteProductModal" class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 hidden transition-opacity">
-    <div class="relative w-full max-w-md rounded-2xl bg-slate-950 border border-rose-900/60 shadow-2xl overflow-hidden p-6 space-y-5">
-        <div class="flex items-center justify-between border-b border-slate-800/80 pb-3.5">
-            <div class="flex items-center space-x-3">
-                <div class="w-9 h-9 rounded-xl bg-rose-950 text-rose-400 flex items-center justify-center border border-rose-800">
-                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg>
-                </div>
-                <div>
-                    <h3 class="text-base font-bold text-white tracking-tight">Remove Stock from Inventory</h3>
-                    <p class="text-xs text-rose-400 font-medium">Stock is zero (0) &bull; Remove completely from inventory</p>
-                </div>
-            </div>
-            <button type="button" onclick="closeDeleteProductModal()" class="text-slate-400 hover:text-white transition">
-                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
-            </button>
-        </div>
-
-        <p class="text-xs text-slate-300">
-            The stock for this product is zero (0). Are you sure you want to completely remove this stock from the inventory catalog?
-        </p>
-
-        <div class="p-3.5 rounded-xl bg-slate-900 border border-slate-800 space-y-1.5 text-xs">
-            <div class="flex justify-between">
-                <span class="text-slate-400">Product Name:</span>
-                <span id="deleteModalProductName" class="font-bold text-white">Product Name</span>
-            </div>
-            <div class="flex justify-between">
-                <span class="text-slate-400">Current Stock:</span>
-                <span class="font-mono-code text-rose-400 font-bold">0 units (Zero Stock)</span>
-            </div>
-        </div>
-
-        <form method="post" action="{% url 'add-inventory' %}" class="flex items-center justify-end space-x-3 pt-2 border-t border-slate-800">
-            {% csrf_token %}
-            <input type="hidden" name="action" value="delete_product">
-            <input type="hidden" name="item_id" id="deleteModalItemId">
-            <button
-                type="button"
-                onclick="closeDeleteProductModal()"
-                class="px-4 py-2 rounded-xl bg-slate-900 hover:bg-slate-800 text-slate-300 text-xs font-semibold border border-slate-800 transition"
-            >
-                Cancel
-            </button>
-            <button
-                type="submit"
-                class="inline-flex items-center space-x-2 px-5 py-2 rounded-xl bg-rose-600 hover:bg-rose-500 text-white text-xs font-bold shadow-lg shadow-rose-950/60 transition"
-            >
-                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg>
-                <span>Yes, Remove from Inventory Completely</span>
-            </button>
         </form>
     </div>
 </div>
@@ -593,15 +601,24 @@
                         class="w-full px-4 py-2.5 rounded-xl bg-slate-900 border border-slate-700 text-white text-sm focus:border-amber-500 focus:ring-2 focus:ring-amber-500/20 transition font-medium appearance-none pr-10 cursor-pointer"
                     >
                         <option value="" disabled selected>-- Select Product Name --</option>
-                        <option value="BQ without Lid">BQ without Lid</option>
-                        <option value="NQ with Lid">NQ with Lid</option>
-                        <option value="HQ with Lid">HQ with Lid</option>
-                        <option value="Trunk (Peti)">Trunk (Peti)</option>
-                        {% for item in items %}
-                        {% if item.name != "BQ without Lid" and item.name != "NQ with Lid" and item.name != "HQ with Lid" and item.name != "Trunk (Peti)" %}
-                        <option value="{{ item.name }}">{{ item.name }} [{{ item.sku }}]</option>
-                        {% endif %}
-                        {% endfor %}
+                        <optgroup label="Finished Goods (pieces)">
+                            <option value="BQ without Lid" data-unit="pcs">BQ without Lid</option>
+                            <option value="NQ with Lid" data-unit="pcs">NQ with Lid</option>
+                            <option value="HQ with Lid" data-unit="pcs">HQ with Lid</option>
+                            <option value="Trunk (Peti)" data-unit="pcs">Trunk (Peti)</option>
+                            {% for item in finished_items %}
+                            {% if item.name != "BQ without Lid" and item.name != "NQ with Lid" and item.name != "HQ with Lid" and item.name != "Trunk (Peti)" %}
+                            <option value="{{ item.name }}" data-unit="pcs">{{ item.name }}</option>
+                            {% endif %}
+                            {% endfor %}
+                            </optgroup>
+                            {% if raw_items %}
+                            <optgroup label="Raw Material (tonnes)">
+                            {% for item in raw_items %}
+                            <option value="{{ item.name }}" data-unit="tonnes">{{ item.name }}</option>
+                            {% endfor %}
+                            </optgroup>
+                            {% endif %}
                     </select>
                     <div class="pointer-events-none absolute inset-y-0 right-0 flex items-center px-3.5 text-slate-400">
                         <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/></svg>
@@ -622,14 +639,14 @@
                         name="quantity"
                         id="editModalQuantity"
                         min="0"
-                        step="1"
+                        step="any"
                         required
                         placeholder="e.g. 50"
                         class="w-full px-4 py-2.5 rounded-xl bg-slate-900 border border-slate-700 text-white font-mono-code text-sm focus:border-amber-500 focus:ring-2 focus:ring-amber-500/20 transition"
                     >
-                    <span class="absolute right-3.5 top-2.5 text-xs text-slate-400 font-mono-code font-bold pointer-events-none">units</span>
+                    <span id="editModalUnitBadge" class="absolute right-3.5 top-2.5 text-xs text-slate-400 font-mono-code font-bold pointer-events-none">pcs</span>
                 </div>
-                <p class="text-[11px] text-slate-400">Set the corrected physical stock count on hand.</p>
+                <p class="text-[11px] text-slate-400">Set the corrected physical stock on hand (pieces or tonnes).</p>
             </div>
 
             <!-- Modal Actions -->
@@ -676,11 +693,12 @@
         const valName = escapeHtml(productNameInput.value.trim());
         const qty = parseFloat(quantityInput.value) || 0;
 
-        calcQuantity.textContent = qty > 0 ? `${qty.toFixed(0)} units` : '0 units';
+        const unit = currentUnit();
+        calcQuantity.textContent = `${qty > 0 ? qty : 0} ${unit}`;
 
         if (currentMode === 'add') {
             if (valName && qty > 0) {
-                previewStatusText.innerHTML = `<span class="text-emerald-400 font-medium">Ready:</span> ${qty} units of "${valName}".`;
+                previewStatusText.innerHTML = `<span class="text-emerald-400 font-medium">Ready:</span> ${qty} ${unit} of "${valName}".`;
             } else if (valName) {
                 previewStatusText.innerHTML = `Configuring stock inward for <span class="text-white font-medium">"${valName}"</span>.`;
             } else {
@@ -688,7 +706,7 @@
             }
         } else {
             if (valName && qty > 0) {
-                previewStatusText.innerHTML = `<span class="text-rose-400 font-medium">Removal Ready:</span> Deducting ${qty} units from "${valName}".`;
+                previewStatusText.innerHTML = `<span class="text-rose-400 font-medium">Removal Ready:</span> Deducting ${qty} ${unit} from "${valName}".`;
             } else if (valName) {
                 previewStatusText.innerHTML = `Preparing stock removal for <span class="text-white font-medium">"${valName}"</span>.`;
             } else {
@@ -743,6 +761,18 @@
         updateCalculations();
     }
 
+    function currentUnit() {
+        const opt = productNameInput.options[productNameInput.selectedIndex];
+        return (opt && opt.dataset.unit) || 'pcs';
+    }
+    function applySelectedUnit() {
+        const unit = currentUnit();
+        document.getElementById('qtyUnitBadge').textContent = unit;
+        quantityInput.step = unit === 'tonnes' ? '0.001' : '1';
+        quantityInput.min = unit === 'tonnes' ? '0.001' : '1';
+    }
+    productNameInput.addEventListener('change', applySelectedUnit);
+
     productNameInput.addEventListener('input', updateCalculations);
     productNameInput.addEventListener('change', updateCalculations);
     quantityInput.addEventListener('input', updateCalculations);
@@ -755,6 +785,7 @@
             productNameInput.add(opt);
         }
         productNameInput.value = name;
+        applySelectedUnit();
         quantityInput.focus();
         updateCalculations();
 
@@ -784,6 +815,8 @@
         modalUomBadge.textContent = uom || 'units';
         modalQuantity.value = '';
         modalQuantity.max = stock;
+        modalQuantity.step = uom === 'tonnes' ? '0.001' : '1';
+        modalQuantity.min = uom === 'tonnes' ? '0.001' : '1';
         modalMaxHelp.textContent = `Available on-hand: ${stock} ${uom}. Maximum deduction: ${stock}.`;
 
         removeModal.classList.remove('hidden');
@@ -794,28 +827,15 @@
         removeModal.classList.add('hidden');
     }
 
-    // Modal: Open & Close Delete Product Dialog (when stock is zero)
-    const deleteModal = document.getElementById('deleteProductModal');
-    const deleteModalItemId = document.getElementById('deleteModalItemId');
-    const deleteModalProductName = document.getElementById('deleteModalProductName');
-
-    function openDeleteProductModal(id, name, sku) {
-        deleteModalItemId.value = id;
-        deleteModalProductName.textContent = name;
-        deleteModal.classList.remove('hidden');
-    }
-
-    function closeDeleteProductModal() {
-        deleteModal.classList.add('hidden');
-    }
-
     // Modal: Open & Close Edit Product Dialog
     const editModal = document.getElementById('editProductModal');
     const editModalItemId = document.getElementById('editModalItemId');
     const editModalName = document.getElementById('editModalName');
     const editModalQuantity = document.getElementById('editModalQuantity');
 
-    function openEditProductModal(id, name, stock) {
+    function openEditProductModal(id, name, stock, unit) {
+        document.getElementById('editModalUnitBadge').textContent = unit || 'pcs';
+        editModalQuantity.step = unit === 'tonnes' ? '0.001' : '1';
         editModalItemId.value = id;
         if (!Array.from(editModalName.options).some(o => o.value === name)) {
             const opt = new Option(name, name, true, true);
@@ -831,19 +851,60 @@
         editModal.classList.add('hidden');
     }
 
+    // Modal: Create New Product
+    const newProductModal = document.getElementById('newProductModal');
+
+    // Switch the form between Finished Good (pieces) and Raw Material (tonnes)
+    const npTypeOptions = document.querySelectorAll('.np-type-option');
+    function applyNewProductType() {
+        const isRaw = document.querySelector('input[name="type"][value="Raw Material"]').checked;
+        npTypeOptions.forEach(opt => {
+            const on = opt.querySelector('input').checked;
+            opt.classList.toggle('border-emerald-500', on);
+            opt.classList.toggle('bg-emerald-950/40', on);
+            opt.classList.toggle('border-slate-700', !on);
+            opt.classList.toggle('bg-slate-900', !on);
+        });
+        const qty = document.getElementById('npQuantity');
+        document.getElementById('npNameLabel').innerHTML = (isRaw ? 'Name of the Material' : 'Name of the Product') + ' <span class="text-rose-400">*</span>';
+        document.getElementById('npQuantityLabel').innerHTML = (isRaw ? 'Quantity (tonnes)' : 'Quantity (pieces)') + ' <span class="text-rose-400">*</span>';
+        document.getElementById('npUnitBadge').textContent = isRaw ? 'tonnes' : 'pcs';
+        document.getElementById('npName').placeholder = isRaw ? 'e.g. Silica Sand' : 'e.g. PQ with Lid';
+        qty.step = isRaw ? '0.001' : '1';
+        qty.inputMode = isRaw ? 'decimal' : 'numeric';
+        qty.placeholder = isRaw ? 'e.g. 2.5' : 'e.g. 50';
+    }
+    npTypeOptions.forEach(opt => opt.querySelector('input').addEventListener('change', applyNewProductType));
+
+    function openNewProductModal() {
+        applyNewProductType();
+        newProductModal.classList.remove('hidden');
+        setTimeout(() => document.getElementById('npName').focus(), 50);
+    }
+
+    function closeNewProductModal() {
+        newProductModal.classList.add('hidden');
+    }
+
+    newProductModal.addEventListener('click', function (e) {
+        if (e.target === newProductModal) closeNewProductModal();
+    });
+
+    // Links like /inventory/?new_product=1 open the form straight away
+    if (new URLSearchParams(window.location.search).has('new_product')) {
+        openNewProductModal();
+    }
+
     // Close modal on Escape or Outside click
     window.addEventListener('keydown', function (e) {
         if (e.key === 'Escape') {
+            if (!newProductModal.classList.contains('hidden')) closeNewProductModal();
             if (!removeModal.classList.contains('hidden')) closeRemoveStockModal();
-            if (!deleteModal.classList.contains('hidden')) closeDeleteProductModal();
             if (!editModal.classList.contains('hidden')) closeEditProductModal();
         }
     });
     removeModal.addEventListener('click', function (e) {
         if (e.target === removeModal) closeRemoveStockModal();
-    });
-    deleteModal.addEventListener('click', function (e) {
-        if (e.target === deleteModal) closeDeleteProductModal();
     });
     editModal.addEventListener('click', function (e) {
         if (e.target === editModal) closeEditProductModal();
@@ -858,8 +919,8 @@
             const query = this.value.toLowerCase().trim();
             tableRows.forEach(row => {
                 const nameText = row.querySelector('.product-name')?.textContent.toLowerCase() || '';
-                const skuText = row.querySelector('.product-sku')?.textContent.toLowerCase() || '';
-                if (nameText.includes(query) || skuText.includes(query)) {
+                const typeText = row.querySelector('.product-type')?.textContent.toLowerCase() || '';
+                if (nameText.includes(query) || typeText.includes(query)) {
                     row.style.display = '';
                 } else {
                     row.style.display = 'none';
@@ -872,7 +933,7 @@
     const resetBtn = document.getElementById('resetBtn');
     if (resetBtn) {
         resetBtn.addEventListener('click', function () {
-            setTimeout(updateCalculations, 50);
+            setTimeout(() => { applySelectedUnit(); updateCalculations(); }, 50);
         });
     }
 </script>

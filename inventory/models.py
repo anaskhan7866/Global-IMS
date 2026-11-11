@@ -18,7 +18,37 @@ class UnitOfMeasure(models.TextChoices):
     METER = 'm', _('Meter (m)')
     PIECE = 'pcs', _('Pieces (pcs)')
     BOX = 'box', _('Box (box)')
+    TONNE = 't', _('Tonnes (t)')
     ROLL = 'roll', _('Roll (roll)')
+
+
+# Each item type is measured in exactly one unit.
+TYPE_UNITS = {
+    ItemType.FINISHED_GOOD: UnitOfMeasure.PIECE,
+    ItemType.RAW_MATERIAL: UnitOfMeasure.TONNE,
+}
+UNIT_LABELS = {
+    UnitOfMeasure.PIECE: 'pcs',
+    UnitOfMeasure.TONNE: 'tonnes',
+}
+WHOLE_NUMBER_UNITS = {UnitOfMeasure.PIECE, UnitOfMeasure.BOX}
+
+
+def default_unit_for(item_type) -> str:
+    return TYPE_UNITS.get(item_type, UnitOfMeasure.PIECE)
+
+
+def format_quantity(value, unit=None) -> str:
+    """Format a stock quantity: whole numbers for pieces, up to 3 decimals for tonnes."""
+    if value is None:
+        return '0'
+    value = Decimal(value)
+    if unit in WHOLE_NUMBER_UNITS:
+        value = value.quantize(Decimal('1'))
+    else:
+        value = value.quantize(Decimal('0.001'))
+    text = format(value.normalize(), 'f')
+    return '0' if text in ('-0', '') else text
 
 
 class Item(models.Model):
@@ -32,12 +62,6 @@ class Item(models.Model):
         default=ItemType.RAW_MATERIAL,
         db_index=True,
         help_text=_("Categorizes whether this item is procured as raw stock or produced in-house.")
-    )
-    sku = models.CharField(
-        max_length=64,
-        unique=True,
-        db_index=True,
-        help_text=_("Stock Keeping Unit - unique alphanumeric item identifier.")
     )
     name = models.CharField(
         max_length=255,
@@ -99,7 +123,7 @@ class Item(models.Model):
             )
         ]
         indexes = [
-            models.Index(fields=['sku', 'type']),
+            models.Index(fields=['type', 'name']),
             models.Index(fields=['created_at']),
         ]
 
@@ -112,13 +136,31 @@ class Item(models.Model):
             return (self.current_stock * self.weight).quantize(Decimal('0.001'))
         return Decimal('0.000')
 
-    def clean(self):
-        super().clean()
-        if self.sku:
-            self.sku = self.sku.strip().upper()
+    @property
+    def unit_label(self) -> str:
+        """Short unit shown next to quantities: 'pcs' for finished goods, 'tonnes' for raw material."""
+        return UNIT_LABELS.get(self.unit_of_measure, self.unit_of_measure)
+
+    @property
+    def is_whole_unit(self) -> bool:
+        """Pieces are counted in whole numbers; tonnes (and other units) may have decimals."""
+        return self.unit_of_measure in WHOLE_NUMBER_UNITS
+
+    @property
+    def stock_display(self) -> str:
+        """Current stock without trailing zeros: '120' pcs, '2.5' tonnes."""
+        return format_quantity(self.current_stock, self.unit_of_measure)
+
+    def save(self, *args, **kwargs):
+        # Each product type has one fixed unit: finished goods in pieces, raw material in tonnes.
+        self.unit_of_measure = default_unit_for(self.type)
+        update_fields = kwargs.get('update_fields')
+        if update_fields is not None and 'type' in update_fields and 'unit_of_measure' not in update_fields:
+            kwargs['update_fields'] = list(update_fields) + ['unit_of_measure']
+        super().save(*args, **kwargs)
 
     def __str__(self) -> str:
-        return f"[{self.sku}] {self.name} ({self.get_type_display()})"
+        return f"{self.name} ({self.get_type_display()})"
 
 
 class BillOfMaterials(models.Model):
@@ -312,7 +354,7 @@ class ProductionLog(models.Model):
         ]
 
     def __str__(self) -> str:
-        return f"[{self.production_date}] {self.employee.full_name}: {self.quantity} x {self.item.sku}"
+        return f"[{self.production_date}] {self.employee.full_name}: {self.quantity} x {self.item.name}"
 
 
 class Company(models.Model):

@@ -79,7 +79,7 @@ def process_manufacturing_order(
 
     if finished_good.type != ItemType.FINISHED_GOOD:
         raise ValidationError(
-            f"Item '{finished_good.name}' (SKU: {finished_good.sku}) is not classified as a Finished Good."
+            f"Item '{finished_good.name}' is not classified as a Finished Good."
         )
 
     # Resolve active BOM
@@ -90,7 +90,7 @@ def process_manufacturing_order(
 
     if not bom:
         raise BOMNotFoundError(
-            f"No active Bill of Materials found for finished good '{finished_good.name}' (SKU: {finished_good.sku})."
+            f"No active Bill of Materials found for finished good '{finished_good.name}'."
         )
 
     components = list(bom.components.select_related('raw_material').all())
@@ -119,9 +119,9 @@ def process_manufacturing_order(
         needed = required_quantities[comp.raw_material_id]
         if rm.current_stock < needed:
             raise InsufficientStockError(
-                f"Insufficient stock for raw material '{rm.name}' (SKU: {rm.sku}). "
+                f"Insufficient stock for raw material '{rm.name}'. "
                 f"Required: {needed:.4f} {rm.unit_of_measure}, Available: {rm.current_stock:.4f} {rm.unit_of_measure}",
-                item_sku=rm.sku,
+                item_name=rm.name,
                 required_qty=needed,
                 available_qty=rm.current_stock
             )
@@ -230,10 +230,10 @@ def process_sales_order(
 
     if locked_item.current_stock < quantity:
         raise InsufficientStockError(
-            f"Insufficient stock for '{locked_item.name}' (SKU: {locked_item.sku}). "
+            f"Insufficient stock for '{locked_item.name}'. "
             f"Requested: {quantity:.4f} {locked_item.unit_of_measure}, "
             f"Available: {locked_item.current_stock:.4f} {locked_item.unit_of_measure}",
-            item_sku=locked_item.sku,
+            item_name=locked_item.name,
             required_qty=quantity,
             available_qty=locked_item.current_stock
         )

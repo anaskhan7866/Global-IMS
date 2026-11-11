@@ -1,52 +1,55 @@
 from django.contrib import admin
+from django.contrib.auth.models import Group
 from django.db import models
+from django.urls import reverse
 from django.utils.html import format_html
 from django.utils.translation import gettext_lazy as _
-from .models import Item, BillOfMaterials, BOMComponent, Employee, ProductionLog, Company, DailyCoreBoxDispatch
+from .models import Item, Employee, ProductionLog, Company, DailyCoreBoxDispatch
+
+# Groups are not used (access is per user), so hide them from the admin.
+admin.site.unregister(Group)
 
 
-class BOMComponentInline(admin.TabularInline):
-    model = BOMComponent
-    extra = 1
-    fk_name = 'bom'
-    autocomplete_fields = ['raw_material']
-    fields = ('raw_material', 'quantity', 'scrap_percentage')
-    show_change_link = True
+class StockStatusFilter(admin.SimpleListFilter):
+    """Zero-stock products stay in the system (and in the dropdowns) but are hidden from the inventory list."""
+    title = _('stock')
+    parameter_name = 'stock'
+
+    def lookups(self, request, model_admin):
+        return (('in', _('In stock')), ('out', _('Out of stock (hidden from inventory list)')))
+
+    def queryset(self, request, queryset):
+        if self.value() == 'in':
+            return queryset.filter(current_stock__gt=0)
+        if self.value() == 'out':
+            return queryset.filter(current_stock__lte=0)
+        return queryset
 
 
 @admin.register(Item)
 class ItemAdmin(admin.ModelAdmin):
+    """Products: a name, a type and a quantity. Finished goods count pieces, raw material counts tonnes."""
     list_display = (
-        'sku',
         'name',
         'type_badge',
-        'unit_of_measure',
         'formatted_stock',
-        'formatted_weight',
-        'formatted_moving_cost',
         'is_active',
         'updated_at',
     )
     list_filter = (
         'type',
-        'unit_of_measure',
+        StockStatusFilter,
         'is_active',
-        'created_at',
     )
     search_fields = (
-        'sku',
         'name',
-        'description',
     )
     ordering = ('name',)
     readonly_fields = ('created_at', 'updated_at')
     fieldsets = (
-        (_('Item Identification'), {
-            'fields': ('sku', 'name', 'type', 'unit_of_measure', 'is_active', 'description')
-        }),
-        (_('Inventory & Financial Valuation'), {
-            'fields': ('current_stock', 'weight', 'moving_average_cost'),
-            'description': _('Current stock levels are modified via transaction ledgers.')
+        (None, {
+            'fields': ('name', 'type', 'current_stock', 'is_active'),
+            'description': _('Finished goods are counted in pieces, raw material in tonnes (set automatically from the type).'),
         }),
         (_('Audit Timestamps'), {
             'fields': ('created_at', 'updated_at'),
@@ -65,52 +68,7 @@ class ItemAdmin(admin.ModelAdmin):
 
     @admin.display(description=_('Current Stock'), ordering='current_stock')
     def formatted_stock(self, obj: Item) -> str:
-        return f"{obj.current_stock:,.2f} {obj.unit_of_measure}"
-
-    @admin.display(description=_('Weight (kg)'), ordering='weight')
-    def formatted_weight(self, obj: Item) -> str:
-        return f"{obj.weight:,.3f} kg"
-
-    @admin.display(description=_('Moving Avg Cost'), ordering='moving_average_cost')
-    def formatted_moving_cost(self, obj: Item) -> str:
-        return f"${obj.moving_average_cost:,.2f}"
-
-
-@admin.register(BillOfMaterials)
-class BillOfMaterialsAdmin(admin.ModelAdmin):
-    list_display = (
-        'finished_good',
-        'version',
-        'components_count',
-        'is_active',
-        'created_at',
-    )
-    list_filter = (
-        'is_active',
-        'created_at',
-    )
-    search_fields = (
-        'finished_good__sku',
-        'finished_good__name',
-        'version',
-        'description',
-    )
-    autocomplete_fields = ['finished_good']
-    inlines = [BOMComponentInline]
-    readonly_fields = ('created_at', 'updated_at')
-    fieldsets = (
-        (_('BOM Specifications'), {
-            'fields': ('finished_good', 'version', 'is_active', 'description')
-        }),
-        (_('Audit Timestamps'), {
-            'fields': ('created_at', 'updated_at'),
-            'classes': ('collapse',)
-        }),
-    )
-
-    @admin.display(description=_('Total Components'))
-    def components_count(self, obj: BillOfMaterials) -> int:
-        return obj.components.count()
+        return f"{obj.stock_display} {obj.unit_label}"
 
 
 @admin.register(Employee)
@@ -156,10 +114,10 @@ class ProductionLogAdmin(admin.ModelAdmin):
     search_fields = (
         'employee__first_name',
         'employee__last_name',
-        'item__sku',
         'item__name',
     )
     autocomplete_fields = ['employee', 'item']
+    list_select_related = ('employee', 'item')
     date_hierarchy = 'production_date'
     readonly_fields = ('production_date',)
 
@@ -181,10 +139,13 @@ class CompanyAdmin(admin.ModelAdmin):
     )
     readonly_fields = ('created_at', 'updated_at')
 
-    @admin.display(description=_('Total Core Boxes Dispatched'))
+    def get_queryset(self, request):
+        # One query for the whole list instead of one SUM query per company.
+        return super().get_queryset(request).annotate(_total_boxes=models.Sum('dispatches__quantity'))
+
+    @admin.display(description=_('Total Core Boxes Dispatched'), ordering='_total_boxes')
     def total_dispatched_boxes(self, obj: Company) -> int:
-        total = obj.dispatches.aggregate(models.Sum('quantity'))['quantity__sum']
-        return total or 0
+        return getattr(obj, '_total_boxes', None) or 0
 
 
 @admin.register(DailyCoreBoxDispatch)
@@ -212,6 +173,7 @@ class DailyCoreBoxDispatchAdmin(admin.ModelAdmin):
         'location_to',
     )
     autocomplete_fields = ['company', 'item']
+    list_select_related = ('company',)
     date_hierarchy = 'dispatch_date'
     readonly_fields = ('image_link', 'created_at', 'updated_at')
 
@@ -220,8 +182,6 @@ class DailyCoreBoxDispatchAdmin(admin.ModelAdmin):
 
     @admin.display(description='Image')
     def image_link(self, obj):
-        from django.urls import reverse
-        from django.utils.html import format_html
         if not obj.pk or not obj.has_attachment:
             return '-'
         url = reverse('daily-core-box-attachment', kwargs={'pk': obj.pk})

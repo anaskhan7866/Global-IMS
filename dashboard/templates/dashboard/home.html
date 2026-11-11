@@ -151,7 +151,7 @@
                 <p class="text-xs text-slate-400 mt-0.5">Raw materials and finished goods with available stock below the critical threshold (less than 10 units)</p>
             </div>
             <div>
-                <a href="/admin/inventory/item/add/" class="inline-flex items-center space-x-1 px-3 py-1.5 rounded-md bg-cyan-600 hover:bg-cyan-500 text-white text-xs font-semibold transition">
+                <a href="{% url 'vendor-order-list' %}" class="inline-flex items-center space-x-1 px-3 py-1.5 rounded-md bg-cyan-600 hover:bg-cyan-500 text-white text-xs font-semibold transition">
                     <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" />
                     </svg>
@@ -164,8 +164,7 @@
             <table class="min-w-full divide-y divide-slate-800 text-left text-sm">
                 <thead class="bg-slate-900/60 text-xs uppercase font-semibold text-slate-400">
                     <tr>
-                        <th scope="col" class="py-3.5 pl-6 pr-3">SKU</th>
-                        <th scope="col" class="px-3 py-3.5">Item Name</th>
+                        <th scope="col" class="py-3.5 pl-6 pr-3">Item Name</th>
                         <th scope="col" class="px-3 py-3.5">Classification</th>
                         <th scope="col" class="px-3 py-3.5">Unit of Measure</th>
                         <th scope="col" class="px-3 py-3.5">Unit Valuation</th>
@@ -176,10 +175,7 @@
                 <tbody class="divide-y divide-slate-800/60 bg-slate-950 text-slate-200">
                     {% for item in low_stock_alerts %}
                     <tr class="hover:bg-slate-900/40 transition">
-                        <td class="whitespace-nowrap py-4 pl-6 pr-3 font-mono-code text-xs font-bold text-cyan-400">
-                            {{ item.sku }}
-                        </td>
-                        <td class="whitespace-nowrap px-3 py-4 font-medium text-white">
+                        <td class="whitespace-nowrap py-4 pl-6 pr-3 font-medium text-white">
                             {{ item.name }}
                         </td>
                         <td class="whitespace-nowrap px-3 py-4 text-xs">
@@ -194,13 +190,13 @@
                             {% endif %}
                         </td>
                         <td class="whitespace-nowrap px-3 py-4 text-xs text-slate-400 font-mono-code">
-                            {{ item.unit_of_measure }}
+                            {{ item.unit_label }}
                         </td>
                         <td class="whitespace-nowrap px-3 py-4 font-mono-code text-xs text-slate-300">
                             ${{ item.moving_average_cost|floatformat:2 }}
                         </td>
                         <td class="whitespace-nowrap px-3 py-4 font-mono-code text-sm font-bold {% if item.current_stock < 5 %}text-rose-500 font-extrabold{% else %}text-amber-400{% endif %}">
-                            {{ item.current_stock|floatformat:2 }} {{ item.unit_of_measure }}
+                            {{ item.stock_display }} {{ item.unit_label }}
                         </td>
                         <td class="whitespace-nowrap py-4 pl-3 pr-6 text-right text-xs">
                             {% if item.current_stock == 0 %}
@@ -248,6 +244,15 @@
     document.addEventListener('DOMContentLoaded', function () {
         const ctx = document.getElementById('salesChart').getContext('2d');
 
+        // Chart colours that follow the light / dark theme
+        function chartColors() {
+            const light = document.documentElement.getAttribute('data-theme') === 'light';
+            return light
+                ? { grid: 'rgba(148, 163, 184, 0.35)', tick: '#475569', tipBg: '#ffffff', tipTitle: '#0f172a', tipBody: '#334155', tipBorder: '#cbd5e1' }
+                : { grid: 'rgba(51, 65, 85, 0.4)', tick: '#94a3b8', tipBg: '#020617', tipTitle: '#f8fafc', tipBody: '#e2e8f0', tipBorder: '#334155' };
+        }
+        const themeColors = chartColors();
+
         // Gradient backgrounds
         const revGradient = ctx.createLinearGradient(0, 0, 0, 320);
         revGradient.addColorStop(0, 'rgba(6, 182, 212, 0.4)');
@@ -268,7 +273,7 @@
         const cogsData = salesTrend.cogs;
         const grossMarginData = revenueData.map((rev, idx) => rev - cogsData[idx]);
 
-        new Chart(ctx, {
+        const salesChart = new Chart(ctx, {
             type: 'line',
             data: {
                 labels: labels,
@@ -324,10 +329,10 @@
                         display: false,
                     },
                     tooltip: {
-                        backgroundColor: '#020617',
-                        titleColor: '#f8fafc',
-                        bodyColor: '#e2e8f0',
-                        borderColor: '#334155',
+                        backgroundColor: themeColors.tipBg,
+                        titleColor: themeColors.tipTitle,
+                        bodyColor: themeColors.tipBody,
+                        borderColor: themeColors.tipBorder,
                         borderWidth: 1,
                         padding: 12,
                         boxPadding: 6,
@@ -349,11 +354,11 @@
                 scales: {
                     x: {
                         grid: {
-                            color: 'rgba(51, 65, 85, 0.4)',
+                            color: themeColors.grid,
                             drawBorder: false,
                         },
                         ticks: {
-                            color: '#94a3b8',
+                            color: themeColors.tick,
                             font: {
                                 family: 'system-ui',
                                 size: 11
@@ -362,11 +367,11 @@
                     },
                     y: {
                         grid: {
-                            color: 'rgba(51, 65, 85, 0.4)',
+                            color: themeColors.grid,
                             drawBorder: false,
                         },
                         ticks: {
-                            color: '#94a3b8',
+                            color: themeColors.tick,
                             font: {
                                 family: 'ui-monospace',
                                 size: 11
@@ -378,6 +383,21 @@
                     }
                 }
             }
+        });
+
+        // Re-colour the chart when the theme is switched
+        document.addEventListener('themechange', function () {
+            const c = chartColors();
+            const tip = salesChart.options.plugins.tooltip;
+            tip.backgroundColor = c.tipBg;
+            tip.titleColor = c.tipTitle;
+            tip.bodyColor = c.tipBody;
+            tip.borderColor = c.tipBorder;
+            ['x', 'y'].forEach(function (axis) {
+                salesChart.options.scales[axis].grid.color = c.grid;
+                salesChart.options.scales[axis].ticks.color = c.tick;
+            });
+            salesChart.update('none');
         });
     });
 </script>
